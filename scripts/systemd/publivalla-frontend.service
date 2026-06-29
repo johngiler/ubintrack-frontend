@@ -1,0 +1,18 @@
+[Unit]
+Description=publivalla saas frontend (Next.js standalone)
+After=network.target
+
+[Service]
+Type=simple
+User=git
+Group=git
+WorkingDirectory=/home/git/publivalla
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3010
+ExecStart=/usr/bin/node /home/git/publivalla/server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

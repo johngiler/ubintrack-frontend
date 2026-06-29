@@ -1,0 +1,268 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@source "../components/**/*.{js,jsx}";
+@source "../views/**/*.{js,jsx}";
+@source "./**/*.{js,jsx}";
+
+:root {
+  --background: #f4f6f9;
+  --foreground: #0f172a;
+  --foreground-muted: #64748b;
+  --header-bg: #f8f9fb;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #64748b;
+  --sidebar-text-active: #0284c7;
+  --sidebar-hover: #f8fafc;
+  --sidebar-active: transparent;
+  --surface: #ffffff;
+  --surface-hover: #f8fafc;
+  --border: rgba(15, 23, 42, 0.08);
+  --border-subtle: rgba(15, 23, 42, 0.06);
+  --accent: #0ea5e9;
+  --accent-hover: #0284c7;
+  --accent-muted: #e0f2fe;
+  --brand-primary: #0ea5e9;
+  --brand-secondary: #6366f1;
+  --brand-gradient: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  --brand-gradient-hover: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 88%, black) 0%,
+    color-mix(in srgb, var(--brand-secondary) 88%, black) 100%
+  );
+  --brand-surface: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 12%, white) 0%,
+    color-mix(in srgb, var(--brand-secondary) 10%, white) 100%
+  );
+  --sidebar-active: var(--brand-surface);
+  --card: #ffffff;
+  --muted: #64748b;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+  --header-height: 4rem;
+}
+
+.dark {
+  --background: #0b1220;
+  --foreground: #f1f5f9;
+  --foreground-muted: #94a3b8;
+  --header-bg: #111827;
+  --sidebar-bg: #0f172a;
+  --sidebar-text: #94a3b8;
+  --sidebar-text-active: #38bdf8;
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+  --sidebar-active: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-primary) 18%, transparent) 0%,
+    color-mix(in srgb, var(--brand-secondary) 14%, transparent) 100%
+  );
+  --brand-surface: var(--sidebar-active);
+  --surface: #1e293b;
+  --surface-hover: #334155;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --accent: #38bdf8;
+  --accent-hover: #0ea5e9;
+  --accent-muted: #0c4a6e;
+  --card: #1e293b;
+  --muted: #94a3b8;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.btn-brand {
+  background: var(--brand-gradient);
+  color: #fff;
+  transition: filter 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--brand-primary) 28%, transparent);
+}
+
+.btn-brand:hover:not(:disabled) {
+  background: var(--brand-gradient-hover);
+  filter: brightness(1.04);
+}
+
+.btn-brand:active:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.btn-brand:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+}
+
+.brand-icon-box {
+  background: var(--brand-surface);
+  color: var(--brand-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 14%, transparent);
+}
+
+.brand-nav-active {
+  font-weight: 500;
+  color: var(--brand-primary);
+  background: var(--brand-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 12%, transparent);
+}
+
+.brand-nav-active svg {
+  color: var(--brand-primary);
+}
+
+.nav-link-brand:hover:not(.brand-nav-active) {
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 6%, transparent);
+}
+
+.nav-link-brand:hover:not(.brand-nav-active) svg {
+  color: var(--brand-primary);
+}
+
+.brand-menu-active {
+  font-weight: 500;
+  color: var(--brand-primary) !important;
+  background: var(--brand-surface) !important;
+}
+
+.brand-tab-active {
+  border-radius: 0.5rem;
+  font-weight: 500;
+  color: var(--brand-primary);
+  background: var(--brand-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 12%, transparent);
+}
+
+.text-brand {
+  color: var(--brand-primary);
+}
+
+.text-brand-gradient {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
+@keyframes login-orb-float {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.85; }
+  33% { transform: translate(24px, -18px) scale(1.05); opacity: 1; }
+  66% { transform: translate(-16px, 12px) scale(0.98); opacity: 0.9; }
+}
+
+.login-orb {
+  animation: login-orb-float 18s ease-in-out infinite;
+}
+
+.login-orb-delay {
+  animation-delay: -6s;
+}
+
+.login-orb-delay-2 {
+  animation-delay: -12s;
+}
+
+/* WMS module animations (from rbcold) */
+.expanded-content {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+.product-item {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.product-item:hover {
+  border-left-color: var(--accent);
+  background-color: rgba(14, 165, 233, 0.04);
+}
+
+.bins-container {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* Fallback: utilidades slate/bg fijas en vistas → tokens del tema en oscuro */
+.dark .text-slate-900,
+.dark .text-slate-800 {
+  color: var(--foreground);
+}
+
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: color-mix(in srgb, var(--foreground) 92%, var(--foreground-muted));
+}
+
+.dark .text-slate-500 {
+  color: var(--foreground-muted);
+}
+
+.dark .text-slate-400 {
+  color: color-mix(in srgb, var(--foreground-muted) 85%, transparent);
+}
+
+.dark .bg-white {
+  background-color: var(--surface);
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-50\/80,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/40 {
+  background-color: color-mix(in srgb, var(--surface-hover) 50%, transparent);
+}
+
+.dark .border-slate-200,
+.dark .border-slate-100 {
+  border-color: var(--border-subtle);
+}
+
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover {
+  background-color: var(--surface-hover);
+}
