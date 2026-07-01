@@ -44,7 +44,10 @@ export function AuthProvider({ children }) {
       const fullUser = await getMyProfile().catch(() => data.user);
       setUser(fullUser || data.user);
       const u = fullUser || data.user;
-      const target = u?.user_type === "cliente" ? "/inventory/bins" : "/dashboards/sales";
+      const target =
+        u?.user_type === "administrador"
+          ? "/dashboards/sales"
+          : "/inventory/bins";
       router.replace(target);
       return data;
     },

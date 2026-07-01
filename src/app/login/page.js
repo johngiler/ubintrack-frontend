@@ -130,7 +130,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(user.user_type === "cliente" ? "/inventory/bins" : "/dashboards/sales");
+      router.replace(
+        user.user_type === "administrador" ? "/dashboards/sales" : "/inventory/bins",
+      );
     }
   }, [user, loading, router]);
 
