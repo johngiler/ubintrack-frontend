@@ -2,7 +2,6 @@ import { WMS_NAV_GROUPS } from "@/lib/wmsNavConfig";
 
 const EXTRA_ROUTE_TITLES = {
   "/login": "Iniciar sesión",
-  "/inventory/entries": "Bins",
   "/account/profile": "Mi cuenta",
 };
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useMemo } from "react";
 import useSWR from "swr";
 
-import { clientTenantSlug, workspaceSlugRequestHeaders } from "@/lib/tenant";
+import { clientTenantSlug, envTenantSlugFallback, workspaceSlugRequestHeaders } from "@/lib/tenant";
 
 const WorkspaceContext = createContext(undefined);
 
@@ -20,7 +20,7 @@ async function fetchWorkspace() {
 }
 
 export function WorkspaceProvider({ children }) {
-  const slug = typeof window !== "undefined" ? clientTenantSlug() : "rbcold";
+  const slug = typeof window !== "undefined" ? clientTenantSlug() : envTenantSlugFallback();
   const { data, error, isLoading, mutate } = useSWR(`workspace-${slug}`, fetchWorkspace, {
     revalidateOnFocus: false,
   });

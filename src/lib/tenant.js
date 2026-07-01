@@ -9,7 +9,7 @@ export const TENANT_RESERVED_SUBDOMAINS = new Set(["www", "api", "cdn"]);
 /**
  * Extrae slug de `{slug}.{base}` cuando hay un solo subdominio.
  * @param {string} host
- * @param {string} base apex normalizado (p. ej. publivalla.com)
+ * @param {string} base apex normalizado (p. ej. ubintrack.com)
  * @returns {string | null}
  */
 function slugFromHostAndBase(host, base) {
@@ -26,6 +26,8 @@ function envTenantSlugFallback() {
   const env = (process.env.NEXT_PUBLIC_WORKSPACE_SLUG || "").trim().toLowerCase();
   return env || "local";
 }
+
+export { envTenantSlugFallback };
 
 /**
  * Resuelve el slug del workspace a partir del hostname (sin puerto).

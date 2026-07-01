@@ -207,7 +207,7 @@ body {
   animation-delay: -12s;
 }
 
-/* WMS module animations (from rbcold) */
+/* Animaciones de módulos WMS */
 .expanded-content {
   animation: slide-up 0.3s ease-out forwards;
 }

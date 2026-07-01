@@ -6,11 +6,13 @@ import { Warehouse } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { canSeeNavItem, WMS_NAV_GROUPS } from "@/lib/wmsNavConfig";
+import { getWorkspaceLogoUrl } from "@/lib/workspaceMedia";
 import { useWorkspace } from "@/context/WorkspaceContext";
 
 export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
   const pathname = usePathname();
   const { workspace } = useWorkspace();
+  const logoUrl = getWorkspaceLogoUrl(workspace);
 
   const sidebarContent = (isMobile = false) => {
     const isCollapsed = !isMobile && collapsed;
@@ -28,10 +30,10 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
             isCollapsed ? "px-2 py-5" : "px-5",
           )}
         >
-          {workspace?.logo_url || workspace?.logo_mark_url ? (
+          {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={workspace.logo_url || workspace.logo_mark_url}
+              src={logoUrl}
               alt=""
               className={cn(
                 "object-contain",

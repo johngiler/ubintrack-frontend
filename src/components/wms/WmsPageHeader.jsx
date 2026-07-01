@@ -46,7 +46,7 @@ export function WmsPageHeader({ title, description, icon: Icon, breadcrumbs = []
   );
 }
 
-/** Compat rbcold Pageheader */
+/** Alias legacy de WmsPageHeader (prop `Heading` / `Pages`) */
 export default function Pageheader({ Heading, Pages = [] }) {
   return (
     <WmsPageHeader

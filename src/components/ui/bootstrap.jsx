@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Adaptador compatible con react-bootstrap para migrar módulos rbcold con mínimos cambios.
+ * Componentes estilo Bootstrap para formularios y layout en modales WMS.
  */
 import React from "react";
 
@@ -175,7 +175,7 @@ function FormText({ children, className, muted, ...props }) {
   );
 }
 
-/** Wrapper `<Form>` usado en modales migrados de rbcold */
+/** Wrapper `<Form>` para modales WMS */
 function Form({ children, className, onSubmit, ...props }) {
   return (
     <form className={cn(className)} onSubmit={onSubmit} noValidate {...props}>

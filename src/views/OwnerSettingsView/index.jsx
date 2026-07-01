@@ -420,7 +420,7 @@ export default function OwnerSettingsView() {
                           name="invoice_prefix"
                           value={form.invoice_prefix}
                           onChange={handleChange}
-                          placeholder="Ej. RBCOLD"
+                          placeholder="Ej. ACME"
                         />
                       </Form.Group>
                     </Col>

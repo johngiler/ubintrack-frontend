@@ -1,4 +1,4 @@
-/* Utilidades mínimas compatibles con clases bootstrap usadas en módulos rbcold migrados */
+/* Utilidades mínimas compatibles con clases bootstrap en vistas WMS */
 .d-flex { display: flex; }
 .d-inline { display: inline; }
 .d-block { display: block; }

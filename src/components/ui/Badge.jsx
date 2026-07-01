@@ -53,7 +53,7 @@ export function Badge({ children, variant = "default", bg, text, dot = false, cl
   );
 }
 
-/** Map rbcold bootstrap variants */
+/** Variante de badge según estado de orden/bin */
 export function statusBadgeVariant(status) {
   const map = {
     pendiente: "warning",
