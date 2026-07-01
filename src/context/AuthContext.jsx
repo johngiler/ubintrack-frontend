@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 
 import { login, logout as authLogout } from "@/services/authService";
-import { getWhoAmI } from "@/services/coreService";
+import { getMyProfile } from "@/services/coreService";
 
 const AuthContext = createContext(undefined);
 
@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
       return null;
     }
     try {
-      const data = await getWhoAmI();
+      const data = await getMyProfile();
       setUser(data);
       return data;
     } catch {
@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
     async (credentials) => {
       const data = await login(credentials);
       localStorage.setItem("token", data.token);
-      const fullUser = await getWhoAmI().catch(() => data.user);
+      const fullUser = await getMyProfile().catch(() => data.user);
       setUser(fullUser || data.user);
       const u = fullUser || data.user;
       const target = u?.user_type === "cliente" ? "/inventory/bins" : "/dashboards/sales";

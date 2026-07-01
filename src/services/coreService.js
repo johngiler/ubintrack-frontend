@@ -1,13 +1,13 @@
 import httpClient from "./httpClient";
 
-export async function getWhoAmI() {
-  const response = await httpClient.get("/api/whoami/");
-  return response.data;
-}
-
 export async function getMyProfile() {
   const response = await httpClient.get("/api/me/");
   return response.data;
+}
+
+/** @deprecated Usar getMyProfile */
+export async function getWhoAmI() {
+  return getMyProfile();
 }
 
 export async function updateMyProfile(data) {
