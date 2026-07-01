@@ -160,14 +160,6 @@ export async function getBinProducts(filters = {}, search = "") {
   return [];
 }
 
-export async function extractProductFromBins(data) {
-  const response = await httpClient.post(
-    "/api/bin-products/extract/",
-    data
-  );
-  return response.data;
-}
-
 export async function getBinProduct(id) {
   const response = await httpClient.get(`/api/bin-products/${id}/`);
   return response.data;
