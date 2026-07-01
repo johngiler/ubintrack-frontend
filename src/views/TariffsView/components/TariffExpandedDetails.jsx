@@ -47,7 +47,6 @@ const CONDITION_SECTIONS = [
 ];
 
 const ADDITIONAL_SERVICES = [
-  { key: "crossdocking", label: "Crossdocking" },
   { key: "restiba", label: "Restiba" },
   { key: "added_pallet", label: "Pallet adicional" },
   { key: "wrap", label: "Wrap/Strech" },

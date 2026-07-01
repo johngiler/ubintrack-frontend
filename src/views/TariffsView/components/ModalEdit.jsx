@@ -324,19 +324,6 @@ export default function ModalEdit({ show, onHide, tariff, mode, onSave, showAler
             <Row className="gap-y-3">
               <Col md={4}>
                 <Form.Group>
-                  <Form.Label className="text-xs">Crossdocking ($)</Form.Label>
-                  <Form.Control
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.crossdocking ?? ""}
-                    disabled={readOnly}
-                    onChange={(e) => handleChange("crossdocking", e.target.value)}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
                   <Form.Label className="text-xs">Restiba ($)</Form.Label>
                   <Form.Control
                     type="number"

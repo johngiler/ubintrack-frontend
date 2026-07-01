@@ -14,7 +14,6 @@ export const EMPTY_TARIFF = {
   dry_storage: "0.00",
   picking: "0.00",
   has_picking_tariff: false,
-  crossdocking: "0.00",
   restiba: "0.00",
   added_pallet: "0.00",
   wrap: "0.00",
