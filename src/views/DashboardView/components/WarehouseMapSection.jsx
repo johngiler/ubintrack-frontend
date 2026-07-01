@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ChevronRight,
   Home,
+  Plus,
   RefreshCw,
   Thermometer,
 } from "lucide-react";
@@ -170,7 +172,14 @@ function HallsView({ cava, onBack }) {
   );
 }
 
-export default function WarehouseMapSection({ warehouseData, loading, error, onRetry }) {
+export default function WarehouseMapSection({
+  warehouseData,
+  loading,
+  error,
+  missingWarehouse = false,
+  onRetry,
+}) {
+  const router = useRouter();
   const [selectedCava, setSelectedCava] = useState(null);
 
   const cavas = useMemo(
@@ -224,11 +233,33 @@ export default function WarehouseMapSection({ warehouseData, loading, error, onR
           </div>
         ) : error ? (
           <div className="py-12 text-center">
-            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-red-500" />
-            <p className="text-sm font-medium text-red-600">{error}</p>
-            <Button variant="outline" size="sm" icon={RefreshCw} className="mt-4" onClick={onRetry}>
-              Reintentar
-            </Button>
+            <AlertTriangle
+              className={`mx-auto mb-3 h-10 w-10 ${missingWarehouse ? "text-amber-500" : "text-red-500"}`}
+            />
+            <p
+              className={`text-sm font-medium ${missingWarehouse ? "text-amber-800" : "text-red-600"}`}
+            >
+              {error}
+            </p>
+            {missingWarehouse ? (
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Plus}
+                  onClick={() => router.push("/storage/storages?new=1")}
+                >
+                  Crear bodega
+                </Button>
+                <Button variant="outline" size="sm" icon={RefreshCw} onClick={onRetry}>
+                  Reintentar
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" icon={RefreshCw} className="mt-4" onClick={onRetry}>
+                Reintentar
+              </Button>
+            )}
           </div>
         ) : !cavas.length ? (
           <p className="py-12 text-center text-sm text-slate-500">No hay datos del almacén disponibles.</p>

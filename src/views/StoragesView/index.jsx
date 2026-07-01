@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Building2, Eye, FilterX, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -27,6 +28,7 @@ const PAGE_SIZE = 20;
 
 export default function StoragesView() {
   const user = useAuth().user;
+  const searchParams = useSearchParams();
   const perms = canCRUD(user, "storage", "storage");
 
   const [storages, setStorages] = useState([]);
@@ -73,6 +75,13 @@ export default function StoragesView() {
   useEffect(() => {
     loadStorages();
   }, [loadStorages]);
+
+  useEffect(() => {
+    if (searchParams.get("new") !== "1" || !perms.add) return;
+    setSelectedStorage(null);
+    setModalMode("edit");
+    setShowModal(true);
+  }, [searchParams, perms.add]);
 
   const clearFilters = () => {
     setSearchTerm("");

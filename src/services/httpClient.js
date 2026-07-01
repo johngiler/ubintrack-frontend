@@ -25,6 +25,21 @@ httpClient.interceptors.request.use(
 
 export default httpClient;
 
+/** Mensaje legible desde respuesta de error del API (axios). */
+export function getApiErrorMessage(error, fallback = "Error inesperado") {
+  const data = error?.response?.data;
+  if (typeof data === "string" && data.trim()) return data.trim();
+  if (data && typeof data === "object") {
+    if (typeof data.error === "string" && data.error.trim()) return data.error.trim();
+    if (typeof data.detail === "string" && data.detail.trim()) return data.detail.trim();
+    if (typeof data.message === "string" && data.message.trim()) return data.message.trim();
+  }
+  if (error?.message && !/^Request failed with status code \d+$/i.test(error.message)) {
+    return error.message;
+  }
+  return fallback;
+}
+
 export const hasPerm = (user, codename) => {
   if (!user) return false;
   if (user.is_superuser || user.is_workspace_admin) return true;

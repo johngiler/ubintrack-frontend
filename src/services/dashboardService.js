@@ -6,8 +6,16 @@ export async function getDashboardStats() {
 }
 
 export async function getWarehouseStructure() {
-  const response = await httpClient.get("/api/warehouse/structure/");
-  return response.data;
+  try {
+    const response = await httpClient.get("/api/warehouse/structure/");
+    return response.data;
+  } catch (error) {
+    const data = error.response?.data;
+    if (data && typeof data === "object" && "success" in data) {
+      return data;
+    }
+    throw error;
+  }
 }
 
 export async function getClientStats() {

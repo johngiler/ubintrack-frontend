@@ -19,6 +19,7 @@ import {
   getDashboardStats,
   getWarehouseStructure,
 } from "@/services/dashboardService";
+import { getApiErrorMessage } from "@/services/httpClient";
 import KpiStatCard from "./components/KpiStatCard";
 import WarehouseMapSection from "./components/WarehouseMapSection";
 import SeriesChart from "./components/SeriesChart";
@@ -37,6 +38,7 @@ export default function DashboardView() {
   const [loading, setLoading] = useState(true);
   const [warehouseLoading, setWarehouseLoading] = useState(true);
   const [warehouseError, setWarehouseError] = useState(null);
+  const [warehouseMissing, setWarehouseMissing] = useState(false);
 
   const [startDate] = useState(() => {
     const today = new Date();
@@ -50,15 +52,19 @@ export default function DashboardView() {
   const fetchWarehouse = useCallback(async () => {
     setWarehouseLoading(true);
     setWarehouseError(null);
+    setWarehouseMissing(false);
     try {
       const response = await getWarehouseStructure();
       if (response.success) {
         setWarehouseData(response.data);
       } else {
-        throw new Error(response.error || "Error al cargar el almacén");
+        setWarehouseData(null);
+        setWarehouseError(response.error || "Error al cargar el almacén");
+        setWarehouseMissing(true);
       }
     } catch (error) {
-      setWarehouseError(error.message || "Error al cargar el almacén");
+      setWarehouseData(null);
+      setWarehouseError(getApiErrorMessage(error, "Error al cargar el almacén"));
     } finally {
       setWarehouseLoading(false);
     }
@@ -187,6 +193,7 @@ export default function DashboardView() {
             warehouseData={warehouseData}
             loading={warehouseLoading}
             error={warehouseError}
+            missingWarehouse={warehouseMissing}
             onRetry={fetchWarehouse}
           />
 
