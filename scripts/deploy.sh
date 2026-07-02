@@ -33,7 +33,9 @@ rm -rf "$STAGE_DIR"
 mkdir -p "$STAGE_DIR/.next"
 cp -a "$STANDALONE"/. "$STAGE_DIR/"
 cp -a "$FRONTEND_DIR/.next/static" "$STAGE_DIR/.next/static"
-cp -a "$FRONTEND_DIR/public" "$STAGE_DIR/public"
+if [[ -d "$FRONTEND_DIR/public" ]]; then
+  cp -a "$FRONTEND_DIR/public" "$STAGE_DIR/public"
+fi
 
 echo "[deploy] Creando directorio remoto..."
 ssh "$REMOTE_HOST" "mkdir -p $REMOTE_PATH && chown -R git:git /home/git/ubintrack 2>/dev/null || true"
