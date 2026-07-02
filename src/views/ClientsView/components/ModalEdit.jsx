@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, X } from "lucide-react";
+import { ExternalLink, Save, X } from "lucide-react";
 
-import { Modal, Button, Form, Row, Col } from "@/components/ui/bootstrap";
+import { Modal, Button, Form, Row, Col, Alert } from "@/components/ui/bootstrap";
 import Select from "@/components/ui/Select";
+import { useWmsNavigate } from "@/hooks/useWmsRouter";
 import {
   updateClient,
   createClient,
@@ -42,6 +43,7 @@ function cleanBranchForApi(branch, clientId) {
 }
 
 export default function ModalEdit({ show, onHide, client, mode, onSave, showAlert }) {
+  const navigate = useWmsNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_CLIENT);
   const [originalBranches, setOriginalBranches] = useState([]);
@@ -53,6 +55,23 @@ export default function ModalEdit({ show, onHide, client, mode, onSave, showAler
 
   const readOnly = mode === "view";
   const isEditMode = mode === "edit";
+  const hasTariffs = tariffOptions.length > 0;
+
+  const renderNoTariffsAlert = () => (
+    <Alert variant="warning" className="mb-0 text-sm">
+      <p className="mb-2">
+        No hay tarifas disponibles. Debe crear al menos una tarifa antes de registrar clientes.
+      </p>
+      <Button
+        variant="outline"
+        size="sm"
+        icon={ExternalLink}
+        onClick={() => navigate("/finance/tariffs?new=1")}
+      >
+        Ir a crear tarifa
+      </Button>
+    </Alert>
+  );
 
   useEffect(() => {
     if (!show || readOnly) return undefined;
@@ -108,14 +127,24 @@ export default function ModalEdit({ show, onHide, client, mode, onSave, showAler
       isBlank(formData.company) ||
       isBlank(formData.address) ||
       isBlank(formData.ruc) ||
-      isBlank(formData.dv);
+      isBlank(formData.dv) ||
+      !formData.tariff?.id;
 
     if (clientFieldsMissing) {
       setClientFormErrors(true);
-      showAlert(
-        "danger",
-        "Complete los datos obligatorios del cliente: nombre, empresa, dirección, RUC y DV.",
-      );
+      if (!formData.tariff?.id) {
+        showAlert(
+          "danger",
+          hasTariffs
+            ? "Seleccione una tarifa para el cliente."
+            : "Debe crear una tarifa antes de registrar clientes.",
+        );
+      } else {
+        showAlert(
+          "danger",
+          "Complete los datos obligatorios del cliente: nombre, empresa, dirección, RUC y DV.",
+        );
+      }
       return;
     }
 
@@ -238,6 +267,7 @@ export default function ModalEdit({ show, onHide, client, mode, onSave, showAler
 
   const isClientFieldInvalid = (field) => {
     if (!clientFormErrors) return false;
+    if (field === "tariff") return !formData.tariff?.id;
     return isBlank(formData[field]);
   };
 
@@ -370,36 +400,46 @@ export default function ModalEdit({ show, onHide, client, mode, onSave, showAler
               </Col>
               <Col md={6} className="mb-0">
                 <Form.Group controlId="tariff-select" className="mb-0">
-                  <Form.Label className="!text-xs !font-medium !text-slate-600">Tarifa</Form.Label>
+                  <Form.Label className="!text-xs !font-medium !text-slate-600">
+                    Tarifa {!readOnly && <span className="text-red-500">*</span>}
+                  </Form.Label>
                   {readOnly ? (
                     <Form.Control value={formData.tariff?.name || "Sin tarifa"} readOnly />
+                  ) : isLoadingTariffs ? (
+                    <Form.Control value="Cargando tarifas…" readOnly disabled />
+                  ) : !hasTariffs ? (
+                    renderNoTariffsAlert()
                   ) : (
-                    <Select
-                      inputId="tariff-select"
-                      id="tariff-select"
-                      name="tariff"
-                      options={tariffOptions}
-                      value={formData.tariff?.id ?? ""}
-                      isDisabled={isLoadingTariffs}
-                      isClearable
-                      isSearchable
-                      placeholder={isLoadingTariffs ? "Cargando tarifas…" : "Seleccione una tarifa"}
-                      noOptionsMessage={() =>
-                        isLoadingTariffs ? "Cargando…" : "No hay tarifas disponibles"
-                      }
-                      onChange={(e) => {
-                        const selectedId = e.target.value;
-                        const selected = tariffOptions.find(
-                          (option) => String(option.value) === String(selectedId),
-                        );
-                        setFormData({
-                          ...formData,
-                          tariff: selected
-                            ? { id: selected.value, name: selected.label }
-                            : null,
-                        });
-                      }}
-                    />
+                    <>
+                      <Select
+                        inputId="tariff-select"
+                        id="tariff-select"
+                        name="tariff"
+                        options={tariffOptions}
+                        value={formData.tariff?.id ?? ""}
+                        isSearchable
+                        placeholder="Seleccione una tarifa"
+                        noOptionsMessage={() => "No hay tarifas disponibles"}
+                        isInvalid={isClientFieldInvalid("tariff")}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          const selected = tariffOptions.find(
+                            (option) => String(option.value) === String(selectedId),
+                          );
+                          setFormData({
+                            ...formData,
+                            tariff: selected
+                              ? { id: selected.value, name: selected.label }
+                              : null,
+                          });
+                        }}
+                      />
+                      {isClientFieldInvalid("tariff") && (
+                        <Form.Text className="text-danger">
+                          Debe seleccionar una tarifa para el cliente.
+                        </Form.Text>
+                      )}
+                    </>
                   )}
                 </Form.Group>
               </Col>
@@ -443,7 +483,13 @@ export default function ModalEdit({ show, onHide, client, mode, onSave, showAler
           Cerrar
         </Button>
         {isEditMode && (
-          <Button variant="primary" icon={Save} onClick={handleSave} disabled={isSaving} loading={isSaving}>
+          <Button
+            variant="primary"
+            icon={Save}
+            onClick={handleSave}
+            disabled={isSaving || isLoadingTariffs || (!readOnly && !hasTariffs)}
+            loading={isSaving}
+          >
             {isSaving ? "Guardando…" : "Guardar cambios"}
           </Button>
         )}

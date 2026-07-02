@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ChevronDown,
   ChevronUp,
@@ -43,6 +44,7 @@ const EMPTY_FILTERS = {
 
 export default function TariffsView() {
   const user = useAuth().user;
+  const searchParams = useSearchParams();
   const perms = canCRUD(user, "finance", "tariff");
 
   const [tariffs, setTariffs] = useState([]);
@@ -91,6 +93,13 @@ export default function TariffsView() {
   useEffect(() => {
     loadTariffs();
   }, [loadTariffs]);
+
+  useEffect(() => {
+    if (searchParams.get("new") !== "1" || !perms.add) return;
+    setSelectedTariff(null);
+    setModalMode("new");
+    setShowModal(true);
+  }, [searchParams, perms.add]);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
