@@ -1,16 +1,16 @@
 [Unit]
-Description=publivalla saas frontend (Next.js standalone)
+Description=ubintrack saas frontend (Next.js standalone)
 After=network.target
 
 [Service]
 Type=simple
 User=git
 Group=git
-WorkingDirectory=/home/git/publivalla
+WorkingDirectory=/home/git/ubintrack
 Environment=NODE_ENV=production
 Environment=HOSTNAME=127.0.0.1
 Environment=PORT=3010
-ExecStart=/usr/bin/node /home/git/publivalla/server.js
+ExecStart=/usr/bin/node /home/git/ubintrack/server.js
 Restart=always
 RestartSec=5
 

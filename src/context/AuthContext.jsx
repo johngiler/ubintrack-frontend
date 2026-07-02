@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { login, logout as authLogout } from "@/services/authService";
 import { getMyProfile } from "@/services/coreService";
+import { getDefaultHomeRoute } from "@/lib/wmsRouteAccess";
 
 const AuthContext = createContext(undefined);
 
@@ -44,11 +45,7 @@ export function AuthProvider({ children }) {
       const fullUser = await getMyProfile().catch(() => data.user);
       setUser(fullUser || data.user);
       const u = fullUser || data.user;
-      const target =
-        u?.user_type === "administrador"
-          ? "/dashboards/sales"
-          : "/inventory/bins";
-      router.replace(target);
+      router.replace(getDefaultHomeRoute(u));
       return data;
     },
     [router],

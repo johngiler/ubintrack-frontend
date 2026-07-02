@@ -1,8 +1,8 @@
 import httpClient from "./httpClient";
 
 // Tasks
-export async function getTasks(page = 1, filters = {}, searchTerm = "") {
-  let url = `/api/tasks/?page=${page}`;
+export async function getTasks(page = 1, filters = {}, searchTerm = "", pageSize = 20) {
+  let url = `/api/tasks/?page=${page}&page_size=${pageSize}`;
 
   // Agregar filtros a la URL
   if (filters.task_type) {
@@ -93,8 +93,8 @@ export async function deleteTaskLog(id) {
 }
 
 // Task Trackings
-export async function getTaskTrackings(page = 1, filters = {}) {
-  let url = `/api/task-trackings/?page=${page}`;
+export async function getTaskTrackings(page = 1, filters = {}, pageSize = 20) {
+  let url = `/api/task-trackings/?page=${page}&page_size=${pageSize}`;
 
   if (filters.user) {
     url += `&user=${filters.user}`;

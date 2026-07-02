@@ -1,10 +1,5 @@
-import WmsModulePlaceholder from "@/components/wms/WmsModulePlaceholder";
+import TasksView from "@/views/TasksView";
 
 export default function TasksPage() {
-  return (
-    <WmsModulePlaceholder
-      title="Tareas"
-      description="Listado y gestión de tareas operativas."
-    />
-  );
+  return <TasksView />;
 }

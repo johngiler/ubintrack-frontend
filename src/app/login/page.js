@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { useAuth } from "@/context/AuthContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { getDefaultHomeRoute } from "@/lib/wmsRouteAccess";
 import { getWorkspaceLogoUrl, getWorkspaceLogotypeUrl } from "@/lib/workspaceMedia";
 
 const HIGHLIGHTS = [
@@ -130,9 +131,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(
-        user.user_type === "administrador" ? "/dashboards/sales" : "/inventory/bins",
-      );
+      router.replace(getDefaultHomeRoute(user));
     }
   }, [user, loading, router]);
 

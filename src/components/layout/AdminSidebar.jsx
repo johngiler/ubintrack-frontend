@@ -20,7 +20,7 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
     return (
       <div
         className={cn(
-          "flex h-full flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)] transition-colors duration-300",
+          "flex h-full min-h-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)] transition-colors duration-300",
           isCollapsed ? "w-[4.75rem]" : "w-64",
         )}
       >
@@ -52,7 +52,7 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
           {WMS_NAV_GROUPS.map((group) => {
             const items = group.items.filter((item) => canSeeNavItem(item, user));
             if (!items.length) return null;
@@ -108,7 +108,7 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
 
   return (
     <>
-      <aside className="hidden shrink-0 lg:flex">{sidebarContent()}</aside>
+      <aside className="hidden h-screen shrink-0 lg:sticky lg:top-0 lg:flex">{sidebarContent()}</aside>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">

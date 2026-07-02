@@ -1,10 +1,5 @@
-import WmsModulePlaceholder from "@/components/wms/WmsModulePlaceholder";
+import TrackingsView from "@/views/TrackingsView";
 
 export default function TrackingsPage() {
-  return (
-    <WmsModulePlaceholder
-      title="Seguimiento"
-      description="Seguimiento de tareas y tiempos operativos."
-    />
-  );
+  return <TrackingsView />;
 }

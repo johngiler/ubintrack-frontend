@@ -4,7 +4,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REMOTE_HOST="${PUBLIVALLA_FRONTEND_SSH:-webapp}"
+REMOTE_HOST="${UBINTACK_FRONTEND_SSH:-webapp}"
 REMOTE_PATH="/home/git/ubintrack"
 STAGE_DIR="$FRONTEND_DIR/.next/ubintrack-deploy-bundle"
 

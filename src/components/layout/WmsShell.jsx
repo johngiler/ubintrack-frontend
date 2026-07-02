@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
+import WmsAccessDenied from "@/components/layout/WmsAccessDenied";
 import { useAuth } from "@/context/AuthContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { canAccessRoute } from "@/lib/wmsRouteAccess";
 
 const SIDEBAR_KEY = "ubintrack-sidebar-collapsed";
 
@@ -76,17 +78,21 @@ export function WmsShell({ children }) {
     );
   }
 
+  const routeAllowed = canAccessRoute(pathname, user);
+
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
+    <div className="flex h-screen overflow-hidden bg-[var(--background)]">
       <AdminSidebar
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
         user={user}
         collapsed={sidebarCollapsed}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <AdminHeader onMenuClick={handleMenuClick} />
-        <main className="flex-1 overflow-x-hidden bg-[var(--background)] p-4 lg:p-6">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--background)] p-4 lg:p-6">
+          {routeAllowed ? children : <WmsAccessDenied pathname={pathname} user={user} />}
+        </main>
       </div>
     </div>
   );
