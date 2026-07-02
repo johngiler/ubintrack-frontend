@@ -110,7 +110,7 @@ export default function DashboardView() {
               <Calendar className="h-4 w-4 text-sky-600" />
               {formatMonthRange(startDate, endDate)}
             </div>
-            <Button variant="outline" size="sm" icon={Upload}>
+            <Button variant="secondary" size="sm" icon={Upload}>
               Exportar informe
             </Button>
           </div>
