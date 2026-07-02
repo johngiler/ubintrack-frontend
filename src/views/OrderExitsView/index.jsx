@@ -814,25 +814,25 @@ const Exits = () => {
         actions={
           <>
             {isAdmin ? (
-              <Button
-                variant="success"
-                size="sm"
+            <Button
+              variant="success"
+              size="sm"
                 icon={Upload}
                 onClick={() => setShowImportModal(true)}
-              >
+            >
                 Importar desde excel
-              </Button>
+            </Button>
             ) : null}
-            <Button
-              variant="secondary"
+          <Button
+            variant="secondary"
               size="sm"
               icon={Download}
-              onClick={handleExportExcel}
-              disabled={isExporting}
+            onClick={handleExportExcel}
+            disabled={isExporting}
               loading={isExporting}
             >
               {isExporting ? "Exportando…" : "Exportar a excel"}
-            </Button>
+          </Button>
           </>
         }
       />
@@ -843,92 +843,92 @@ const Exits = () => {
             <Card.Header className="justify-content-between border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 !py-3">
               <div className="flex w-full flex-wrap items-center gap-2">
                 <WmsSearchBar
-                  id="search-exit"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    if (searchParams.toString()) {
-                      setSearchParams({});
-                    }
-                  }}
+                      id="search-exit"
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        if (searchParams.toString()) {
+                          setSearchParams({});
+                        }
+                      }}
                   onClear={() => {
-                    setSearchTerm("");
-                    setSearchParams({});
-                  }}
+                          setSearchTerm("");
+                          setSearchParams({});
+                        }}
                   placeholder="Buscar por código, cliente, bin o sku…"
                   className="!w-[300px] !min-w-[300px] !max-w-[300px] shrink-0"
                 />
-                <Form.Select
-                  id="filter-status"
-                  name="filter-status"
-                  size="sm"
-                  value={filters.status}
+                      <Form.Select
+                        id="filter-status"
+                        name="filter-status"
+                        size="sm"
+                        value={filters.status}
                   onChange={(e) => handleFilterChange("status", e.target.value)}
-                  aria-label="Filtrar por estado"
+                        aria-label="Filtrar por estado"
                   className="!w-[150px] shrink-0"
                   style={{ minWidth: "150px" }}
-                >
+                      >
                   <option value="">Estado</option>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Select
-                  id="filter-exit-date"
-                  name="filter-exit-date"
-                  size="sm"
-                  value={filters.exit_date}
+                        {Object.entries(statusLabels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </Form.Select>
+                      <Form.Select
+                        id="filter-exit-date"
+                        name="filter-exit-date"
+                        size="sm"
+                        value={filters.exit_date}
                   onChange={(e) => handleFilterChange("exit_date", e.target.value)}
-                  aria-label="Filtrar por fecha de salida"
+                        aria-label="Filtrar por fecha de salida"
                   className="!w-[200px] shrink-0"
-                  style={{ minWidth: "200px" }}
-                >
+                        style={{ minWidth: "200px" }}
+                      >
                   <option value="">Fecha de salida</option>
-                  {(() => {
-                    const options = [];
-                    const today = new Date();
-                    for (let i = 0; i < 14; i++) {
-                      const date = new Date(today);
-                      date.setDate(today.getDate() + i);
-                      const dateValue = date.toISOString().split("T")[0];
-                      const dayName = date.toLocaleDateString("es-PA", {
-                        weekday: "long",
-                      });
-                      const dayNum = date.getDate();
-                      const monthName = date.toLocaleDateString("es-PA", {
-                        month: "long",
-                      });
-                      const capitalizedDay =
+                        {(() => {
+                          const options = [];
+                          const today = new Date();
+                          for (let i = 0; i < 14; i++) {
+                            const date = new Date(today);
+                            date.setDate(today.getDate() + i);
+                            const dateValue = date.toISOString().split("T")[0];
+                            const dayName = date.toLocaleDateString("es-PA", {
+                              weekday: "long",
+                            });
+                            const dayNum = date.getDate();
+                            const monthName = date.toLocaleDateString("es-PA", {
+                              month: "long",
+                            });
+                            const capitalizedDay =
                         dayName.charAt(0).toUpperCase() + dayName.slice(1);
-                      const label =
-                        i === 0
-                          ? `Hoy - ${capitalizedDay}, ${dayNum} de ${monthName}`
-                          : i === 1
-                            ? `Mañana - ${capitalizedDay}, ${dayNum} de ${monthName}`
-                            : `${capitalizedDay}, ${dayNum} de ${monthName}`;
-                      options.push(
-                        <option key={dateValue} value={dateValue}>
-                          {label}
+                            const label =
+                              i === 0
+                                ? `Hoy - ${capitalizedDay}, ${dayNum} de ${monthName}`
+                                : i === 1
+                                ? `Mañana - ${capitalizedDay}, ${dayNum} de ${monthName}`
+                                : `${capitalizedDay}, ${dayNum} de ${monthName}`;
+                            options.push(
+                              <option key={dateValue} value={dateValue}>
+                                {label}
                         </option>,
-                      );
-                    }
-                    return options;
-                  })()}
-                </Form.Select>
+                            );
+                          }
+                          return options;
+                        })()}
+                      </Form.Select>
                 {hasFilters && (
-                  <Button
+                        <Button
                     variant="outline"
-                    size="sm"
+                          size="sm"
                     icon={FilterX}
                     onClick={clearFilters}
                     title="Limpiar filtros"
                     className="shrink-0 whitespace-nowrap"
                   >
-                    Limpiar filtros
-                  </Button>
-                )}
+                          Limpiar filtros
+                        </Button>
+                    )}
                 <div className="ml-auto shrink-0 pl-2">
                   {perms.add && (
                     <Button
@@ -954,15 +954,15 @@ const Exits = () => {
               ) : exits.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[1040px]">
                   <Table.Head>
-                    <tr>
+                      <tr>
                       <Table.HeaderCell className="min-w-[140px] normal-case tracking-normal">
-                        Código
+                          Código
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[180px] normal-case tracking-normal">
-                        Cliente / Sucursal
+                          Cliente / Sucursal
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[130px] normal-case tracking-normal">
-                        Productos
+                          Productos
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[120px] normal-case tracking-normal">
                         Estado
@@ -974,9 +974,9 @@ const Exits = () => {
                         Salida
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[150px] normal-case tracking-normal">
-                        Acciones
+                          Acciones
                       </Table.HeaderCell>
-                    </tr>
+                      </tr>
                   </Table.Head>
                   <Table.Body>
                     {exits.map((exit) => (
@@ -1003,11 +1003,11 @@ const Exits = () => {
                           </Table.Cell>
                           <Table.Cell>
                             <div className="font-medium text-slate-900">
-                              {exit.client?.name || "Sin cliente"}
+                                  {exit.client?.name || "Sin cliente"}
                             </div>
                             <div className="text-sm text-slate-500">
-                              {exit.branch?.name || "Sin sucursal"}
-                            </div>
+                                  {exit.branch?.name || "Sin sucursal"}
+                              </div>
                           </Table.Cell>
                           <Table.Cell>
                             {exit.exit_product_groups?.length > 0 ? (
@@ -1017,13 +1017,13 @@ const Exits = () => {
                                 onClick={() => toggleProductGroup(exit.id)}
                                 suffix={
                                   <span className="ms-1 text-slate-500">
-                                    (
-                                    {exit.exit_product_groups.reduce(
-                                      (sum, g) => sum + (g.quantity || 0),
+                                        (
+                                        {exit.exit_product_groups.reduce(
+                                          (sum, g) => sum + (g.quantity || 0),
                                       0,
-                                    )}{" "}
-                                    uds)
-                                  </span>
+                                        )}{" "}
+                                        uds)
+                                      </span>
                                 }
                               />
                             ) : (
@@ -1031,48 +1031,48 @@ const Exits = () => {
                             )}
                           </Table.Cell>
                           <Table.Cell>
-                            <Badge
+                              <Badge
                               variant={statusVariants[exit.status] || "secondary"}
                               dot={false}
-                            >
-                              {statusLabels[exit.status] || "Desconocido"}
-                            </Badge>
+                              >
+                                {statusLabels[exit.status] || "Desconocido"}
+                              </Badge>
                           </Table.Cell>
                           <Table.Cell className="whitespace-nowrap text-slate-600">
-                            {formatDate(exit.created_at)}
+                              {formatDate(exit.created_at)}
                           </Table.Cell>
                           <Table.Cell className="whitespace-nowrap text-slate-600">
-                            {formatExitDate(exit.exit_date)}
+                              {formatExitDate(exit.exit_date)}
                           </Table.Cell>
                           <Table.Cell>
                             <div className="flex items-center gap-1">
                               {exit.status === "completada" &&
-                                exit.exit_detail?.pdf_document && (
-                                  <Link
+                                  exit.exit_detail?.pdf_document && (
+                                    <Link
                                     href={exit.exit_detail.pdf_document}
-                                    target="_blank"
+                                      target="_blank"
                                     rel="noopener noreferrer"
                                     title="Ver PDF"
                                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-sky-600 transition-colors hover:bg-sky-50"
-                                  >
+                                    >
                                     <FileText className="h-4 w-4" />
-                                  </Link>
-                                )}
-                              {areAllBinsProcessed(exit) &&
-                                exit.status !== "completada" &&
-                                !isClientUser && (
+                                    </Link>
+                                  )}
+                                {areAllBinsProcessed(exit) &&
+                                  exit.status !== "completada" &&
+                                  !isClientUser && (
                                   <IconButton
                                     size="sm"
                                     className="text-emerald-600 hover:bg-emerald-50"
-                                    onClick={() => handleCompleteExit(exit)}
-                                    disabled={completingExitId === exit.id}
-                                    title="Completar salida"
-                                  >
-                                    {completingExitId === exit.id ? (
-                                      <span
+                                      onClick={() => handleCompleteExit(exit)}
+                                      disabled={completingExitId === exit.id}
+                                      title="Completar salida"
+                                    >
+                                      {completingExitId === exit.id ? (
+                                        <span
                                         className="spinner-border spinner-border-sm"
-                                        role="status"
-                                        aria-hidden="true"
+                                          role="status"
+                                          aria-hidden="true"
                                       />
                                     ) : (
                                       <Check className="h-4 w-4" />
@@ -1082,7 +1082,7 @@ const Exits = () => {
                               <IconButton
                                 size="sm"
                                 className="text-sky-600 hover:bg-sky-50"
-                                onClick={() => handleShowModal(exit, "view")}
+                                  onClick={() => handleShowModal(exit, "view")}
                                 title="Ver salida"
                               >
                                 <Eye className="h-4 w-4" />
@@ -1091,11 +1091,11 @@ const Exits = () => {
                                 size="sm"
                                 className="text-amber-600 hover:bg-amber-50"
                                 onClick={() => handleShowModal(exit, "view", "movements")}
-                                title="Ver historial de movimientos"
-                              >
+                                  title="Ver historial de movimientos"
+                                >
                                 <History className="h-4 w-4" />
                               </IconButton>
-                              {perms.change && (
+                                {perms.change && (
                                 <IconButton
                                   size="sm"
                                   className="text-violet-600 hover:bg-violet-50"
@@ -1104,8 +1104,8 @@ const Exits = () => {
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </IconButton>
-                              )}
-                              {perms.delete && (
+                                )}
+                                {perms.delete && (
                                 <IconButton
                                   size="sm"
                                   className="text-red-600 hover:bg-red-50"
@@ -1114,8 +1114,8 @@ const Exits = () => {
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </IconButton>
-                              )}
-                            </div>
+                                )}
+                              </div>
                           </Table.Cell>
                         </Table.Row>
                           {expandedGroups[exit.id] && (
@@ -1140,7 +1140,7 @@ const Exits = () => {
                         </Fragment>
                       ))}
                   </Table.Body>
-                </Table>
+                  </Table>
               ) : (
                 <WmsListEmptyState
                   hasFilters={hasFilters}
@@ -1157,8 +1157,8 @@ const Exits = () => {
               <Card.Footer>
                 <div className="d-flex flex-column flex-md-row align-items-center gap-3">
                   <div className="text-sm text-slate-600 text-center text-md-start">
-                    Mostrando del{" "}
-                    <strong>{(currentPage - 1) * PAGE_SIZE + 1}</strong> al{" "}
+                      Mostrando del{" "}
+                      <strong>{(currentPage - 1) * PAGE_SIZE + 1}</strong> al{" "}
                     <strong>{Math.min(currentPage * PAGE_SIZE, totalItems)}</strong> de{" "}
                     <strong>{totalItems}</strong> registros
                   </div>
