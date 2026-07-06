@@ -7,14 +7,17 @@ import { Warehouse } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { getDefaultHomeRoute } from "@/lib/wmsRouteAccess";
 import { canSeeNavItem, WMS_NAV_GROUPS } from "@/lib/wmsNavConfig";
-import { getWorkspaceLogoUrl } from "@/lib/workspaceMedia";
+import { getWorkspaceLogoUrl, isSidebarLogoGradientEnabled } from "@/lib/workspaceMedia";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useTheme } from "@/context/ThemeContext";
 
 export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
   const pathname = usePathname();
   const { workspace } = useWorkspace();
+  const { isDark } = useTheme();
   const logoUrl = getWorkspaceLogoUrl(workspace);
   const homeHref = getDefaultHomeRoute(user);
+  const logoGradient = isSidebarLogoGradientEnabled(workspace, isDark);
 
   const sidebarContent = (isMobile = false) => {
     const isCollapsed = !isMobile && collapsed;
@@ -31,9 +34,11 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
           onClick={() => isMobile && setMobileOpen?.(false)}
           aria-label="Inicio"
           title="Inicio"
+          style={logoGradient ? { background: "var(--brand-gradient)" } : undefined}
           className={cn(
-            "flex shrink-0 flex-col items-center border-b border-[var(--border-subtle)] px-4 py-7 transition-opacity hover:opacity-90",
+            "flex w-full shrink-0 flex-col items-center border-b border-[var(--border-subtle)] px-4 py-7 transition-opacity hover:opacity-90",
             isCollapsed ? "px-2 py-5" : "px-5",
+            logoGradient && "sidebar-logo-gradient",
           )}
         >
           {logoUrl ? (

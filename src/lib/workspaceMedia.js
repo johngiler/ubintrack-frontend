@@ -32,6 +32,49 @@ export function resolveWorkspaceMediaUrl(url) {
   return `${apiBase()}/${trimmed}`;
 }
 
+/** @typedef {"none" | "light" | "dark" | "both"} SidebarLogoGradientMode */
+
+export const SIDEBAR_LOGO_GRADIENT_MODES = {
+  NONE: "none",
+  LIGHT: "light",
+  DARK: "dark",
+  BOTH: "both",
+};
+
+/**
+ * @param {Record<string, unknown> | null | undefined} workspace
+ * @returns {SidebarLogoGradientMode}
+ */
+export function normalizeSidebarLogoGradientMode(workspace) {
+  const mode = workspace?.sidebar_logo_gradient_mode;
+  if (mode === SIDEBAR_LOGO_GRADIENT_MODES.LIGHT) return SIDEBAR_LOGO_GRADIENT_MODES.LIGHT;
+  if (mode === SIDEBAR_LOGO_GRADIENT_MODES.DARK) return SIDEBAR_LOGO_GRADIENT_MODES.DARK;
+  if (mode === SIDEBAR_LOGO_GRADIENT_MODES.BOTH) return SIDEBAR_LOGO_GRADIENT_MODES.BOTH;
+  if (workspace?.sidebar_logo_gradient) return SIDEBAR_LOGO_GRADIENT_MODES.BOTH;
+  return SIDEBAR_LOGO_GRADIENT_MODES.NONE;
+}
+
+/**
+ * @param {SidebarLogoGradientMode | string | null | undefined} mode
+ * @param {boolean} isDark
+ */
+export function shouldShowSidebarLogoGradient(mode, isDark) {
+  if (!mode || mode === SIDEBAR_LOGO_GRADIENT_MODES.NONE) return false;
+  if (mode === SIDEBAR_LOGO_GRADIENT_MODES.BOTH) return true;
+  if (mode === SIDEBAR_LOGO_GRADIENT_MODES.LIGHT) return !isDark;
+  if (mode === SIDEBAR_LOGO_GRADIENT_MODES.DARK) return isDark;
+  return false;
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} workspace
+ * @param {boolean} isDark
+ */
+export function isSidebarLogoGradientEnabled(workspace, isDark) {
+  if (!workspace) return false;
+  return shouldShowSidebarLogoGradient(normalizeSidebarLogoGradientMode(workspace), isDark);
+}
+
 /**
  * @param {Record<string, unknown> | null | undefined} workspace
  * @returns {string | null}

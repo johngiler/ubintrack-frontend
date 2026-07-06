@@ -115,6 +115,10 @@ body {
   box-shadow: 0 1px 2px color-mix(in srgb, var(--brand-primary) 28%, transparent);
 }
 
+.sidebar-logo-gradient {
+  background: var(--brand-gradient);
+}
+
 .btn-brand:hover:not(:disabled) {
   background: var(--brand-gradient-hover);
   filter: brightness(1.04);

@@ -7,9 +7,23 @@ import { Building2, ImageIcon, Save } from "lucide-react";
 import { Alert, Button, Card, Col, Form, Row } from "@/components/ui/bootstrap";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { cn } from "@/lib/cn";
 import { isWorkspaceAdministrator } from "@/lib/wmsUserDisplay";
+import {
+  normalizeSidebarLogoGradientMode,
+  shouldShowSidebarLogoGradient,
+  SIDEBAR_LOGO_GRADIENT_MODES,
+} from "@/lib/workspaceMedia";
 import { getOwnerSettings, updateOwnerSettings } from "@/services/workspaceService";
+
+const GRADIENT_MODE_OPTIONS = [
+  { value: SIDEBAR_LOGO_GRADIENT_MODES.NONE, label: "Desactivado" },
+  { value: SIDEBAR_LOGO_GRADIENT_MODES.LIGHT, label: "Solo modo claro" },
+  { value: SIDEBAR_LOGO_GRADIENT_MODES.DARK, label: "Solo modo oscuro" },
+  { value: SIDEBAR_LOGO_GRADIENT_MODES.BOTH, label: "Ambos modos" },
+];
 
 const EMPTY_FORM = {
   name: "",
@@ -22,6 +36,7 @@ const EMPTY_FORM = {
   app_title: "",
   app_tagline: "",
   invoice_prefix: "",
+  sidebar_logo_gradient_mode: SIDEBAR_LOGO_GRADIENT_MODES.NONE,
 };
 
 function ReadOnlyField({ label, value, hint }) {
@@ -36,7 +51,7 @@ function ReadOnlyField({ label, value, hint }) {
   );
 }
 
-function ImagePreview({ label, url, file, onChange }) {
+function ImagePreview({ label, url, file, onChange, gradientPreview = false }) {
   const previewUrl = file ? URL.createObjectURL(file) : url;
 
   useEffect(() => {
@@ -49,7 +64,13 @@ function ImagePreview({ label, url, file, onChange }) {
       <Form.Label>{label}</Form.Label>
       <div className="flex flex-col items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
         {previewUrl ? (
-          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--background)]">
+          <div
+            className={cn(
+              "flex h-20 w-full max-w-[180px] items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] px-2",
+              !gradientPreview && "bg-[var(--background)]",
+            )}
+            style={gradientPreview ? { background: "var(--brand-gradient)" } : undefined}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previewUrl} alt={label} className="max-h-full max-w-full object-contain" />
           </div>
@@ -68,6 +89,7 @@ export default function OwnerSettingsView() {
   const router = useRouter();
   const { user } = useAuth();
   const { reloadWorkspace } = useWorkspace();
+  const { isDark } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -113,6 +135,7 @@ export default function OwnerSettingsView() {
           app_title: data.app_title || "",
           app_tagline: data.app_tagline || "",
           invoice_prefix: data.invoice_prefix || "",
+          sidebar_logo_gradient_mode: normalizeSidebarLogoGradientMode(data),
         });
         setMediaUrls({
           logo_url: data.logo_url || null,
@@ -131,8 +154,11 @@ export default function OwnerSettingsView() {
   }, [isAdmin]);
 
   const handleChange = (event) => {
-    const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = event.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
     setSuccess(null);
   };
 
@@ -155,7 +181,11 @@ export default function OwnerSettingsView() {
       if (hasFiles) {
         payload = new FormData();
         Object.entries(form).forEach(([key, value]) => {
-          payload.append(key, value ?? "");
+          if (typeof value === "boolean") {
+            payload.append(key, value ? "true" : "false");
+          } else {
+            payload.append(key, value ?? "");
+          }
         });
         if (files.logo) payload.append("logo", files.logo);
         if (files.logo_mark) payload.append("logo_mark", files.logo_mark);
@@ -176,6 +206,7 @@ export default function OwnerSettingsView() {
         app_title: updated.app_title || "",
         app_tagline: updated.app_tagline || "",
         invoice_prefix: updated.invoice_prefix || "",
+        sidebar_logo_gradient_mode: normalizeSidebarLogoGradientMode(updated),
       });
       setMediaUrls({
         logo_url: updated.logo_url || null,
@@ -356,6 +387,30 @@ export default function OwnerSettingsView() {
                         </div>
                       </Form.Group>
                     </Col>
+                    <Col xs={12} md={6}>
+                      <Form.Group className="mb-0">
+                        <Form.Label htmlFor="sidebar_logo_gradient_mode">
+                          Fondo gradiente en el logo del menú lateral
+                        </Form.Label>
+                        <Form.Select
+                          id="sidebar_logo_gradient_mode"
+                          name="sidebar_logo_gradient_mode"
+                          value={form.sidebar_logo_gradient_mode}
+                          onChange={handleChange}
+                        >
+                          {GRADIENT_MODE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </Form.Select>
+                        <Form.Text className="text-[var(--foreground-muted)]">
+                          Usa los colores primario y secundario detrás del logo según el tema activo.
+                          La vista previa refleja el modo que tienes ahora (
+                          {isDark ? "oscuro" : "claro"}).
+                        </Form.Text>
+                      </Form.Group>
+                    </Col>
                   </Row>
                   <Row className="g-3 mt-1">
                     <Col xs={12} md={4}>
@@ -364,6 +419,10 @@ export default function OwnerSettingsView() {
                         url={mediaUrls.logo_url}
                         file={files.logo}
                         onChange={handleFileChange("logo")}
+                        gradientPreview={shouldShowSidebarLogoGradient(
+                          form.sidebar_logo_gradient_mode,
+                          isDark,
+                        )}
                       />
                     </Col>
                     <Col xs={12} md={4}>
