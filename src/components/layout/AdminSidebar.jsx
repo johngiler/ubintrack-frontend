@@ -25,7 +25,7 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
     return (
       <div
         className={cn(
-          "flex h-full min-h-0 flex-col border-r border-[var(--border)] bg-[var(--sidebar-bg)] transition-colors duration-300",
+          "flex h-full min-h-0 flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--sidebar-bg)] transition-[width] duration-300 ease-in-out",
           isCollapsed ? "w-[4.75rem]" : "w-64",
         )}
       >
@@ -36,7 +36,7 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
           title="Inicio"
           style={logoGradient ? { background: "var(--brand-gradient)" } : undefined}
           className={cn(
-            "flex w-full shrink-0 flex-col items-center border-b border-[var(--border-subtle)] px-4 py-7 transition-opacity hover:opacity-90",
+            "flex w-full shrink-0 flex-col items-center border-b border-[var(--border-subtle)] px-4 py-7 transition-[padding,opacity] duration-300 ease-in-out hover:opacity-90",
             isCollapsed ? "px-2 py-5" : "px-5",
             logoGradient && "sidebar-logo-gradient",
           )}
@@ -47,34 +47,44 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
               src={logoUrl}
               alt=""
               className={cn(
-                "object-contain",
+                "object-contain transition-all duration-300 ease-in-out",
                 isCollapsed ? "h-12 w-12" : "h-24 w-auto max-w-[220px]",
               )}
             />
           ) : (
             <div
               className={cn(
-                "brand-icon-box flex items-center justify-center rounded-2xl",
+                "brand-icon-box flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out",
                 isCollapsed ? "h-12 w-12" : "h-24 w-24",
               )}
             >
-              <Warehouse className={isCollapsed ? "h-6 w-6" : "h-11 w-11"} strokeWidth={1.75} />
+              <Warehouse
+                className={cn(
+                  "transition-all duration-300 ease-in-out",
+                  isCollapsed ? "h-6 w-6" : "h-11 w-11",
+                )}
+                strokeWidth={1.75}
+              />
             </div>
           )}
         </Link>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+        <nav className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-4">
           {WMS_NAV_GROUPS.map((group) => {
             const items = group.items.filter((item) => canSeeNavItem(item, user));
             if (!items.length) return null;
 
             return (
               <div key={group.label} className="mb-5">
-                {!isCollapsed ? (
-                  <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-[var(--foreground-muted)]">
-                    {group.label}
-                  </p>
-                ) : (
+                <p
+                  className={cn(
+                    "mb-2 overflow-hidden px-3 text-[11px] font-semibold uppercase tracking-widest text-[var(--foreground-muted)] transition-all duration-300 ease-in-out",
+                    isCollapsed ? "mb-0 max-h-0 opacity-0" : "max-h-8 opacity-100",
+                  )}
+                >
+                  {group.label}
+                </p>
+                {!isCollapsed ? null : (
                   <div className="mb-2 h-px bg-[var(--border-subtle)]" aria-hidden />
                 )}
                 <ul className="space-y-0.5">
@@ -103,7 +113,11 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
                             )}
                             strokeWidth={active ? 2.25 : 2}
                           />
-                          {!isCollapsed ? <span className="truncate">{item.label}</span> : null}
+                          {!isCollapsed ? (
+                            <span className="truncate transition-opacity duration-300 ease-in-out">
+                              {item.label}
+                            </span>
+                          ) : null}
                         </Link>
                       </li>
                     );
@@ -119,17 +133,19 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
 
   return (
     <>
-      <aside className="hidden h-screen shrink-0 lg:sticky lg:top-0 lg:flex">{sidebarContent()}</aside>
+      <aside className="hidden h-screen shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out lg:sticky lg:top-0 lg:flex">
+        {sidebarContent()}
+      </aside>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 cursor-pointer bg-slate-900/40 backdrop-blur-[1px]"
+            className="absolute inset-0 cursor-pointer bg-slate-900/40 backdrop-blur-[1px] animate-sidebar-backdrop-in"
             onClick={() => setMobileOpen(false)}
             aria-label="Cerrar menú"
           />
-          <aside className="relative z-10 h-full shadow-2xl animate-slide-up">{sidebarContent(true)}</aside>
+          <aside className="relative z-10 h-full shadow-2xl animate-sidebar-in">{sidebarContent(true)}</aside>
         </div>
       ) : null}
     </>

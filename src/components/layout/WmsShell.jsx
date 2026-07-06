@@ -89,7 +89,7 @@ export function WmsShell({ children }) {
         collapsed={sidebarCollapsed}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <AdminHeader onMenuClick={handleMenuClick} />
+        <AdminHeader onMenuClick={handleMenuClick} sidebarCollapsed={sidebarCollapsed} />
         <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--background)] p-4 lg:p-6">
           {routeAllowed ? children : <WmsAccessDenied pathname={pathname} user={user} />}
         </main>

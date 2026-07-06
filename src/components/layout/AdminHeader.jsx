@@ -8,12 +8,12 @@ import {
   Building2,
   LogOut,
   Maximize,
-  Menu,
   Minimize,
   User,
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { SidebarToggle } from "@/components/layout/SidebarToggle";
 
 import { cn } from "@/lib/cn";
 import {
@@ -44,7 +44,7 @@ function HeaderIconButton({ children, className, badge, ...props }) {
   );
 }
 
-export function AdminHeader({ onMenuClick }) {
+export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const { workspace, displayName } = useWorkspace();
@@ -88,14 +88,7 @@ export function AdminHeader({ onMenuClick }) {
   return (
     <header className="sticky top-0 z-30 flex h-[var(--header-height)] items-center justify-between gap-4 border-b border-[var(--border)] bg-[var(--header-bg)] px-4 transition-colors duration-300 lg:px-5">
       <div className="flex min-w-0 items-center gap-3">
-        <button
-          type="button"
-          onClick={onMenuClick}
-          aria-label="Menú"
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
-        >
-          <Menu className="h-5 w-5" strokeWidth={2} />
-        </button>
+        <SidebarToggle collapsed={sidebarCollapsed} onClick={onMenuClick} />
 
         <div className="hidden min-w-0 items-center gap-3 md:flex">
           {logotypeUrl ? (
