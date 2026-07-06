@@ -20,6 +20,10 @@ echo "[setup] Allowing nginx to read letsencrypt challenges..."
 mkdir -p /var/www/letsencrypt
 chown -R www-data:www-data /var/www/letsencrypt
 
+echo "[setup] Tip: en servidores multi-proyecto (webapp), instala también"
+echo "       frontend/scripts/nginx/000-default-unconfigured.conf como catch-all"
+echo "       para que subdominios sin vhost no caigan en otro proyecto."
+
 cat <<'EOF'
 
 [setup] Done. Siguientes pasos (ejecutar desde tu Mac / máquina de desarrollo).
@@ -36,6 +40,16 @@ REMOTE_PATH="/home/git/ubintrack"
 NGINX_SITE="rbcold.ubintrack.com"
 
 ──────────────────────────────────────────────────────────────────────────────
+0b) Catch-all nginx en webapp (una sola vez por servidor multi-proyecto)
+──────────────────────────────────────────────────────────────────────────────
+scp "$LOCAL_FRONTEND/scripts/nginx/000-default-unconfigured.conf" \
+  "${REMOTE_HOST}:/tmp/000-default-unconfigured.conf"
+
+ssh "${REMOTE_HOST}" "sudo cp /tmp/000-default-unconfigured.conf /etc/nginx/sites-available/000-default-unconfigured.conf && \
+  sudo ln -sf /etc/nginx/sites-available/000-default-unconfigured.conf /etc/nginx/sites-enabled/000-default-unconfigured.conf && \
+  sudo nginx -t && sudo systemctl reload nginx"
+
+──────────────────────────────────────────────────────────────────────────────
 1) Primer deploy del bundle compilado (standalone + Node)
 ──────────────────────────────────────────────────────────────────────────────
 cd "$LOCAL_FRONTEND" && ./scripts/deploy.sh
@@ -43,7 +57,7 @@ cd "$LOCAL_FRONTEND" && ./scripts/deploy.sh
 ──────────────────────────────────────────────────────────────────────────────
 2) Nginx + systemd (una sola vez; DNS de rbcold.ubintrack.com → servidor)
 ──────────────────────────────────────────────────────────────────────────────
-scp "$LOCAL_FRONTEND/scripts/nginx/rbcold.publivalla.com.conf" \
+scp "$LOCAL_FRONTEND/scripts/nginx/rbcold.ubintrack.com.conf" \
   "${REMOTE_HOST}:/tmp/${NGINX_SITE}.conf"
 
 ssh "${REMOTE_HOST}" "sudo cp /tmp/${NGINX_SITE}.conf /etc/nginx/sites-available/${NGINX_SITE}.conf && \
