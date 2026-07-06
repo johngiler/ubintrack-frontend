@@ -4,17 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Warehouse } from "lucide-react";
 
+import { NavCountBadge } from "@/components/layout/NavCountBadge";
+import { useTheme } from "@/context/ThemeContext";
+import { useWorkspace } from "@/context/WorkspaceContext";
+import { useNavCounts } from "@/hooks/useNavCounts";
 import { cn } from "@/lib/cn";
 import { getDefaultHomeRoute } from "@/lib/wmsRouteAccess";
 import { canSeeNavItem, WMS_NAV_GROUPS } from "@/lib/wmsNavConfig";
 import { getWorkspaceLogoUrl, isSidebarLogoGradientEnabled } from "@/lib/workspaceMedia";
-import { useWorkspace } from "@/context/WorkspaceContext";
-import { useTheme } from "@/context/ThemeContext";
 
 export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
   const pathname = usePathname();
   const { workspace } = useWorkspace();
   const { isDark } = useTheme();
+  const { counts } = useNavCounts();
   const logoUrl = getWorkspaceLogoUrl(workspace);
   const homeHref = getDefaultHomeRoute(user);
   const logoGradient = isSidebarLogoGradientEnabled(workspace, isDark);
@@ -91,13 +94,18 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
                   {items.map((item) => {
                     const Icon = item.icon;
                     const active = pathname.startsWith(item.href);
+                    const itemCount = counts[item.href];
+                    const countTitle =
+                      itemCount > 999
+                        ? `${item.label} · ${Number(itemCount).toLocaleString("es")}`
+                        : undefined;
 
                     return (
                       <li key={item.href}>
                         <Link
                           href={item.href}
                           onClick={() => isMobile && setMobileOpen?.(false)}
-                          title={isCollapsed ? item.label : undefined}
+                          title={isCollapsed ? item.label : countTitle}
                           className={cn(
                             "nav-link-brand group flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-150",
                             active
@@ -114,9 +122,12 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
                             strokeWidth={active ? 2.25 : 2}
                           />
                           {!isCollapsed ? (
-                            <span className="truncate transition-opacity duration-300 ease-in-out">
-                              {item.label}
-                            </span>
+                            <>
+                              <span className="min-w-0 flex-1 truncate transition-opacity duration-300 ease-in-out">
+                                {item.label}
+                              </span>
+                              <NavCountBadge count={itemCount} active={active} />
+                            </>
                           ) : null}
                         </Link>
                       </li>
