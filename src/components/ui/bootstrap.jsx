@@ -7,7 +7,7 @@ import React from "react";
 
 import { cn } from "@/lib/cn";
 import {
-  fieldRingClass,
+  inputFieldRingClass,
   splitBootstrapFieldProps,
 } from "@/lib/bootstrapFieldProps";
 
@@ -61,14 +61,7 @@ function FormControl(props) {
   const { className, size, as: As, rows, ...rest } = domProps;
 
   const sizeClass = size === "sm" ? "h-8 text-xs rounded-lg" : "";
-  const base = cn(
-    "flex w-full rounded-xl bg-[var(--surface)] px-3 text-sm text-[var(--foreground)] ring-1 ring-[var(--border)]",
-    "placeholder:text-[var(--foreground-muted)]",
-    "focus:outline-none focus:ring-2",
-    fieldRingClass(isInvalid, isValid),
-    sizeClass,
-    className,
-  );
+  const base = cn(inputFieldRingClass(isInvalid, isValid), "flex w-full px-3", sizeClass, className);
 
   if (As === "textarea" || rest.type === "textarea") {
     return <textarea rows={rows || 3} className={cn(base, "min-h-[88px] py-2")} {...rest} />;

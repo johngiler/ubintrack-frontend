@@ -1083,10 +1083,10 @@ const ModalEdit = ({
                         </Form.Text>
                       )}
                       {!isViewMode && !isClientUser && (
-                        <Form.Text className="!mt-1.5 block text-xs leading-relaxed text-slate-500">
+                        <Form.Text className="!mt-1.5 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                           Solo se puede cambiar manualmente a{" "}
-                          <span className="font-medium text-slate-700">Pendiente</span> y{" "}
-                          <span className="font-medium text-slate-700">Cancelada</span>. Los
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Pendiente</span> y{" "}
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Cancelada</span>. Los
                           otros estados se actualizan automáticamente por el sistema.
                         </Form.Text>
                       )}
@@ -1459,11 +1459,6 @@ const ModalEdit = ({
                                           control: (base) => ({
                                             ...base,
                                             width: "100%",
-                                            ...(isViewMode ||
-                                            !selectedExit.client ||
-                                            group.id
-                                              ? { backgroundColor: "#e9ecef" }
-                                              : {}),
                                           }),
                                           container: (base) => ({
                                             ...base,

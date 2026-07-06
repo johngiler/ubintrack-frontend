@@ -72,7 +72,7 @@ export default function Select(props) {
   );
 
   if (!SelectComponent) {
-    return <div className="h-10 animate-pulse rounded-xl bg-slate-100" />;
+    return <div className="h-10 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700/50" />;
   }
 
   return (

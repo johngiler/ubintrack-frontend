@@ -692,7 +692,7 @@ const BinsView = () => {
                               {entry.position?.code ? (
                                 <button
                                   type="button"
-                                  className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                                  className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200/80 hover:bg-sky-100 dark:bg-sky-500/15 dark:text-sky-400 dark:ring-sky-500/25 dark:hover:bg-sky-500/25"
                                   onClick={() =>
                                     navigate(
                                       `/storage/positions?search=${encodeURIComponent(entry.position.code)}`,

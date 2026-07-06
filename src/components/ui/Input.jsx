@@ -2,7 +2,7 @@
 
 import ReactSelectWrapper from "@/components/ui/Select";
 import { cn } from "@/lib/cn";
-import { fieldRingClass, splitBootstrapFieldProps } from "@/lib/bootstrapFieldProps";
+import { inputFieldRingClass, splitBootstrapFieldProps } from "@/lib/bootstrapFieldProps";
 
 export function Input(props) {
   const { isInvalid, isValid, domProps } = splitBootstrapFieldProps(props);
@@ -20,11 +20,8 @@ export function Input(props) {
       ) : null}
       <input
         className={cn(
-          "flex h-10 w-full rounded-xl bg-[var(--surface)] text-sm text-[var(--foreground)] ring-1 ring-[var(--border)]",
-          "placeholder:text-[var(--foreground-muted)] transition-colors",
-          "focus:outline-none focus:ring-2",
-          fieldRingClass(isInvalid, isValid),
-          "disabled:cursor-not-allowed disabled:opacity-50",
+          inputFieldRingClass(isInvalid, isValid),
+          "flex h-10 w-full disabled:cursor-not-allowed disabled:opacity-50",
           Icon ? "pl-10 pr-3" : "px-3",
           rest.type === "search" &&
             "[appearance:textfield] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden",
@@ -54,12 +51,7 @@ export function Textarea(props) {
 
   return (
     <textarea
-      className={cn(
-        "flex min-h-[88px] w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] ring-1 ring-[var(--border)]",
-        "focus:border-sky-400 focus:outline-none focus:ring-2",
-        fieldRingClass(isInvalid, isValid),
-        className,
-      )}
+      className={cn(inputFieldRingClass(isInvalid, isValid), "flex min-h-[88px] w-full px-3 py-2", className)}
       {...rest}
     />
   );

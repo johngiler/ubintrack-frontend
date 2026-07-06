@@ -18,6 +18,7 @@
   --sidebar-active: transparent;
   --surface: #ffffff;
   --surface-hover: #f8fafc;
+  --input-border: rgba(15, 23, 42, 0.14);
   --border: rgba(15, 23, 42, 0.08);
   --border-subtle: rgba(15, 23, 42, 0.06);
   --accent: #0ea5e9;
@@ -63,6 +64,7 @@
   --brand-surface: var(--sidebar-active);
   --surface: #1e293b;
   --surface-hover: #334155;
+  --input-border: rgba(148, 163, 184, 0.28);
   --border: rgba(255, 255, 255, 0.08);
   --border-subtle: rgba(255, 255, 255, 0.06);
   --accent: #38bdf8;
@@ -76,6 +78,15 @@
 
 html.dark {
   color-scheme: dark;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--foreground);
+  box-shadow: 0 0 0 1000px var(--surface) inset;
 }
 
 @theme inline {
@@ -265,4 +276,155 @@ body {
 .dark .hover\:bg-slate-50:hover,
 .dark .hover\:bg-slate-100:hover {
   background-color: var(--surface-hover);
+}
+
+/* react-select searchable: evita fondo blanco cuando vistas hacen `...base` en styles.control */
+.dark .react-select__control {
+  background-color: var(--surface) !important;
+  border-color: var(--input-border) !important;
+  color: var(--foreground);
+}
+
+.dark .react-select__control--is-disabled {
+  background-color: var(--surface-hover) !important;
+}
+
+.dark .react-select__single-value,
+.dark .react-select__input-container {
+  color: var(--foreground);
+}
+
+.dark .react-select__input-container input {
+  color: var(--foreground) !important;
+  background: transparent !important;
+}
+
+.dark .react-select__placeholder {
+  color: var(--foreground-muted);
+}
+
+.dark .react-select__menu {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--input-border);
+}
+
+.dark .react-select__option {
+  color: var(--foreground);
+}
+
+.dark .react-select__option--is-focused {
+  background-color: var(--surface-hover);
+}
+
+.dark .react-select__option--is-selected {
+  background-color: var(--accent);
+  color: #fff;
+}
+
+.dark .react-select__dropdown-indicator,
+.dark .react-select__clear-indicator {
+  color: var(--foreground-muted);
+}
+
+/* Timeline historial de movimientos (bins / salidas) */
+.wms-movements-timeline {
+  position: relative;
+  padding-left: 1.5rem;
+  color: var(--foreground);
+}
+
+@media (min-width: 576px) {
+  .wms-movements-timeline {
+    padding-left: 2rem;
+  }
+}
+
+.wms-movements-timeline .timeline-item {
+  position: relative;
+  padding-bottom: 1.5rem;
+}
+
+.wms-movements-timeline .timeline-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: -1rem;
+  top: 2rem;
+  bottom: -0.5rem;
+  width: 2px;
+  background-color: var(--input-border);
+}
+
+@media (min-width: 576px) {
+  .wms-movements-timeline .timeline-item:not(:last-child)::before {
+    left: -1.5rem;
+  }
+}
+
+.wms-movements-timeline .timeline-icon {
+  position: absolute;
+  left: -1.5rem;
+  top: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--input-border);
+  z-index: 1;
+}
+
+@media (min-width: 576px) {
+  .wms-movements-timeline .timeline-icon {
+    left: -2rem;
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+.wms-movements-timeline .timeline-content {
+  background-color: color-mix(in srgb, var(--surface-hover) 55%, var(--surface));
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  border-left: 4px solid var(--border);
+  color: var(--foreground);
+}
+
+@media (min-width: 576px) {
+  .wms-movements-timeline .timeline-content {
+    padding: 1rem;
+  }
+}
+
+.wms-movements-timeline .timeline-content h6 {
+  color: var(--foreground);
+}
+
+.wms-movements-timeline .info-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+@media (min-width: 576px) {
+  .wms-movements-timeline .info-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .wms-movements-timeline .info-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.wms-movements-timeline .link-badge {
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.wms-movements-timeline .link-badge:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
 }

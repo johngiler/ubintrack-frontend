@@ -326,7 +326,7 @@ export default function OwnerSettingsView() {
                               setForm((prev) => ({ ...prev, primary_color: e.target.value }));
                               setSuccess(null);
                             }}
-                            className="h-[38px] w-10 shrink-0 cursor-pointer rounded border border-[var(--border)] bg-transparent"
+                            className="h-[38px] w-10 shrink-0 cursor-pointer rounded border border-[var(--input-border)] bg-transparent"
                             aria-label="Selector color primario"
                           />
                         </div>
@@ -350,7 +350,7 @@ export default function OwnerSettingsView() {
                               setForm((prev) => ({ ...prev, secondary_color: e.target.value }));
                               setSuccess(null);
                             }}
-                            className="h-[38px] w-10 shrink-0 cursor-pointer rounded border border-[var(--border)] bg-transparent"
+                            className="h-[38px] w-10 shrink-0 cursor-pointer rounded border border-[var(--input-border)] bg-transparent"
                             aria-label="Selector color secundario"
                           />
                         </div>

@@ -63,37 +63,60 @@ export function buildReactSelectStyles({
   isDark = false,
 } = {}) {
   const minHeight = CONTROL_HEIGHT[size] ?? CONTROL_HEIGHT.default;
-  const fontSize = contextFontSize(size);
   const invalidStyles = reactSelectInvalidStyles(isInvalid);
   const tokens = typeof window !== "undefined" ? readThemeTokens() : null;
 
   const surface = tokens?.surface ?? (isDark ? "#1e293b" : "#ffffff");
   const foreground = tokens?.foreground ?? (isDark ? "#f1f5f9" : "#0f172a");
   const foregroundMuted = tokens?.foregroundMuted ?? (isDark ? "#94a3b8" : "#64748b");
-  const border = tokens?.border ?? (isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0");
+  const border = tokens?.inputBorder ?? tokens?.border ?? (isDark ? "rgba(148,163,184,0.28)" : "#e2e8f0");
   const surfaceHover = tokens?.surfaceHover ?? (isDark ? "#334155" : "#f0f9ff");
   const accent = tokens?.accent ?? "#0ea5e9";
 
-  const withFont = (key, base, state, extra = {}) => ({
-    ...base,
-    fontSize,
-    ...extra,
-    ...(styles[key]?.(base, state) ?? {}),
-  });
+  function withFont(key, base, state, extra = {}) {
+    const fontSize = contextFontSize(size);
+    const custom = styles[key]?.(base, state) ?? {};
+    const merged = {
+      ...base,
+      fontSize,
+      ...extra,
+      ...custom,
+    };
+
+    // Los overrides de vistas suelen hacer `...base` y restauran el fondo blanco por defecto.
+    if (extra.backgroundColor != null && key !== "option") {
+      merged.backgroundColor = extra.backgroundColor;
+    }
+    if (extra.color != null && key !== "option") {
+      merged.color = extra.color;
+    }
+    if (custom.borderColor != null) {
+      merged.borderColor = custom.borderColor;
+    } else if (extra.borderColor != null) {
+      merged.borderColor = extra.borderColor;
+    }
+    if (custom.boxShadow != null) {
+      merged.boxShadow = custom.boxShadow;
+    } else if (extra.boxShadow != null) {
+      merged.boxShadow = extra.boxShadow;
+    }
+
+    return merged;
+  }
 
   return {
     ...styles,
     container: (base, state) => ({
       ...base,
       width: "100%",
-      fontSize,
+      fontSize: contextFontSize(size),
       ...(styles.container?.(base, state) ?? {}),
     }),
     control: (base, state) => ({
       ...withFont("control", base, state, {
         minHeight,
         borderRadius: 12,
-        backgroundColor: surface,
+        backgroundColor: state.isDisabled ? surfaceHover : surface,
         borderColor: isInvalid ? "#f87171" : border,
         color: foreground,
         boxShadow: state.isFocused
@@ -102,7 +125,7 @@ export function buildReactSelectStyles({
             : `0 0 0 1px ${accent}`
           : "none",
         "&:hover": {
-          borderColor: isInvalid ? "#ef4444" : isDark ? "rgba(255,255,255,0.16)" : "#cbd5e1",
+          borderColor: isInvalid ? "#ef4444" : isDark ? "rgba(148,163,184,0.38)" : "#cbd5e1",
         },
       }),
       ...(invalidStyles.control?.(base, state) ?? {}),
@@ -118,6 +141,7 @@ export function buildReactSelectStyles({
       withFont("input", base, state, {
         margin: 0,
         padding: 0,
+        color: foreground,
       }),
     placeholder: (base, state) =>
       withFont("placeholder", base, state, {
@@ -145,6 +169,18 @@ export function buildReactSelectStyles({
             ? surfaceHover
             : surface,
         color: state.isSelected ? "#fff" : foreground,
+      }),
+    dropdownIndicator: (base, state) =>
+      withFont("dropdownIndicator", base, state, {
+        color: foregroundMuted,
+      }),
+    clearIndicator: (base, state) =>
+      withFont("clearIndicator", base, state, {
+        color: foregroundMuted,
+      }),
+    loadingIndicator: (base, state) =>
+      withFont("loadingIndicator", base, state, {
+        color: accent,
       }),
   };
 }

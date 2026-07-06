@@ -10,6 +10,7 @@ import {
   findSelectOption,
   resolveReactSelectComponent,
 } from "@/lib/reactSelectTheme";
+import { useTheme } from "@/context/ThemeContext";
 
 function resolveCreatableComponent() {
   if (typeof window === "undefined") return null;
@@ -61,13 +62,15 @@ export default function CreatableSelect(props) {
     );
   }, [options, value, formatOptionLabel]);
 
+  const { isDark } = useTheme();
+
   const mergedStyles = useMemo(
-    () => buildReactSelectStyles({ isInvalid, size, styles }),
-    [isInvalid, size, styles],
+    () => buildReactSelectStyles({ isInvalid, size, styles, isDark }),
+    [isInvalid, size, styles, isDark],
   );
 
   if (!SelectComponent) {
-    return <div className="h-10 animate-pulse rounded-xl bg-slate-100" />;
+    return <div className="h-10 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700/50" />;
   }
 
   return (

@@ -1,16 +1,27 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Badge, Spinner } from "@/components/ui/bootstrap";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
-import { getBinMovements } from "@/services/inventoryService";
+
+import {
+  BinMovementIcon,
+  inlineIconClass,
+  TimelineBuilding,
+  TimelineCalendar,
+  TimelineCheckCircle,
+  TimelineExternalLink,
+  TimelineInbox,
+  TimelineMapPin,
+  TimelineUndo,
+  TimelineUser,
+} from "@/components/timeline/TimelineIcons";
+import { Badge, Spinner } from "@/components/ui/bootstrap";
 import { formatDateTime } from "@/lib/format";
+import { getBinMovements } from "@/services/inventoryService";
 
 const BinMovementsTimeline = ({ binId }) => {
-  const navigate = useWmsNavigate();
   const [movements, setMovements] = useState([]);
-  const [binInfo, setBinInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -26,32 +37,12 @@ const BinMovementsTimeline = ({ binId }) => {
     try {
       const data = await getBinMovements(binId);
       setMovements(data.movements || []);
-      setBinInfo({ bin_id: data.bin_id, bin_code: data.bin_code });
     } catch (err) {
       console.error("Error al cargar movimientos:", err);
       setError("Error al cargar el historial de movimientos");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const getMovementIcon = (movementType, newStatus) => {
-    if (movementType === "created") {
-      return "ri-add-circle-line text-success";
-    }
-    if (movementType === "exit_processed") {
-      return "ri-subtract-line text-warning";
-    }
-    if (movementType === "exit_reversed") {
-      return "ri-arrow-go-back-line text-info";
-    }
-    if (movementType === "status_changed") {
-      if (newStatus === "almacenado") return "ri-archive-line text-primary";
-      if (newStatus === "en_despacho") return "ri-truck-line text-info";
-      if (newStatus === "despachado")
-        return "ri-checkbox-circle-line text-secondary";
-    }
-    return "ri-information-line text-secondary";
   };
 
   const getMovementTypeLabel = (movementType, newStatus) => {
@@ -114,7 +105,7 @@ const BinMovementsTimeline = ({ binId }) => {
           >
             <Badge bg="light" text="dark" className="border">
               SKU: {productSku}
-              <i className="ri-external-link-line ms-1"></i>
+              <TimelineExternalLink className={`${inlineIconClass} ms-1`} />
             </Badge>
           </Link>
         )}
@@ -150,120 +141,21 @@ const BinMovementsTimeline = ({ binId }) => {
   if (movements.length === 0) {
     return (
       <div className="text-center py-4 text-muted">
-        <i className="ri-inbox-line fs-1 mb-2 d-block"></i>
+        <TimelineInbox className="mx-auto mb-2 h-10 w-10 text-slate-400" />
         <p>No hay movimientos registrados para este bin</p>
       </div>
     );
   }
 
   return (
-    <div className="bin-movements-timeline">
-      <style>{`
-        .bin-movements-timeline {
-          position: relative;
-          padding-left: 1.5rem;
-        }
-        
-        @media (min-width: 576px) {
-          .bin-movements-timeline {
-            padding-left: 2rem;
-          }
-        }
-        
-        .timeline-item {
-          position: relative;
-          padding-bottom: 1.5rem;
-        }
-        
-        .timeline-item:not(:last-child)::before {
-          content: '';
-          position: absolute;
-          left: -1rem;
-          top: 2rem;
-          bottom: -0.5rem;
-          width: 2px;
-          background-color: #dee2e6;
-        }
-        
-        @media (min-width: 576px) {
-          .timeline-item:not(:last-child)::before {
-            left: -1.5rem;
-          }
-        }
-        
-        .timeline-icon {
-          position: absolute;
-          left: -1.5rem;
-          top: 0.25rem;
-          width: 1.5rem;
-          height: 1.5rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background-color: white;
-          border-radius: 50%;
-          z-index: 1;
-        }
-        
-        @media (min-width: 576px) {
-          .timeline-icon {
-            left: -2rem;
-            width: 2rem;
-            height: 2rem;
-          }
-        }
-        
-        .timeline-content {
-          background-color: #f8f9fa;
-          border-radius: 0.5rem;
-          padding: 0.75rem;
-          border-left: 4px solid #dee2e6;
-        }
-        
-        @media (min-width: 576px) {
-          .timeline-content {
-            padding: 1rem;
-          }
-        }
-
-        .info-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 0.5rem;
-        }
-
-        @media (min-width: 576px) {
-          .info-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (min-width: 768px) {
-          .info-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
-        }
-
-        .link-badge {
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .link-badge:hover {
-          opacity: 0.8;
-          transform: translateY(-1px);
-        }
-      `}</style>
-
+    <div className="wms-movements-timeline">
       {movements.map((movement) => (
         <div key={movement.id} className="timeline-item">
           <div className="timeline-icon">
-            <i
-              className={`${getMovementIcon(
-                movement.movement_type,
-                movement.new_status
-              )} fs-5`}
-            ></i>
+            <BinMovementIcon
+              movementType={movement.movement_type}
+              newStatus={movement.new_status}
+            />
           </div>
 
           <div
@@ -285,12 +177,12 @@ const BinMovementsTimeline = ({ binId }) => {
                   )}
                 </h6>
                 <small className="text-muted d-block">
-                  <i className="ri-calendar-line me-1"></i>
+                  <TimelineCalendar className={`${inlineIconClass} me-1`} />
                   {formatDateTime(movement.created_at)}
                 </small>
                 {movement.client_name && (
                   <small className="text-muted d-block">
-                    <i className="ri-building-line me-1"></i>
+                    <TimelineBuilding className={`${inlineIconClass} me-1`} />
                     {movement.client_name}
                   </small>
                 )}
@@ -298,7 +190,7 @@ const BinMovementsTimeline = ({ binId }) => {
               {movement.created_by && (
                 <div className="text-start text-sm-end">
                   <small className="text-muted">
-                    <i className="ri-user-line me-1"></i>
+                    <TimelineUser className={`${inlineIconClass} me-1`} />
                     {movement.created_by.full_name ||
                       movement.created_by.email ||
                       movement.created_by.username}
@@ -332,7 +224,7 @@ const BinMovementsTimeline = ({ binId }) => {
                   >
                     <Badge bg="dark">
                       {movement.bin_code}
-                      <i className="ri-external-link-line ms-1"></i>
+                      <TimelineExternalLink className={`${inlineIconClass} ms-1`} />
                     </Badge>
                   </Link>
                 </InfoField>
@@ -355,7 +247,7 @@ const BinMovementsTimeline = ({ binId }) => {
                     >
                       <Badge bg="info">
                         {movement.entry_code}
-                        <i className="ri-external-link-line ms-1"></i>
+                        <TimelineExternalLink className={`${inlineIconClass} ms-1`} />
                       </Badge>
                     </Link>
                   ) : (
@@ -380,7 +272,7 @@ const BinMovementsTimeline = ({ binId }) => {
                       <Badge bg={getStatusBadgeVariant(movement.old_status)}>
                         {getStatusLabel(movement.old_status)}
                       </Badge>
-                      <i className="ri-arrow-right-line text-muted"></i>
+                      <ArrowRight className={`${inlineIconClass} text-muted`} />
                       <Badge bg={getStatusBadgeVariant(movement.new_status)}>
                         {getStatusLabel(movement.new_status)}
                       </Badge>
@@ -396,9 +288,9 @@ const BinMovementsTimeline = ({ binId }) => {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Badge bg="info">
-                            <i className="ri-map-pin-line me-1"></i>
+                            <TimelineMapPin className={`${inlineIconClass} me-1`} />
                             {movement.position_code}
-                            <i className="ri-external-link-line ms-1"></i>
+                            <TimelineExternalLink className={`${inlineIconClass} ms-1`} />
                           </Badge>
                         </Link>
                       </InfoField>
@@ -448,7 +340,7 @@ const BinMovementsTimeline = ({ binId }) => {
                         >
                           <Badge bg="info">
                             {movement.exit_code}
-                            <i className="ri-external-link-line ms-1"></i>
+                            <TimelineExternalLink className={`${inlineIconClass} ms-1`} />
                           </Badge>
                         </Link>
                       ) : (
@@ -518,14 +410,14 @@ const BinMovementsTimeline = ({ binId }) => {
                         >
                           <Badge bg="info">
                             {movement.exit_code}
-                            <i className="ri-external-link-line ms-1"></i>
+                            <TimelineExternalLink className={`${inlineIconClass} ms-1`} />
                           </Badge>
                         </Link>
                       ) : (
                         <Badge bg="info">{movement.exit_code || "N/A"}</Badge>
                       )}
                       <Badge bg="secondary">
-                        <i className="ri-arrow-go-back-line me-1"></i>
+                        <TimelineUndo className={`${inlineIconClass} me-1`} />
                         Reversión
                       </Badge>
                     </div>
@@ -572,7 +464,7 @@ const BinMovementsTimeline = ({ binId }) => {
                         <Badge bg={getStatusBadgeVariant(movement.old_status)}>
                           {getStatusLabel(movement.old_status)}
                         </Badge>
-                        <i className="ri-arrow-right-line"></i>
+                        <ArrowRight className={inlineIconClass} />
                         <Badge bg={getStatusBadgeVariant(movement.new_status)}>
                           {getStatusLabel(movement.new_status)}
                         </Badge>
@@ -601,7 +493,7 @@ const BinMovementsTimeline = ({ binId }) => {
                       <Badge bg={getStatusBadgeVariant(movement.old_status)}>
                         {getStatusLabel(movement.old_status)}
                       </Badge>
-                      <i className="ri-arrow-right-line text-muted"></i>
+                      <ArrowRight className={`${inlineIconClass} text-muted`} />
                       <Badge bg={getStatusBadgeVariant(movement.new_status)}>
                         {getStatusLabel(movement.new_status)}
                       </Badge>
@@ -617,9 +509,9 @@ const BinMovementsTimeline = ({ binId }) => {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Badge bg="secondary">
-                            <i className="ri-map-pin-line me-1"></i>
+                            <TimelineMapPin className={`${inlineIconClass} me-1`} />
                             {movement.position_code}
-                            <i className="ri-external-link-line ms-1"></i>
+                            <TimelineExternalLink className={`${inlineIconClass} ms-1`} />
                           </Badge>
                         </Link>
                       </InfoField>
@@ -654,7 +546,7 @@ const BinMovementsTimeline = ({ binId }) => {
                       <Badge bg={getStatusBadgeVariant(movement.old_status)}>
                         {getStatusLabel(movement.old_status)}
                       </Badge>
-                      <i className="ri-arrow-right-line text-muted"></i>
+                      <ArrowRight className={`${inlineIconClass} text-muted`} />
                       <Badge bg={getStatusBadgeVariant(movement.new_status)}>
                         {getStatusLabel(movement.new_status)}
                       </Badge>
@@ -670,7 +562,7 @@ const BinMovementsTimeline = ({ binId }) => {
                       >
                         <Badge bg="secondary">
                           {movement.bin_code}
-                          <i className="ri-checkbox-circle-line ms-1"></i>
+                          <TimelineCheckCircle className={`${inlineIconClass} ms-1`} />
                         </Badge>
                       </Link>
                     </InfoField>
@@ -706,7 +598,7 @@ const BinMovementsTimeline = ({ binId }) => {
                       <Badge bg={getStatusBadgeVariant(movement.old_status)}>
                         {getStatusLabel(movement.old_status)}
                       </Badge>
-                      <i className="ri-arrow-right-line text-muted"></i>
+                      <ArrowRight className={`${inlineIconClass} text-muted`} />
                       <Badge bg={getStatusBadgeVariant(movement.new_status)}>
                         {getStatusLabel(movement.new_status)}
                       </Badge>

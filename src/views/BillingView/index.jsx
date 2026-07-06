@@ -236,7 +236,6 @@ export default function BillingView() {
               label="Total facturación"
               value={formatBillingCurrency(summary?.total_billing)}
               badge={`${summary?.total_clients || 0} clientes`}
-              color="#0f172a"
               icon={Users}
             />
             <BillingKpiCard

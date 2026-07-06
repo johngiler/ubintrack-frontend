@@ -1,6 +1,7 @@
 "use client";
 
 import axios from "axios";
+import { hasUserPermission } from "@/lib/userPermissions";
 import { clientTenantSlug, workspaceSlugRequestHeaders } from "@/lib/tenant";
 
 const baseURL =
@@ -40,15 +41,7 @@ export function getApiErrorMessage(error, fallback = "Error inesperado") {
   return fallback;
 }
 
-export const hasPerm = (user, codename) => {
-  if (!user) return false;
-  if (user.is_superuser || user.is_workspace_admin) return true;
-  const perms = user.permissions || [];
-  return perms.some((p) => {
-    const key = typeof p === "string" ? p : p?.key;
-    return key === codename;
-  });
-};
+export const hasPerm = (user, codename) => hasUserPermission(user, codename);
 
 export const canCRUD = (user, appLabel, model) => ({
   add: hasPerm(user, `${appLabel}.add_${model}`),

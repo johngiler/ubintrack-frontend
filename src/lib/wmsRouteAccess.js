@@ -12,12 +12,23 @@ const WMS_ROUTE_RULES = [...collectNavRouteRules(), ...WMS_EXTRA_ROUTE_RULES].so
   (a, b) => b.href.length - a.href.length,
 );
 
-export function getDefaultHomeRoute(user) {
+/** Primer enlace del menú lateral visible para el usuario (mismo criterio que el sidebar). */
+export function getFirstVisibleNavHref(user) {
   if (!user) return "/login";
-  if (user.is_superuser || user.is_workspace_admin || user.user_type === "administrador") {
-    return "/dashboards/sales";
+
+  for (const group of WMS_NAV_GROUPS) {
+    for (const item of group.items) {
+      if (canSeeNavItem(item, user)) {
+        return item.href;
+      }
+    }
   }
-  return "/inventory/bins";
+
+  return "/inventory/products";
+}
+
+export function getDefaultHomeRoute(user) {
+  return getFirstVisibleNavHref(user);
 }
 
 export function getRouteAccessRule(pathname) {

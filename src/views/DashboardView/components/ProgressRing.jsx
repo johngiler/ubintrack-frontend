@@ -15,7 +15,14 @@ export default function ProgressRing({ value, size = 64, strokeWidth = 3, classN
       style={{ width: size, height: size }}
     >
       <svg width={size} height={size} viewBox="0 0 36 36" aria-hidden>
-        <circle cx="18" cy="18" r={radius} fill="none" stroke="#e2e8f0" strokeWidth={strokeWidth} />
+        <circle
+          cx="18"
+          cy="18"
+          r={radius}
+          fill="none"
+          className="stroke-slate-200 dark:stroke-slate-600"
+          strokeWidth={strokeWidth}
+        />
         <circle
           cx="18"
           cy="18"

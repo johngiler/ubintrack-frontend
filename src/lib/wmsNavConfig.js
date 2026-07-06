@@ -25,6 +25,8 @@ import {
   X,
 } from "lucide-react";
 
+import { hasUserPermission, userBypassesPermissions } from "@/lib/userPermissions";
+
 export const WMS_NAV_GROUPS = [
   {
     label: "Dashboards",
@@ -43,23 +45,41 @@ export const WMS_NAV_GROUPS = [
   {
     label: "Inventario",
     items: [
-      { href: "/inventory/products", label: "Productos", icon: Package },
-      { href: "/inventory/bins", label: "Bins", icon: Boxes },
+      { href: "/inventory/products", label: "Productos", icon: Package, viewPerm: "inventory.view_product" },
+      { href: "/inventory/bins", label: "Bins", icon: Boxes, viewPerm: "inventory.view_bin" },
     ],
   },
   {
     label: "Órdenes",
     items: [
-      { href: "/order/entries", label: "Entradas", icon: ArrowDownToLine },
-      { href: "/order/exits", label: "Salidas", icon: ArrowUpFromLine },
+      { href: "/order/entries", label: "Entradas", icon: ArrowDownToLine, viewPerm: "order.view_entry" },
+      { href: "/order/exits", label: "Salidas", icon: ArrowUpFromLine, viewPerm: "order.view_exit" },
     ],
   },
   {
     label: "Bodega",
     items: [
-      { href: "/storage/storages", label: "Bodegas", icon: Building2, staffOnly: true },
-      { href: "/storage/cavas", label: "Cavas", icon: Building, staffOnly: true },
-      { href: "/storage/positions", label: "Posiciones", icon: Grid3x3, staffOnly: true },
+      {
+        href: "/storage/storages",
+        label: "Bodegas",
+        icon: Building2,
+        staffOnly: true,
+        viewPerm: "storage.view_storage",
+      },
+      {
+        href: "/storage/cavas",
+        label: "Cavas",
+        icon: Building,
+        staffOnly: true,
+        viewPerm: "storage.view_cava",
+      },
+      {
+        href: "/storage/positions",
+        label: "Posiciones",
+        icon: Grid3x3,
+        staffOnly: true,
+        viewPerm: "storage.view_position",
+      },
     ],
   },
   {
@@ -72,18 +92,31 @@ export const WMS_NAV_GROUPS = [
   {
     label: "Tareas",
     items: [
-      { href: "/tasks/tasks", label: "Tareas", icon: ListTodo, staffOnly: true },
-      { href: "/tasks/trackings", label: "Seguimiento", icon: Timer, staffOnly: true },
+      {
+        href: "/tasks/tasks",
+        label: "Tareas",
+        icon: ListTodo,
+        staffOnly: true,
+        viewPerm: "task.view_task",
+      },
+      {
+        href: "/tasks/trackings",
+        label: "Seguimiento",
+        icon: Timer,
+        staffOnly: true,
+        viewPerm: "task.view_tasklog",
+      },
     ],
   },
 ];
 
 export function canSeeNavItem(item, user) {
   if (!user) return false;
-  if (user.is_superuser || user.is_workspace_admin) return true;
-  if (item.adminOnly && user.user_type !== "administrador") return false;
+  if (userBypassesPermissions(user)) return true;
+  if (item.adminOnly) return false;
   if (item.staffOnly && user.user_type === "cliente") return false;
-  return true;
+  if (!item.viewPerm) return false;
+  return hasUserPermission(user, item.viewPerm);
 }
 
 export {

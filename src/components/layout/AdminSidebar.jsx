@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Warehouse } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { getDefaultHomeRoute } from "@/lib/wmsRouteAccess";
 import { canSeeNavItem, WMS_NAV_GROUPS } from "@/lib/wmsNavConfig";
 import { getWorkspaceLogoUrl } from "@/lib/workspaceMedia";
 import { useWorkspace } from "@/context/WorkspaceContext";
@@ -13,6 +14,7 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
   const pathname = usePathname();
   const { workspace } = useWorkspace();
   const logoUrl = getWorkspaceLogoUrl(workspace);
+  const homeHref = getDefaultHomeRoute(user);
 
   const sidebarContent = (isMobile = false) => {
     const isCollapsed = !isMobile && collapsed;
@@ -24,9 +26,13 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
           isCollapsed ? "w-[4.75rem]" : "w-64",
         )}
       >
-        <div
+        <Link
+          href={homeHref}
+          onClick={() => isMobile && setMobileOpen?.(false)}
+          aria-label="Inicio"
+          title="Inicio"
           className={cn(
-            "flex shrink-0 flex-col items-center border-b border-[var(--border-subtle)] px-4 py-7",
+            "flex shrink-0 flex-col items-center border-b border-[var(--border-subtle)] px-4 py-7 transition-opacity hover:opacity-90",
             isCollapsed ? "px-2 py-5" : "px-5",
           )}
         >
@@ -50,7 +56,7 @@ export function AdminSidebar({ mobileOpen, setMobileOpen, user, collapsed }) {
               <Warehouse className={isCollapsed ? "h-6 w-6" : "h-11 w-11"} strokeWidth={1.75} />
             </div>
           )}
-        </div>
+        </Link>
 
         <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
           {WMS_NAV_GROUPS.map((group) => {

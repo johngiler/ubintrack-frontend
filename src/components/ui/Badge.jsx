@@ -1,15 +1,15 @@
 import { cn } from "@/lib/cn";
 
 const variants = {
-  default: "bg-slate-100 text-slate-700 ring-1 ring-slate-200/80",
-  primary: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/80",
-  success: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80",
-  warning: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80",
-  danger: "bg-red-50 text-red-700 ring-1 ring-red-200/80",
-  secondary: "bg-slate-50 text-slate-600 ring-1 ring-slate-200/60",
-  info: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/80",
+  default: "bg-slate-100 text-slate-700 ring-1 ring-slate-200/80 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-500/25",
+  primary: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/80 dark:bg-sky-500/15 dark:text-sky-400 dark:ring-sky-500/25",
+  success: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-500/25",
+  warning: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/25",
+  danger: "bg-red-50 text-red-700 ring-1 ring-red-200/80 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/25",
+  secondary: "bg-slate-50 text-slate-600 ring-1 ring-slate-200/60 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-500/25",
+  info: "bg-sky-50 text-sky-700 ring-1 ring-sky-200/80 dark:bg-sky-500/15 dark:text-sky-400 dark:ring-sky-500/25",
   dark: "bg-slate-800 text-slate-100 ring-1 ring-slate-700",
-  light: "bg-slate-50 text-slate-700 ring-1 ring-slate-200",
+  light: "bg-slate-50 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-500/25",
 };
 
 const dots = {

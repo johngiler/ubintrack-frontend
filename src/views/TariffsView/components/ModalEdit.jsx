@@ -159,7 +159,7 @@ export default function ModalEdit({ show, onHide, tariff, mode, onSave, showAler
           </Modal.Section>
 
           <Modal.Section title="Tarifa dinámica / estática" className="!p-3.5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
               <Settings className="h-4 w-4 text-sky-600" />
               Configuración de rotación
             </div>
@@ -211,7 +211,7 @@ export default function ModalEdit({ show, onHide, tariff, mode, onSave, showAler
             </Row>
           </Modal.Section>
 
-          <div className="mb-4 flex items-center gap-2 px-1 text-sm font-medium text-slate-700">
+          <div className="mb-4 flex items-center gap-2 px-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             <ArrowLeftRight className="h-4 w-4 text-emerald-600" />
             Tarifas de entrada y salida por condición
           </div>
@@ -227,7 +227,7 @@ export default function ModalEdit({ show, onHide, tariff, mode, onSave, showAler
           ))}
 
           <Modal.Section title="Almacenamiento mensual por condición" className="!p-3.5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
               <Box className="h-4 w-4 text-sky-600" />
               Tarifa por pallet promedio
             </div>
@@ -279,12 +279,12 @@ export default function ModalEdit({ show, onHide, tariff, mode, onSave, showAler
           </Modal.Section>
 
           <Modal.Section title="Servicios adicionales" className="!p-3.5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
               <Wrench className="h-4 w-4 text-violet-600" />
               Picking y servicios
             </div>
 
-            <div className="mb-4 rounded-xl border border-violet-200/80 bg-violet-50/40 p-3.5">
+            <div className="mb-4 rounded-xl border border-violet-200/80 bg-violet-50/40 p-3.5 dark:border-violet-500/25 dark:bg-violet-500/10">
               <Row className="items-center gap-y-3">
                 <Col md={4}>
                   <Form.Group>

@@ -52,15 +52,15 @@ function ExitBinCard({
     <article
       className={`rounded-lg border p-3 text-sm ${
         product.is_processed
-          ? "border-slate-200 bg-slate-50/70"
+          ? "border-slate-200 bg-slate-50/70 dark:border-slate-700/60 dark:bg-slate-800/40"
           : hasConflict
-            ? "border-amber-300/80 bg-amber-50/30"
-            : "border-slate-200 bg-white"
+            ? "border-amber-300/80 bg-amber-50/30 dark:border-amber-500/30 dark:bg-amber-500/10"
+            : "border-slate-200 bg-white dark:border-slate-700/60 dark:bg-[var(--surface)]"
       }`}
     >
       {hasConflict && (
-        <div className="mb-3 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <div className="mb-3 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <div className="min-w-0 flex-1">
             <p className="font-semibold">Sin stock en este bin</p>
             <p className="mt-0.5 leading-relaxed">
@@ -68,18 +68,18 @@ function ExitBinCard({
               <strong>{product.available_quantity ?? 0}</strong> disponible(s).
             </p>
             {product.alternative_bin && (
-              <div className="mt-2 border-t border-amber-200/80 pt-2">
+              <div className="mt-2 border-t border-amber-200/80 pt-2 dark:border-amber-500/25">
                 <p className="flex items-center gap-1 font-medium">
                   <ArrowRight className="h-3.5 w-3.5" />
                   Se reasignará a: {product.alternative_bin.bin_code}
                   {product.alternative_bin.position ? (
-                    <span className="font-normal text-amber-800/80">
+                    <span className="font-normal text-amber-800/80 dark:text-amber-300/80">
                       {" "}
                       (Pos: {product.alternative_bin.position})
                     </span>
                   ) : null}
                 </p>
-                <p className="mt-1 text-amber-800/80">
+                <p className="mt-1 text-amber-800/80 dark:text-amber-300/80">
                   Disponible: {product.alternative_bin.quantity} {product.product_uom}
                   {product.alternative_bin.same_batch ? (
                     <Badge variant="success" dot={false} className="ms-1.5 !py-0 text-[10px]">
@@ -91,7 +91,7 @@ function ExitBinCard({
                   variant="outline"
                   size="sm"
                   icon={RefreshCw}
-                  className="mt-2 w-full border-amber-300 text-amber-900 hover:bg-amber-100"
+                  className="mt-2 w-full border-amber-300 text-amber-900 hover:bg-amber-100 dark:border-amber-500/40 dark:text-amber-200 dark:hover:bg-amber-500/15"
                   onClick={(e) => {
                     e.stopPropagation();
                     onReassign(product.id);
@@ -108,7 +108,7 @@ function ExitBinCard({
       <div className="mb-2 flex items-center gap-2">
         <button
           type="button"
-          className="inline-flex items-center gap-1 text-left text-sm font-semibold text-sky-600 hover:underline"
+          className="inline-flex items-center gap-1 text-left text-sm font-semibold text-sky-600 hover:underline dark:text-sky-400"
           title={`Ver bin: ${product.bin_code}`}
           onClick={(e) => {
             e.stopPropagation();
@@ -150,41 +150,41 @@ function ExitBinCard({
         </Badge>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600 dark:text-slate-400">
         <div>
-          <dt className="text-slate-500">{product.is_processed ? "Procesado" : "Reservado"}</dt>
-          <dd className="font-medium text-slate-800">
+          <dt className="text-slate-500 dark:text-slate-400">{product.is_processed ? "Procesado" : "Reservado"}</dt>
+          <dd className="font-medium text-slate-800 dark:text-slate-100">
             {product.quantity} {product.product_uom}
           </dd>
         </div>
         {!product.is_processed ? (
           <div>
-            <dt className="text-slate-500">Disponible en bin</dt>
-            <dd className="font-medium text-slate-800">
+            <dt className="text-slate-500 dark:text-slate-400">Disponible en bin</dt>
+            <dd className="font-medium text-slate-800 dark:text-slate-100">
               {product.available_quantity ?? 0} {product.product_uom}
             </dd>
           </div>
         ) : null}
         <div>
-          <dt className="text-slate-500">Posición</dt>
-          <dd className="font-medium text-slate-800">{product.position || "—"}</dd>
+          <dt className="text-slate-500 dark:text-slate-400">Posición</dt>
+          <dd className="font-medium text-slate-800 dark:text-slate-100">{product.position || "—"}</dd>
         </div>
         {product.batch ? (
           <div>
-            <dt className="text-slate-500">Lote</dt>
-            <dd className="font-medium text-slate-800">{product.batch}</dd>
+            <dt className="text-slate-500 dark:text-slate-400">Lote</dt>
+            <dd className="font-medium text-slate-800 dark:text-slate-100">{product.batch}</dd>
           </div>
         ) : null}
         {product.expiration_date ? (
           <div className="col-span-2">
-            <dt className="text-slate-500">Vence</dt>
-            <dd className="font-medium text-slate-800">{formatDate(product.expiration_date)}</dd>
+            <dt className="text-slate-500 dark:text-slate-400">Vence</dt>
+            <dd className="font-medium text-slate-800 dark:text-slate-100">{formatDate(product.expiration_date)}</dd>
           </div>
         ) : null}
       </dl>
 
       {(canProcess || canReplace || canReverse) && (
-        <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-2.5">
+        <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-700/60">
           {canReplace ? (
             <Button
               variant="outline"
@@ -218,7 +218,7 @@ function ExitBinCard({
               variant="outline"
               size="sm"
               icon={RefreshCw}
-              className="border-amber-300 text-amber-800 hover:bg-amber-50"
+              className="border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/15"
               onClick={(e) => {
                 e.stopPropagation();
                 onReverse(product.id, exit.id);
@@ -259,17 +259,17 @@ function ProductGroupCard({
     group.exit_products?.filter((b) => !b.is_processed).length ?? 0;
 
   return (
-    <article className="w-[380px] max-w-full shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <header className="border-b border-slate-100 px-3.5 py-3">
+    <article className="w-[380px] max-w-full shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700/60 dark:bg-[var(--surface)]">
+      <header className="border-b border-slate-100 px-3.5 py-3 dark:border-slate-700/60">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h6 className="text-sm font-semibold uppercase leading-snug text-slate-900">
+            <h6 className="text-sm font-semibold uppercase leading-snug text-slate-900 dark:text-slate-100">
               {group.product_name}
             </h6>
             {group.product_sku ? (
               <button
                 type="button"
-                className="mt-1 inline-flex items-center gap-1 text-xs text-sky-600 hover:underline"
+                className="mt-1 inline-flex items-center gap-1 text-xs text-sky-600 hover:underline dark:text-sky-400"
                 onClick={() =>
                   navigate(`/inventory/products?search=${encodeURIComponent(group.product_sku)}`)
                 }
@@ -292,7 +292,7 @@ function ProductGroupCard({
             ) : (
               <IconButton
                 size="sm"
-                className="text-emerald-600 hover:bg-emerald-50"
+                className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
                 disabled={processingGroupId !== null}
                 title="Procesar todos los bins"
                 onClick={() => onProcessAllBins(group.id)}
@@ -320,7 +320,7 @@ function ProductGroupCard({
 
       <div className="space-y-2.5 p-3.5">
         {showInventoryAlert ? (
-          <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-900">
+          <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-900 dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-200">
             <p className="font-semibold">Estado de inventario</p>
             <p className="mt-1">
               Reservado (no procesado):{" "}
@@ -359,7 +359,7 @@ function ProductGroupCard({
             ))}
           </div>
         ) : (
-          <p className="py-4 text-center text-sm text-slate-500">Sin bins asignados</p>
+          <p className="py-4 text-center text-sm text-slate-500 dark:text-slate-400">Sin bins asignados</p>
         )}
       </div>
     </article>
@@ -383,14 +383,14 @@ export default function ExitExpandedProducts({
 
   if (!groups.length) {
     return (
-      <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-500">
+      <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700/60 dark:bg-slate-900/30 dark:text-slate-400">
         Este pedido no tiene productos asignados
       </div>
     );
   }
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3">
+    <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/30">
       <div className="flex gap-3 overflow-x-auto pb-1">
         {groups.map((group) => (
           <ProductGroupCard

@@ -65,10 +65,10 @@ export default function ClientBranches({ branches, onChange, readOnly, showValid
     return (
       <div
         key={branch.id || branch.temp_id}
-        className="mb-2 overflow-hidden rounded-xl border border-slate-200/80 bg-white"
+        className="mb-2 overflow-hidden rounded-xl border border-slate-200/80 bg-white dark:border-slate-700/60 dark:bg-[var(--surface)]"
       >
         <div
-          className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2.5 hover:bg-slate-50/80"
+          className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
           onClick={() => setExpandedBranch(isExpanded ? null : index)}
         >
           <div className="flex min-w-0 items-center gap-2">
@@ -77,8 +77,8 @@ export default function ClientBranches({ branches, onChange, readOnly, showValid
             ) : (
               <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
             )}
-            <span className="text-sm font-semibold text-slate-800">Sucursal {index + 1}</span>
-            <span className="truncate text-sm text-slate-500">{branch.name || "Sin nombre"}</span>
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Sucursal {index + 1}</span>
+            <span className="truncate text-sm text-slate-500 dark:text-slate-400">{branch.name || "Sin nombre"}</span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Badge variant={branch.is_active ? "success" : "danger"} dot={false}>
@@ -86,7 +86,7 @@ export default function ClientBranches({ branches, onChange, readOnly, showValid
             </Badge>
             <IconButton
               size="sm"
-              className="text-red-600 hover:bg-red-50"
+              className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
               onClick={(e) => {
                 e.stopPropagation();
                 handleRemoveBranch(index);
@@ -98,7 +98,7 @@ export default function ClientBranches({ branches, onChange, readOnly, showValid
           </div>
         </div>
         {isExpanded && (
-          <div className="border-t border-slate-100 px-3 py-3">
+          <div className="border-t border-slate-100 px-3 py-3 dark:border-slate-700/60">
             <Row className="gap-y-3">
               <Col md={6}>
                 <Form.Group>
@@ -181,15 +181,15 @@ export default function ClientBranches({ branches, onChange, readOnly, showValid
     return (
       <article
         key={branch.id || branch.temp_id}
-        className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm"
+        className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-700/60 dark:bg-[var(--surface)]"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-800/40">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">
               <MapPin className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <h6 className="mb-0 truncate text-sm font-semibold text-slate-900">
+              <h6 className="mb-0 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {branch.name || "—"}
               </h6>
               <p className="mb-0 text-xs text-slate-500">Sucursal {index + 1}</p>
@@ -227,7 +227,7 @@ export default function ClientBranches({ branches, onChange, readOnly, showValid
           </div>
 
           {hasCoordinates && (
-            <div className="overflow-hidden rounded-lg ring-1 ring-slate-200">
+            <div className="overflow-hidden rounded-lg ring-1 ring-slate-200 dark:ring-slate-700/60">
               <iframe
                 width="100%"
                 height="160"

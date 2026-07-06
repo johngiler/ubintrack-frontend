@@ -106,8 +106,8 @@ export default function DashboardView() {
         breadcrumbs={[{ title: "Dashboard", active: true }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-              <Calendar className="h-4 w-4 text-sky-600" />
+            <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 dark:border-[var(--border-subtle)] dark:bg-[var(--surface)] dark:text-[var(--foreground-muted)]">
+              <Calendar className="h-4 w-4 text-sky-600 dark:text-sky-400" />
               {formatMonthRange(startDate, endDate)}
             </div>
             <Button variant="secondary" size="sm" icon={Upload}>
