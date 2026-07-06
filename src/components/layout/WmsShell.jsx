@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
+import { WmsBackgroundVortex } from "@/components/layout/WmsBackgroundVortex";
 import WmsAccessDenied from "@/components/layout/WmsAccessDenied";
 import { useAuth } from "@/context/AuthContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
@@ -88,11 +89,14 @@ export function WmsShell({ children }) {
         user={user}
         collapsed={sidebarCollapsed}
       />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <AdminHeader onMenuClick={handleMenuClick} sidebarCollapsed={sidebarCollapsed} />
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--background)] p-4 lg:p-6">
-          {routeAllowed ? children : <WmsAccessDenied pathname={pathname} user={user} />}
-        </main>
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <WmsBackgroundVortex />
+        <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <AdminHeader onMenuClick={handleMenuClick} sidebarCollapsed={sidebarCollapsed} />
+          <main className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">
+            {routeAllowed ? children : <WmsAccessDenied pathname={pathname} user={user} />}
+          </main>
+        </div>
       </div>
     </div>
   );

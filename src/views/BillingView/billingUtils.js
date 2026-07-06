@@ -9,6 +9,43 @@ export const BILLING_COLORS = {
   avgCapacity: "#ec4899",
 };
 
+/** Colores de texto/ejes ApexCharts según tema (billing). */
+export function getBillingApexTheme(isDark) {
+  return {
+    labelColor: isDark ? "#94a3b8" : "#64748b",
+    dataLabelColor: isDark ? "#e2e8f0" : "#1e293b",
+    gridColor: isDark ? "rgba(148, 163, 184, 0.12)" : "#f1f5f9",
+    tooltipTheme: isDark ? "dark" : "light",
+  };
+}
+
+/** Opciones ApexCharts compartidas en vistas de billing. */
+export function billingApexChartDefaults(isDark) {
+  const theme = getBillingApexTheme(isDark);
+  return {
+    theme,
+    chart: { foreColor: theme.labelColor },
+    legend: { labels: { colors: theme.labelColor } },
+    tooltip: { theme: theme.tooltipTheme },
+    grid: { borderColor: theme.gridColor, strokeDashArray: 4 },
+    xaxis: {
+      labels: { style: { colors: theme.labelColor, fontSize: "11px" } },
+      axisBorder: { color: theme.gridColor },
+      axisTicks: { color: theme.gridColor },
+    },
+    yaxis: {
+      labels: { style: { colors: theme.labelColor, fontSize: "11px" } },
+    },
+    dataLabels: {
+      style: {
+        fontSize: "12px",
+        fontWeight: 600,
+        colors: [theme.dataLabelColor],
+      },
+    },
+  };
+}
+
 export function formatBillingCurrency(value) {
   const num = parseFloat(value || 0);
   return num.toLocaleString("en-US", {

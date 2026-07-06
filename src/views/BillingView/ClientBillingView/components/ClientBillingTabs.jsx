@@ -20,14 +20,21 @@ import {
 
 import { Alert, Badge, Button, Card, Col, Row, Table } from "@/components/ui/bootstrap";
 import { cn } from "@/lib/cn";
+import { useTheme } from "@/context/ThemeContext";
 import { formatDate } from "@/lib/format";
 import {
   exportInventoryAverageExcel,
   getInventoryAverage,
 } from "@/services/financeService";
-import { BILLING_COLORS, downloadBlob, formatBillingCurrency } from "../../billingUtils";
+import { BILLING_COLORS, billingApexChartDefaults, downloadBlob, formatBillingCurrency } from "../../billingUtils";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
+
+const SECTION_TITLE =
+  "mb-3 font-semibold text-slate-800 dark:text-[var(--foreground)]";
+const MUTED = "text-slate-500 dark:text-[var(--foreground-muted)]";
+const TAB_INACTIVE =
+  "text-slate-600 hover:bg-slate-50 hover:text-[var(--brand-primary)] dark:text-[var(--foreground-muted)] dark:hover:bg-[var(--surface-hover)]";
 
 const TABS = [
   { key: "overview", label: "Resumen", icon: LayoutDashboard },
@@ -58,6 +65,9 @@ export default function ClientBillingTabs({
   appliedEndDate,
   showAlert,
 }) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const apex = billingApexChartDefaults(isDark);
   const [selectedTab, setSelectedTab] = useState("overview");
   const [averageData, setAverageData] = useState(null);
   const [storageType, setStorageType] = useState("all");
@@ -117,7 +127,7 @@ export default function ClientBillingTabs({
         parseFloat(billingData.additional_services.total_cost),
       ],
       options: {
-        chart: { type: "pie", height: 320 },
+        chart: { type: "pie", height: 320, ...apex.chart },
         labels: ["Almacenamiento", "Entradas", "Salidas", "Picking", "Servicios"],
         colors: [
           BILLING_COLORS.storage,
@@ -126,10 +136,13 @@ export default function ClientBillingTabs({
           BILLING_COLORS.picking,
           BILLING_COLORS.services,
         ],
-        legend: { position: "bottom" },
+        legend: { position: "bottom", ...apex.legend },
+        dataLabels: { enabled: true, ...apex.dataLabels },
+        stroke: { colors: [isDark ? "rgba(15, 23, 42, 0.55)" : "#fff"] },
+        tooltip: apex.tooltip,
       },
     };
-  }, [billingData]);
+  }, [billingData, apex, isDark]);
 
   const storageConditionChart = useMemo(() => {
     if (!billingData) return null;
@@ -144,18 +157,25 @@ export default function ClientBillingTabs({
         },
       ],
       options: {
-        chart: { type: "bar", height: 250, toolbar: { show: false } },
+        chart: { type: "bar", height: 250, toolbar: { show: false }, ...apex.chart },
         plotOptions: { bar: { borderRadius: 4, horizontal: true } },
         colors: [BILLING_COLORS.storage],
         dataLabels: {
           enabled: true,
           formatter: (val) => `$${formatBillingCurrency(val)}`,
           offsetX: 50,
+          ...apex.dataLabels,
         },
-        xaxis: { categories: ["Refrigerado", "Congelado"] },
+        grid: apex.grid,
+        xaxis: {
+          ...apex.xaxis,
+          categories: ["Refrigerado", "Congelado"],
+        },
+        yaxis: apex.yaxis,
+        tooltip: apex.tooltip,
       },
     };
-  }, [billingData]);
+  }, [billingData, apex]);
 
   const monthlyHistoryChart = useMemo(() => {
     if (!historyData) return null;
@@ -168,7 +188,13 @@ export default function ClientBillingTabs({
         { name: "Servicios", data: historyData.months.map((m) => m.services_cost) },
       ],
       options: {
-        chart: { type: "area", height: 350, stacked: true, toolbar: { show: false } },
+        chart: {
+          type: "area",
+          height: 350,
+          stacked: true,
+          toolbar: { show: false },
+          ...apex.chart,
+        },
         colors: [
           BILLING_COLORS.storage,
           BILLING_COLORS.entries,
@@ -177,31 +203,50 @@ export default function ClientBillingTabs({
           BILLING_COLORS.services,
         ],
         stroke: { curve: "smooth", width: 2 },
+        fill: {
+          type: "gradient",
+          gradient: {
+            shadeIntensity: 1,
+            opacityFrom: isDark ? 0.32 : 0.45,
+            opacityTo: isDark ? 0.04 : 0.08,
+          },
+        },
+        grid: apex.grid,
         xaxis: {
+          ...apex.xaxis,
           categories: historyData.months.map((m) => {
             const date = new Date(`${m.month}-01`);
             return date.toLocaleDateString("es-ES", { month: "short", year: "2-digit" });
           }),
         },
-        yaxis: { labels: { formatter: (val) => `$${formatBillingCurrency(val)}` } },
-        legend: { position: "top" },
+        yaxis: {
+          labels: {
+            ...apex.yaxis.labels,
+            formatter: (val) => `$${formatBillingCurrency(val)}`,
+          },
+        },
+        legend: { position: "top", ...apex.legend },
+        tooltip: apex.tooltip,
       },
     };
-  }, [historyData]);
+  }, [historyData, apex, isDark]);
 
   const averageChartConfig = useMemo(() => {
     if (!averageData?.daily_data) return null;
     return {
       series: [{ name: "Pallets", data: averageData.daily_data.map((d) => d.bins_count) }],
       options: {
-        chart: { height: 350, type: "area", toolbar: { show: true } },
+        chart: { height: 350, type: "area", toolbar: { show: true }, ...apex.chart },
         colors: [BILLING_COLORS.entries],
         stroke: { curve: "smooth", width: 3 },
+        grid: apex.grid,
         xaxis: {
+          ...apex.xaxis,
           categories: averageData.daily_data.map((d) => d.date),
-          labels: { rotate: -45 },
+          labels: { ...apex.xaxis.labels, rotate: -45 },
         },
-        yaxis: { min: 0 },
+        yaxis: { min: 0, ...apex.yaxis },
+        tooltip: apex.tooltip,
         annotations: {
           yaxis: [
             {
@@ -216,12 +261,12 @@ export default function ClientBillingTabs({
         },
       },
     };
-  }, [averageData]);
+  }, [averageData, apex]);
 
   const renderOverview = () => (
     <Row>
       <Col xl={6}>
-        <h6 className="mb-3 font-semibold text-slate-800">Distribución de costos</h6>
+        <h6 className={SECTION_TITLE}>Distribución de costos</h6>
         {billingBreakdownChart ? (
           <ReactApexChart
             options={billingBreakdownChart.options}
@@ -232,7 +277,7 @@ export default function ClientBillingTabs({
         ) : null}
       </Col>
       <Col xl={6}>
-        <h6 className="mb-3 font-semibold text-slate-800">Costo por condición</h6>
+        <h6 className={SECTION_TITLE}>Costo por condición</h6>
         {storageConditionChart ? (
           <ReactApexChart
             options={storageConditionChart.options}
@@ -242,59 +287,59 @@ export default function ClientBillingTabs({
           />
         ) : null}
         <div className="mt-4">
-          <h6 className="mb-3 font-semibold text-slate-800">Resumen detallado</h6>
+          <h6 className={SECTION_TITLE}>Resumen detallado</h6>
           <Table size="sm">
             <tbody>
               <tr>
                 <td>Refrigerado</td>
-                <td className="text-end text-slate-500">{billingData.storage.refrigerated.bins} bins</td>
+                <td className={`text-end ${MUTED}`}>{billingData.storage.refrigerated.bins} bins</td>
                 <td className="text-end font-semibold">
                   ${formatBillingCurrency(billingData.storage.refrigerated.cost)}
                 </td>
               </tr>
               <tr>
                 <td>Congelado</td>
-                <td className="text-end text-slate-500">{billingData.storage.frozen.bins} bins</td>
+                <td className="text-end text-slate-500 dark:text-[var(--foreground-muted)]">{billingData.storage.frozen.bins} bins</td>
                 <td className="text-end font-semibold">
                   ${formatBillingCurrency(billingData.storage.frozen.cost)}
                 </td>
               </tr>
               <tr>
                 <td>Entradas (pallet)</td>
-                <td className="text-end text-slate-500">{billingData.entries.pallet.count}</td>
+                <td className="text-end text-slate-500 dark:text-[var(--foreground-muted)]">{billingData.entries.pallet.count}</td>
                 <td className="text-end font-semibold">
                   ${formatBillingCurrency(billingData.entries.pallet.cost)}
                 </td>
               </tr>
               <tr>
                 <td>Entradas (piso)</td>
-                <td className="text-end text-slate-500">{billingData.entries.floor.count}</td>
+                <td className="text-end text-slate-500 dark:text-[var(--foreground-muted)]">{billingData.entries.floor.count}</td>
                 <td className="text-end font-semibold">
                   ${formatBillingCurrency(billingData.entries.floor.cost)}
                 </td>
               </tr>
               <tr>
                 <td>Salidas</td>
-                <td className="text-end text-slate-500">{billingData.exits.count} bins</td>
+                <td className="text-end text-slate-500 dark:text-[var(--foreground-muted)]">{billingData.exits.count} bins</td>
                 <td className="text-end font-semibold">
                   ${formatBillingCurrency(billingData.exits.total_cost)}
                 </td>
               </tr>
               <tr>
                 <td>Picking</td>
-                <td className="text-end text-slate-500">{billingData.picking.count} items</td>
+                <td className="text-end text-slate-500 dark:text-[var(--foreground-muted)]">{billingData.picking.count} items</td>
                 <td className="text-end font-semibold">
                   ${formatBillingCurrency(billingData.picking.total_cost)}
                 </td>
               </tr>
               <tr>
                 <td>Servicios</td>
-                <td className="text-end text-slate-500">Wrap, Restiba</td>
+                <td className="text-end text-slate-500 dark:text-[var(--foreground-muted)]">Wrap, Restiba</td>
                 <td className="text-end font-semibold">
                   ${formatBillingCurrency(billingData.additional_services.total_cost)}
                 </td>
               </tr>
-              <tr className="bg-slate-900 text-white">
+              <tr className="bg-slate-900 text-white dark:bg-[var(--brand-primary)]/15 dark:text-[var(--foreground)]">
                 <td className="font-bold">TOTAL</td>
                 <td />
                 <td className="text-end font-bold">
@@ -310,12 +355,12 @@ export default function ClientBillingTabs({
 
   const renderStorage = () => (
     <>
-      <h6 className="mb-3 font-semibold text-slate-800">
+      <h6 className={SECTION_TITLE}>
         Detalle de bins en almacenamiento ({billingData.storage.bins_count})
       </h6>
       <div className="max-h-[500px] overflow-auto">
         <Table hover size="sm">
-          <thead className="sticky top-0 bg-slate-50">
+          <thead className="sticky top-0 bg-slate-50 dark:bg-[var(--surface)]">
             <tr>
               <th>Código bin</th>
               <th>Estado</th>
@@ -350,7 +395,7 @@ export default function ClientBillingTabs({
             ))}
             {billingData.storage.bins_detail.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-slate-500">
+                <td colSpan={6} className={`py-8 text-center ${MUTED}`}>
                   No hay bins registrados
                 </td>
               </tr>
@@ -372,10 +417,13 @@ export default function ClientBillingTabs({
       ) : null}
       <Row>
         <Col md={6}>
-          <Card className="h-full border-0" style={{ backgroundColor: `${BILLING_COLORS.entries}10` }}>
+          <Card
+            className="h-full border-0 dark:bg-[var(--surface)]"
+            style={{ backgroundColor: isDark ? undefined : `${BILLING_COLORS.entries}10` }}
+          >
             <Card.Body className="text-center">
               <ArrowDown className="mx-auto mb-3 h-10 w-10" style={{ color: BILLING_COLORS.entries }} />
-              <p className="text-sm text-slate-500">
+              <p className={`text-sm ${MUTED}`}>
                 {billingData.tariff_type === "static" ? "Pallets (promedio × 80%)" : "Bins creados"}
               </p>
               <p className="text-3xl font-bold" style={{ color: BILLING_COLORS.entries }}>
@@ -388,10 +436,13 @@ export default function ClientBillingTabs({
           </Card>
         </Col>
         <Col md={6}>
-          <Card className="h-full border-0" style={{ backgroundColor: `${BILLING_COLORS.exits}10` }}>
+          <Card
+            className="h-full border-0 dark:bg-[var(--surface)]"
+            style={{ backgroundColor: isDark ? undefined : `${BILLING_COLORS.exits}10` }}
+          >
             <Card.Body className="text-center">
               <ArrowUp className="mx-auto mb-3 h-10 w-10" style={{ color: BILLING_COLORS.exits }} />
-              <p className="text-sm text-slate-500">
+              <p className={`text-sm ${MUTED}`}>
                 {billingData.tariff_type === "static" ? "Pallets (promedio × 80%)" : "Bins despachados"}
               </p>
               <p className="text-3xl font-bold" style={{ color: BILLING_COLORS.exits }}>
@@ -411,7 +462,7 @@ export default function ClientBillingTabs({
     billingData.tariff_type === "static" ? (
       <div className="py-10 text-center">
         <p className="text-lg font-semibold text-red-600">Picking no aplica</p>
-        <p className="text-slate-500">En tarifa estática no se cobra picking.</p>
+        <p className={`${MUTED}`}>En tarifa estática no se cobra picking.</p>
       </div>
     ) : (
       <div className="py-10 text-center">
@@ -458,9 +509,12 @@ export default function ClientBillingTabs({
         <Row>
           {services.map((service) => (
             <Col md={6} lg={3} key={service.name}>
-              <Card className="h-full border-0 text-center" style={{ backgroundColor: `${BILLING_COLORS.services}08` }}>
+              <Card
+                className="h-full border-0 text-center dark:bg-[var(--surface)]"
+                style={{ backgroundColor: isDark ? undefined : `${BILLING_COLORS.services}08` }}
+              >
                 <Card.Body>
-                  <p className="font-semibold text-slate-800">{service.name}</p>
+                  <p className="font-semibold text-slate-800 dark:text-[var(--foreground)]">{service.name}</p>
                   <p className="text-2xl font-bold" style={{ color: BILLING_COLORS.services }}>
                     {service.count}
                   </p>
@@ -471,7 +525,7 @@ export default function ClientBillingTabs({
           ))}
         </Row>
         <div className="mt-6 border-t pt-4 text-center">
-          <p className="text-slate-500">Total servicios adicionales</p>
+          <p className={MUTED}>Total servicios adicionales</p>
           <p className="text-2xl font-bold" style={{ color: BILLING_COLORS.services }}>
             ${formatBillingCurrency(billingData.additional_services.total_cost)}
           </p>
@@ -482,7 +536,7 @@ export default function ClientBillingTabs({
 
   const renderHistory = () => (
     <>
-      <h6 className="mb-3 font-semibold text-slate-800">Historial mensual (últimos 12 meses)</h6>
+      <h6 className={SECTION_TITLE}>Historial mensual (últimos 12 meses)</h6>
       {monthlyHistoryChart ? (
         <ReactApexChart
           options={monthlyHistoryChart.options}
@@ -491,7 +545,7 @@ export default function ClientBillingTabs({
           height={350}
         />
       ) : (
-        <p className="text-slate-500">Cargando historial…</p>
+        <p className={MUTED}>Cargando historial…</p>
       )}
       {historyData ? (
         <div className="mt-4 overflow-x-auto">
@@ -538,11 +592,11 @@ export default function ClientBillingTabs({
 
   const renderAverage = () => (
     <>
-      <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-slate-100 pb-4">
-        <span className="text-sm font-semibold text-slate-600">Tipo</span>
+      <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-slate-100 pb-4 dark:border-[var(--border-subtle)]">
+        <span className="text-sm font-semibold text-slate-600 dark:text-[var(--foreground-muted)]">Tipo</span>
         <select
           value={storageType}
-          className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
+          className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 dark:border-[var(--border-subtle)] dark:bg-[var(--surface)] dark:text-[var(--foreground)]"
           onChange={(e) => {
             setStorageType(e.target.value);
             setAverageData(null);
@@ -559,28 +613,28 @@ export default function ClientBillingTabs({
       </div>
 
       {isLoadingAverage ? (
-        <div className="py-10 text-center text-slate-500">Calculando promedio…</div>
+        <div className={`py-10 text-center ${MUTED}`}>Calculando promedio…</div>
       ) : null}
 
       {averageData && averageData.average_bins === 0 ? (
-        <div className="py-10 text-center text-slate-500">Sin inventario en este período</div>
+        <div className={`py-10 text-center ${MUTED}`}>Sin inventario en este período</div>
       ) : null}
 
       {averageData && averageData.average_bins > 0 ? (
         <>
           <Row className="mb-4">
             <Col md={4}>
-              <Card className="border-0 bg-sky-50 text-center">
+              <Card className="border-0 bg-sky-50 text-center dark:bg-sky-950/30">
                 <Card.Body>
-                  <p className="text-sm text-slate-500">Días analizados</p>
+                  <p className={`text-sm ${MUTED}`}>Días analizados</p>
                   <p className="text-3xl font-bold text-sky-600">{averageData.total_days}</p>
                 </Card.Body>
               </Card>
             </Col>
             <Col md={4}>
-              <Card className="border-0 bg-emerald-50 text-center">
+              <Card className="border-0 bg-emerald-50 text-center dark:bg-emerald-950/30">
                 <Card.Body>
-                  <p className="text-sm text-slate-500">Promedio diario</p>
+                  <p className={`text-sm ${MUTED}`}>Promedio diario</p>
                   <p className="text-3xl font-bold text-emerald-600">
                     {Math.round(averageData.average_bins)} pallets
                   </p>
@@ -588,9 +642,9 @@ export default function ClientBillingTabs({
               </Card>
             </Col>
             <Col md={4}>
-              <Card className="border-0 bg-amber-50 text-center">
+              <Card className="border-0 bg-amber-50 text-center dark:bg-amber-950/30">
                 <Card.Body>
-                  <p className="text-sm text-slate-500">Valor estimado</p>
+                  <p className={`text-sm ${MUTED}`}>Valor estimado</p>
                   <p className="text-3xl font-bold text-amber-600">
                     ${formatBillingCurrency(averageData.estimated_value)}
                   </p>
@@ -612,7 +666,7 @@ export default function ClientBillingTabs({
             <Card.Header className="flex items-center justify-between">
               <button
                 type="button"
-                className="flex items-center gap-2 text-sm font-semibold text-slate-800"
+                className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-[var(--foreground)]"
                 onClick={() => setShowDailyData((v) => !v)}
               >
                 Datos diarios detallados
@@ -625,7 +679,7 @@ export default function ClientBillingTabs({
             {showDailyData ? (
               <Card.Body className="max-h-[400px] overflow-auto !pt-0">
                 <Table hover size="sm">
-                  <thead className="sticky top-0 bg-slate-50">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-[var(--surface)]">
                     <tr>
                       <th>Fecha</th>
                       <th className="text-end">Total</th>
@@ -647,7 +701,7 @@ export default function ClientBillingTabs({
       ) : null}
 
       {!averageData && !isLoadingAverage ? (
-        <div className="py-10 text-center text-slate-500">
+        <div className={`py-10 text-center ${MUTED}`}>
           Haga clic en Calcular para ver el promedio diario de pallets almacenados.
         </div>
       ) : null}
@@ -666,7 +720,7 @@ export default function ClientBillingTabs({
 
   return (
     <Card>
-      <div className="flex flex-wrap gap-1 border-b border-slate-100 px-3 pt-3">
+      <div className="flex flex-wrap gap-1 border-b border-slate-100 px-3 pt-3 dark:border-[var(--border-subtle)]">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const active = selectedTab === tab.key;
@@ -682,7 +736,7 @@ export default function ClientBillingTabs({
                 "inline-flex items-center gap-2 rounded-t-lg px-3 py-2 text-sm font-medium transition-colors",
                 active
                   ? "bg-[var(--brand-primary)] text-white"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-[var(--brand-primary)]",
+                  : TAB_INACTIVE,
               )}
             >
               <Icon className="h-4 w-4" />

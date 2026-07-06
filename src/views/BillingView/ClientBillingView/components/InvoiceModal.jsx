@@ -213,8 +213,10 @@ export default function InvoiceModal({
           </Col>
         </Row>
 
-        <div className="mt-4 rounded-xl bg-slate-50 p-4">
-          <h6 className="mb-3 font-semibold text-slate-800">Resumen de facturación</h6>
+        <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-[var(--surface)]">
+          <h6 className="mb-3 font-semibold text-slate-800 dark:text-[var(--foreground)]">
+            Resumen de facturación
+          </h6>
           <Table size="sm" className="mb-0">
             <tbody>
               <tr>

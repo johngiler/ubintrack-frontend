@@ -16,7 +16,7 @@ export default function BillingPeriodFilter({
   return (
     <Card className="mb-5">
       <Card.Body className="flex flex-wrap items-center gap-3 !py-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-[var(--foreground-muted)]">
           <Calendar className="h-4 w-4 text-[var(--brand-primary)]" />
           Período
         </div>
@@ -27,7 +27,7 @@ export default function BillingPeriodFilter({
           className="!w-40"
           onChange={(e) => onStartDateChange(e.target.value)}
         />
-        <span className="text-sm text-slate-400">al</span>
+        <span className="text-sm text-slate-400 dark:text-[var(--foreground-muted)]">al</span>
         <Form.Control
           type="date"
           value={endDate}

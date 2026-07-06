@@ -26,7 +26,11 @@
   --accent-muted: #e0f2fe;
   --brand-primary: #0ea5e9;
   --brand-secondary: #6366f1;
-  --brand-gradient: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  --brand-gradient: linear-gradient(
+    135deg,
+    var(--brand-primary) 0%,
+    var(--brand-secondary) 100%
+  );
   --brand-gradient-hover: linear-gradient(
     135deg,
     color-mix(in srgb, var(--brand-primary) 88%, black) 0%,
@@ -111,8 +115,12 @@ body {
 .btn-brand {
   background: var(--brand-gradient);
   color: #fff;
-  transition: filter 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--brand-primary) 28%, transparent);
+  transition:
+    filter 0.15s ease,
+    opacity 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 1px 2px
+    color-mix(in srgb, var(--brand-primary) 28%, transparent);
 }
 
 .sidebar-logo-gradient {
@@ -138,14 +146,16 @@ body {
 .brand-icon-box {
   background: var(--brand-surface);
   color: var(--brand-primary);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 14%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--brand-primary) 14%, transparent);
 }
 
 .brand-nav-active {
   font-weight: 500;
   color: var(--brand-primary);
   background: var(--brand-surface);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--brand-primary) 12%, transparent);
 }
 
 .brand-nav-active svg {
@@ -172,7 +182,8 @@ body {
   font-weight: 500;
   color: var(--brand-primary);
   background: var(--brand-surface);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--brand-primary) 12%, transparent);
 }
 
 .text-brand {
@@ -187,13 +198,23 @@ body {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -230,10 +251,110 @@ body {
   animation: sidebar-backdrop-in 0.22s ease-out;
 }
 
+/* Vórtice decorativo (área principal, lado derecho) */
+.wms-vortex-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.42) 44%,
+    transparent 80%
+  );
+  mask-image: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.42) 44%,
+    transparent 80%
+  );
+  opacity: 0.44;
+}
+
+.wms-vortex-svg {
+  position: absolute;
+  right: -4%;
+  top: 48%;
+  height: min(118vh, 1000px);
+  width: auto;
+  min-width: 460px;
+  max-width: 60vw;
+  transform: translateY(-50%);
+  transform-origin: center right;
+}
+
+.dark .wms-vortex-wrap {
+  opacity: 0.26;
+}
+
+@keyframes wms-vortex-drift {
+  0%,
+  100% {
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+  50% {
+    transform: translateY(calc(-50% - 8px)) translateX(-5px) scale(1.008);
+  }
+}
+
+.wms-vortex-svg {
+  animation: wms-vortex-drift 22s ease-in-out infinite;
+}
+
+@keyframes wms-vortex-layer-shift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-6px, 10px);
+  }
+}
+
+.wms-vortex-ribbon {
+  animation: wms-vortex-layer-shift 30s ease-in-out infinite;
+  transform-origin: 78% 40%;
+}
+
+.wms-vortex-ribbon-cross {
+  animation: wms-vortex-layer-shift-cross 34s ease-in-out infinite;
+  transform-origin: 78% 60%;
+}
+
+@keyframes wms-vortex-layer-shift-cross {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(5px, -8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wms-vortex-svg,
+  .wms-vortex-ribbon,
+  .wms-vortex-ribbon-cross {
+    animation: none;
+  }
+}
+
 @keyframes login-orb-float {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.85; }
-  33% { transform: translate(24px, -18px) scale(1.05); opacity: 1; }
-  66% { transform: translate(-16px, 12px) scale(0.98); opacity: 0.9; }
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.85;
+  }
+  33% {
+    transform: translate(24px, -18px) scale(1.05);
+    opacity: 1;
+  }
+  66% {
+    transform: translate(-16px, 12px) scale(0.98);
+    opacity: 0.9;
+  }
 }
 
 .login-orb {
@@ -254,7 +375,9 @@ body {
 }
 
 .product-item {
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
   border-left: 3px solid transparent;
 }
 
@@ -414,7 +537,11 @@ body {
 }
 
 .wms-movements-timeline .timeline-content {
-  background-color: color-mix(in srgb, var(--surface-hover) 55%, var(--surface));
+  background-color: color-mix(
+    in srgb,
+    var(--surface-hover) 55%,
+    var(--surface)
+  );
   border-radius: 0.5rem;
   padding: 0.75rem;
   border-left: 4px solid var(--border);
@@ -451,7 +578,9 @@ body {
 
 .wms-movements-timeline .link-badge {
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.2s;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
 }
 
 .wms-movements-timeline .link-badge:hover {

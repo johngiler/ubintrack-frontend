@@ -191,18 +191,13 @@ export default function ClientBillingView({ clientId }) {
       {isLoading ? (
         <div className="py-16 text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-[3px] border-sky-600 border-t-transparent" />
-          <p className="mt-3 text-sm text-slate-500">Calculando facturación…</p>
+          <p className="mt-3 text-sm text-slate-500 dark:text-[var(--foreground-muted)]">Calculando facturación…</p>
         </div>
       ) : billingData ? (
         <>
           <Card
             className="mb-5 overflow-hidden border-0 text-white"
-            style={{
-              background:
-                billingData.tariff_type === "static"
-                  ? "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
-                  : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            }}
+            style={{ background: "var(--brand-gradient)" }}
           >
             <Card.Body className="p-5">
               <Row className="items-center">
@@ -326,8 +321,10 @@ export default function ClientBillingView({ clientId }) {
       ) : (
         <Card>
           <Card.Body className="py-12 text-center">
-            <p className="text-lg font-semibold text-red-600">No se encontraron datos</p>
-            <p className="text-slate-500">No se pudo obtener la información de facturación.</p>
+            <p className="text-red-600 dark:text-red-400">No se encontraron datos</p>
+            <p className="text-slate-500 dark:text-[var(--foreground-muted)]">
+              No se pudo obtener la información de facturación.
+            </p>
           </Card.Body>
         </Card>
       )}

@@ -21,6 +21,7 @@ import { Alert, Card, Col, Pagination, Row, Table } from "@/components/ui/bootst
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
+import { useTheme } from "@/context/ThemeContext";
 import { useWmsNavigate } from "@/hooks/useWmsRouter";
 import { getBillingClients, getBillingSummary } from "@/services/financeService";
 import BillingKpiCard from "./components/BillingKpiCard";
@@ -29,6 +30,7 @@ import {
   BILLING_COLORS,
   formatBillingCurrency,
   getDefaultBillingDates,
+  billingApexChartDefaults,
 } from "./billingUtils";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -37,6 +39,9 @@ const PAGE_SIZE = 20;
 
 export default function BillingView() {
   const navigate = useWmsNavigate();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const apexDefaults = billingApexChartDefaults(isDark);
   const searchParams = useSearchParams();
   const defaultDates = getDefaultBillingDates();
 
@@ -135,7 +140,11 @@ export default function BillingView() {
           ]
         : [0, 0, 0, 0, 0],
       options: {
-        chart: { type: "donut", height: 320 },
+        chart: {
+          type: "donut",
+          height: 320,
+          ...apexDefaults.chart,
+        },
         labels: ["Almacenamiento", "Entradas", "Salidas", "Picking", "Servicios Adicionales"],
         colors: [
           BILLING_COLORS.storage,
@@ -144,16 +153,22 @@ export default function BillingView() {
           BILLING_COLORS.picking,
           BILLING_COLORS.services,
         ],
-        legend: { position: "bottom" },
+        legend: {
+          position: "bottom",
+          ...apexDefaults.legend,
+        },
         dataLabels: {
           enabled: true,
+          ...apexDefaults.dataLabels,
           formatter(_val, opts) {
             return `$${opts.w.config.series[opts.seriesIndex].toFixed(2)}`;
           },
         },
+        stroke: { colors: [isDark ? "rgba(15, 23, 42, 0.6)" : "#fff"] },
+        tooltip: apexDefaults.tooltip,
       },
     }),
-    [summary],
+    [summary, apexDefaults, isDark],
   );
 
   const topClientsChart = useMemo(
@@ -169,7 +184,12 @@ export default function BillingView() {
         },
       ],
       options: {
-        chart: { type: "bar", height: 350, toolbar: { show: false } },
+        chart: {
+          type: "bar",
+          height: 350,
+          toolbar: { show: false },
+          ...apexDefaults.chart,
+        },
         plotOptions: {
           bar: { horizontal: true, borderRadius: 4, dataLabels: { position: "top" } },
         },
@@ -180,16 +200,20 @@ export default function BillingView() {
             return `$${formatBillingCurrency(val)}`;
           },
           offsetX: 40,
-          style: { fontSize: "12px", colors: ["#304758"] },
+          ...apexDefaults.dataLabels,
         },
+        grid: apexDefaults.grid,
         xaxis: {
+          ...apexDefaults.xaxis,
           categories: summary
             ? summary.clients_summary.slice(0, 10).map((c) => c.client_name)
             : [],
         },
+        yaxis: apexDefaults.yaxis,
+        tooltip: apexDefaults.tooltip,
       },
     }),
-    [summary],
+    [summary, apexDefaults],
   );
 
   const binsManaged =
@@ -311,7 +335,9 @@ export default function BillingView() {
             <Col xl={6}>
               <Card>
                 <Card.Header>
-                  <h2 className="text-sm font-semibold text-slate-800">Distribución de facturación</h2>
+                  <h2 className="text-sm font-semibold text-slate-800 dark:text-[var(--foreground)]">
+                    Distribución de facturación
+                  </h2>
                 </Card.Header>
                 <Card.Body>
                   <ReactApexChart
@@ -326,7 +352,7 @@ export default function BillingView() {
             <Col xl={6}>
               <Card>
                 <Card.Header>
-                  <h2 className="text-sm font-semibold text-slate-800">
+                  <h2 className="text-sm font-semibold text-slate-800 dark:text-[var(--foreground)]">
                     Top 10 clientes por facturación
                   </h2>
                 </Card.Header>
