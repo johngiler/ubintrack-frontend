@@ -187,7 +187,7 @@ export default function CavasView() {
                         Temperatura
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[90px] normal-case tracking-normal">
-                        Niveles
+                        Posiciones
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[100px] normal-case tracking-normal">
                         Estado

@@ -10,11 +10,14 @@ export const statusBadgeVariant = {
   ocupado: "danger",
 };
 
-export const DEFAULT_HALLS = ["A", "B", "C", "D"];
+export const DEFAULT_HALLS = ["A", "B", "C", "D", "E", "F"];
 export const DEFAULT_RACKS = Array.from({ length: 17 }, (_, index) => index + 1);
 export const DEFAULT_PLACES = [
   { value: "A", label: "A - Adelante" },
-  { value: "B", label: "B - Atrás" },
+  { value: "B", label: "B - Profundidad 2" },
+  { value: "C", label: "C - Profundidad 3" },
+  { value: "D", label: "D - Profundidad 4" },
+  { value: "E", label: "E - Atrás" },
 ];
 
 export function hallOption(value) {
