@@ -10,7 +10,7 @@ export const statusBadgeVariant = {
   ocupado: "danger",
 };
 
-export const DEFAULT_HALLS = ["A", "B", "C", "D", "E", "F"];
+export const DEFAULT_HALLS = ["A", "B", "C", "D", "E", "F", "G"];
 export const DEFAULT_RACKS = Array.from({ length: 17 }, (_, index) => index + 1);
 export const DEFAULT_PLACES = [
   { value: "A", label: "A - Adelante" },
