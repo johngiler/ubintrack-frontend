@@ -498,18 +498,23 @@ const BinsView = () => {
   };
 
   const toggleBinSelection = (binId) => {
+    const bin = entries.find((e) => e.id === binId);
+    if (bin?.position) return;
     setSelectedBinIds((prev) =>
       prev.includes(binId) ? prev.filter((id) => id !== binId) : [...prev, binId]
     );
   };
 
   const toggleSelectAllVisible = () => {
-    const visibleIds = entries.map((e) => e.id);
-    const allSelected = visibleIds.every((id) => selectedBinIds.includes(id));
+    const selectableIds = entries
+      .filter((e) => !e.position)
+      .map((e) => e.id);
+    if (selectableIds.length === 0) return;
+    const allSelected = selectableIds.every((id) => selectedBinIds.includes(id));
     if (allSelected) {
-      setSelectedBinIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      setSelectedBinIds((prev) => prev.filter((id) => !selectableIds.includes(id)));
     } else {
-      setSelectedBinIds((prev) => [...new Set([...prev, ...visibleIds])]);
+      setSelectedBinIds((prev) => [...new Set([...prev, ...selectableIds])]);
     }
   };
 
@@ -546,6 +551,13 @@ const BinsView = () => {
   };
 
   const hasFilters = Boolean(searchTerm || filters.status || filters.is_active !== "");
+
+  const binCanApplyCriterion = (bin) => Boolean(bin && !bin.position);
+
+  const selectableVisibleIds = entries
+    .filter(binCanApplyCriterion)
+    .map((e) => e.id);
+  const showCriterionSelection = perms.change && selectableVisibleIds.length > 0;
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -672,7 +684,7 @@ const BinsView = () => {
                     title="Aplicar criterio de almacenamiento para los bins seleccionados"
                     className="shrink-0 whitespace-nowrap"
                   >
-                    {isAlmacenando
+                    {isAlmacenando && !showAlmacenarModal
                       ? "Procesando…"
                       : `Aplicar criterio (${selectedBinIds.length})`}
                   </Button>
@@ -703,16 +715,18 @@ const BinsView = () => {
                 <Table hover responsive className="mb-0 min-w-[980px]">
                   <Table.Head>
                     <tr>
-                      {perms.change && (
+                      {showCriterionSelection && (
                         <Table.HeaderCell className="w-10 normal-case tracking-normal">
                           <Form.Check
                             type="checkbox"
                             checked={
-                              entries.length > 0 &&
-                              entries.every((e) => selectedBinIds.includes(e.id))
+                              selectableVisibleIds.length > 0 &&
+                              selectableVisibleIds.every((id) =>
+                                selectedBinIds.includes(id)
+                              )
                             }
                             onChange={toggleSelectAllVisible}
-                            aria-label="Seleccionar todos"
+                            aria-label="Seleccionar todos sin posición"
                           />
                         </Table.HeaderCell>
                       )}
@@ -743,18 +757,21 @@ const BinsView = () => {
                     {entries.map((entry) => {
                       const isExpanded = Boolean(expandedGroups[entry.id]);
                       const conditions = getBinConditions(entry);
+                      const canSelectForCriterion = binCanApplyCriterion(entry);
 
                       return (
                         <Fragment key={entry.id}>
                           <Table.Row>
-                            {perms.change && (
+                            {showCriterionSelection && (
                               <Table.Cell>
-                                <Form.Check
-                                  type="checkbox"
-                                  checked={selectedBinIds.includes(entry.id)}
-                                  onChange={() => toggleBinSelection(entry.id)}
-                                  aria-label={`Seleccionar ${entry.code}`}
-                                />
+                                {canSelectForCriterion ? (
+                                  <Form.Check
+                                    type="checkbox"
+                                    checked={selectedBinIds.includes(entry.id)}
+                                    onChange={() => toggleBinSelection(entry.id)}
+                                    aria-label={`Seleccionar ${entry.code}`}
+                                  />
+                                ) : null}
                               </Table.Cell>
                             )}
                             <Table.Cell>
@@ -915,7 +932,7 @@ const BinsView = () => {
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.15 }}
                               >
-                                <td colSpan={perms.change ? 8 : 7} className="p-0">
+                                <td colSpan={showCriterionSelection ? 8 : 7} className="p-0">
                                   <BinExpandedProducts
                                     entry={entry}
                                     user={user}
