@@ -488,9 +488,11 @@ const Entries = () => {
     if (isExporting) return;
     setIsExporting(true);
     try {
-      const result = await exportEntryOrdersToExcel(
-        `Ordenes_Entrada_${new Date().toISOString().split("T")[0]}.xls`
-      );
+      const result = await exportEntryOrdersToExcel({
+        filters,
+        search: debouncedSearchTerm,
+        filename: `Ordenes_Entrada_${new Date().toISOString().split("T")[0]}.xls`,
+      });
       if (result.success) {
         showAlert("success", "Archivo Excel exportado exitosamente");
       } else {

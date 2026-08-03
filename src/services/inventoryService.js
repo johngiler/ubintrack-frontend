@@ -32,6 +32,55 @@ export async function getProducts(page = 1, filters = {}, search = "") {
   return response.data;
 }
 
+/** Params de lista (filtros + search) para exports Excel. */
+function listQueryParams(filters = {}, search = "") {
+  const params = {};
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== "" && value != null) {
+      params[key] = value;
+    }
+  });
+  if (search) {
+    params.search = search;
+  }
+  return params;
+}
+
+async function downloadExcelBlob(url, params, filename) {
+  try {
+    const response = await httpClient.get(url, {
+      params,
+      responseType: "blob",
+    });
+
+    const objectUrl = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(objectUrl);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error al descargar el archivo Excel:", error);
+    return { success: false, error };
+  }
+}
+
+export async function exportProductsToExcel({
+  filters = {},
+  search = "",
+  filename = "Productos_export.xls",
+} = {}) {
+  return downloadExcelBlob(
+    "/api/products/export_excel/",
+    listQueryParams(filters, search),
+    filename,
+  );
+}
+
 export async function getProduct(id) {
   const response = await httpClient.get(`/api/products/${id}/`);
   return response.data;
@@ -200,25 +249,16 @@ export async function deleteBinProduct(id) {
   return response.data;
 }
 
-export async function exportBinsToExcel(filename = "Bins_export.xls") {
-  try {
-    const response = await httpClient.get("/api/bins/export_excel/", {
-      responseType: "blob",
-    });
-
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error al descargar el archivo Excel:", error);
-    return { success: false, error };
-  }
+export async function exportBinsToExcel({
+  filters = {},
+  search = "",
+  filename = "Bins_export.xls",
+} = {}) {
+  return downloadExcelBlob(
+    "/api/bins/export_excel/",
+    listQueryParams(filters, search),
+    filename,
+  );
 }
 
 // Bin Movements

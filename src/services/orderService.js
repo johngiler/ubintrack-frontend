@@ -338,28 +338,30 @@ export async function deleteExitDetail(id) {
 }
 
 // Export Excel - Entries
-export async function exportEntryOrdersToExcel(
-  filename = "Ordenes_Entrada.xls"
-) {
+export async function exportEntryOrdersToExcel({
+  filters = {},
+  search = "",
+  filename = "Ordenes_Entrada.xls",
+} = {}) {
   try {
+    const params = {};
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== "" && value != null) params[key] = value;
+    });
+    if (search) params.search = search;
+
     const response = await httpClient.get("/api/entries/export_excel/", {
+      params,
       responseType: "blob",
     });
 
-    // Crear un objeto URL para el blob
     const url = window.URL.createObjectURL(new Blob([response.data]));
-
-    // Crear un enlace para descargar
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", filename);
-
-    // Añadir al DOM, disparar click y limpiar
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    // Limpiar el objeto URL
     window.URL.revokeObjectURL(url);
 
     return { success: true };
@@ -370,26 +372,30 @@ export async function exportEntryOrdersToExcel(
 }
 
 // Export Excel - Exits
-export async function exportExitOrdersToExcel(filename = "Ordenes_Salida.xls") {
+export async function exportExitOrdersToExcel({
+  filters = {},
+  search = "",
+  filename = "Ordenes_Salida.xls",
+} = {}) {
   try {
+    const params = {};
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== "" && value != null) params[key] = value;
+    });
+    if (search) params.search = search;
+
     const response = await httpClient.get("/api/exits/export_excel/", {
+      params,
       responseType: "blob",
     });
 
-    // Crear un objeto URL para el blob
     const url = window.URL.createObjectURL(new Blob([response.data]));
-
-    // Crear un enlace para descargar
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", filename);
-
-    // Añadir al DOM, disparar click y limpiar
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    // Limpiar el objeto URL
     window.URL.revokeObjectURL(url);
 
     return { success: true };

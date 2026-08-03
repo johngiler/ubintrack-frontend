@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
-import { Eye, FilterX, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Download, Eye, FilterX, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 import {
@@ -19,7 +19,7 @@ import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
-import { getClients } from "@/services/coreService";
+import { getClients, exportClientsToExcel } from "@/services/coreService";
 import { getTariffs } from "@/services/financeService";
 import { canCRUD } from "@/services/httpClient";
 import { formatDate } from "@/lib/format";
@@ -51,6 +51,7 @@ export default function ClientsView() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     getTariffs(1, "")
@@ -117,6 +118,27 @@ export default function ClientsView() {
     setShowModal(true);
   };
 
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const result = await exportClientsToExcel({
+        filters,
+        search: debouncedSearchTerm,
+        filename: `Clientes_${new Date().toISOString().split("T")[0]}.xls`,
+      });
+      if (result.success) {
+        showAlertMessage("success", "Archivo Excel descargado correctamente");
+      } else {
+        showAlertMessage("danger", "Error al descargar el archivo Excel");
+      }
+    } catch {
+      showAlertMessage("danger", "Error al exportar los datos");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const hasFilters =
     Boolean(debouncedSearchTerm) || Boolean(filters.is_active) || Boolean(filters.tariff);
 
@@ -136,6 +158,18 @@ export default function ClientsView() {
           { title: "Principal", active: true },
           { title: "Clientes", active: true },
         ]}
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            loading={isExporting}
+          >
+            {isExporting ? "Exportando…" : "Exportar a excel"}
+          </Button>
+        }
       />
 
       <Row>

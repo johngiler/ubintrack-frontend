@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronUp, Eye, FilterX, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Eye, FilterX, Package, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 import {
@@ -20,7 +20,7 @@ import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import { useWmsSearchParams } from "@/hooks/useWmsRouter";
-import { getProducts, getCategories } from "@/services/inventoryService";
+import { getProducts, getCategories, exportProductsToExcel } from "@/services/inventoryService";
 import { canCRUD } from "@/services/httpClient";
 import { conditionLabels, rotationTypeLabels } from "@/lib/productLabels";
 import ModalEdit from "./components/ModalEdit";
@@ -54,6 +54,7 @@ export default function ProductsView() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [expandedInventory, setExpandedInventory] = useState({});
   const [urlSearchInitialized, setUrlSearchInitialized] = useState(false);
 
@@ -153,6 +154,27 @@ export default function ProductsView() {
     }));
   };
 
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const result = await exportProductsToExcel({
+        filters,
+        search: debouncedSearchTerm,
+        filename: `Productos_${new Date().toISOString().split("T")[0]}.xls`,
+      });
+      if (result.success) {
+        showAlertMessage("success", "Archivo Excel descargado correctamente");
+      } else {
+        showAlertMessage("danger", "Error al descargar el archivo Excel");
+      }
+    } catch {
+      showAlertMessage("danger", "Error al exportar los datos");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const hasFilters =
     Boolean(debouncedSearchTerm) ||
     Boolean(filters.category) ||
@@ -175,6 +197,18 @@ export default function ProductsView() {
           { title: "Inventario", active: true },
           { title: "Productos", active: true },
         ]}
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Download}
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            loading={isExporting}
+          >
+            {isExporting ? "Exportando…" : "Exportar a excel"}
+          </Button>
+        }
       />
 
       <Row>

@@ -770,9 +770,11 @@ const Exits = () => {
     if (isExporting) return;
     setIsExporting(true);
     try {
-      const result = await exportExitOrdersToExcel(
-        `Ordenes_Salida_${new Date().toISOString().split("T")[0]}.xls`
-      );
+      const result = await exportExitOrdersToExcel({
+        filters,
+        search: debouncedSearchTerm,
+        filename: `Ordenes_Salida_${new Date().toISOString().split("T")[0]}.xls`,
+      });
       if (result.success) {
         showAlert("success", "Archivo Excel exportado exitosamente");
       } else {

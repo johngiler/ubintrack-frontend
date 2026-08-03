@@ -173,6 +173,44 @@ export async function deleteClient(id) {
   return response.data;
 }
 
+export async function exportClientsToExcel({
+  filters = {},
+  search = "",
+  filename = "Clientes_export.xls",
+} = {}) {
+  try {
+    const params = {};
+    if (search) params.search = search;
+    if (filters.is_active !== undefined && filters.is_active !== "") {
+      params.is_active = filters.is_active;
+    }
+    if (filters.tariff === "none") {
+      params.sin_tarifa = "1";
+    } else if (filters.tariff) {
+      params.tariff = filters.tariff;
+    }
+
+    const response = await httpClient.get("/api/clients/export_excel/", {
+      params,
+      responseType: "blob",
+    });
+
+    const objectUrl = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(objectUrl);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error al descargar el archivo Excel:", error);
+    return { success: false, error };
+  }
+}
+
 // Branches
 export async function getBranches(clientId, search = "") {
   let url = "/api/branches/";
