@@ -327,6 +327,9 @@ export default function PositionsView() {
                         Picking?
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[90px] normal-case tracking-normal">
+                        Push?
+                      </Table.HeaderCell>
+                      <Table.HeaderCell className="min-w-[90px] normal-case tracking-normal">
                         Activo?
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[150px] normal-case tracking-normal">
@@ -388,6 +391,11 @@ export default function PositionsView() {
                             <Table.Cell>
                               <Badge variant={position.is_picking ? "info" : "secondary"} dot={false}>
                                 {position.is_picking ? "Sí" : "No"}
+                              </Badge>
+                            </Table.Cell>
+                            <Table.Cell>
+                              <Badge variant={position.is_push ? "warning" : "secondary"} dot={false}>
+                                {position.is_push ? "Sí" : "No"}
                               </Badge>
                             </Table.Cell>
                             <Table.Cell>

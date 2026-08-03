@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { Save, X } from "lucide-react";
 
-import { Modal, Button, Form, Row, Col } from "@/components/ui/bootstrap";
+import { Modal, Button, Form, Row, Col, Alert } from "@/components/ui/bootstrap";
 import CreatableSelect from "@/components/ui/CreatableSelect";
 import Select from "@/components/ui/Select";
 import { createPosition, updatePosition, getCavas } from "@/services/storageService";
+import { getApiErrorMessage } from "@/services/httpClient";
 import {
   buildHallOptions,
   buildPlaceOptions,
@@ -27,6 +28,7 @@ const EMPTY_POSITION = {
   status: "libre",
   is_active: true,
   is_picking: false,
+  is_push: false,
 };
 
 function isBlank(value) {
@@ -39,6 +41,7 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
   const [cavas, setCavas] = useState([]);
   const [isLoadingCavas, setIsLoadingCavas] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
+  const [formError, setFormError] = useState(null);
   const [hallOptions, setHallOptions] = useState(() => buildHallOptions());
   const [rackOptions, setRackOptions] = useState(() => buildRackOptions());
   const [placeOptions, setPlaceOptions] = useState(() => buildPlaceOptions());
@@ -78,6 +81,7 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
         level: position.level ?? 1,
         is_active: position.is_active !== false,
         is_picking: Boolean(position.is_picking),
+        is_push: Boolean(position.is_push),
       });
       setHallOptions(buildHallOptions([position.hall].filter(Boolean)));
       setRackOptions(buildRackOptions([position.rack].filter((value) => value != null && value !== "")));
@@ -92,6 +96,7 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
     }
     if (!show) {
       setShowValidation(false);
+      setFormError(null);
     }
   }, [position, show]);
 
@@ -128,11 +133,12 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
 
     if (cavaMissing || hallMissing || rackMissing || placeMissing || levelMissing) {
       setShowValidation(true);
-      showAlert("danger", "Complete cava, pasillo, rack, nivel y lugar.");
+      setFormError("Complete cava, pasillo, rack, nivel y lugar.");
       return;
     }
 
     setShowValidation(false);
+    setFormError(null);
     setIsSaving(true);
     try {
       const payload = {
@@ -144,6 +150,7 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
         status: formData.status || "libre",
         is_active: Boolean(formData.is_active),
         is_picking: Boolean(formData.is_picking),
+        is_push: Boolean(formData.is_push),
       };
 
       if (formData.id) {
@@ -155,8 +162,14 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
       await onSave();
       onHide();
       showAlert("success", "Posición guardada correctamente");
-    } catch {
-      showAlert("danger", "Error al guardar la posición");
+    } catch (err) {
+      const fieldPush = err?.response?.data?.is_push;
+      const apiMsg = Array.isArray(fieldPush)
+        ? fieldPush[0]
+        : typeof fieldPush === "string"
+          ? fieldPush
+          : getApiErrorMessage(err, "Error al guardar la posición");
+      setFormError(apiMsg);
     } finally {
       setIsSaving(false);
     }
@@ -185,6 +198,16 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {formError ? (
+          <Alert
+            variant="danger"
+            dismissible
+            onClose={() => setFormError(null)}
+            className="mb-3"
+          >
+            {formError}
+          </Alert>
+        ) : null}
         <Form onSubmit={(e) => e.preventDefault()}>
           <Row className="gap-y-3">
             {readOnly && formData.code && (
@@ -402,6 +425,26 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
                   disabled={readOnly}
                   onChange={(e) => setFormData({ ...formData, is_picking: e.target.checked })}
                 />
+              </Form.Group>
+            </Col>
+
+            <Col md={6}>
+              <Form.Group className="mb-0">
+                <Form.Label>Push (conducto)</Form.Label>
+                <Form.Check
+                  type="switch"
+                  id="position-is-push"
+                  label={formData.is_push ? "Sí" : "No"}
+                  checked={Boolean(formData.is_push)}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setFormError(null);
+                    setFormData({ ...formData, is_push: e.target.checked });
+                  }}
+                />
+                <Form.Text className="text-muted">
+                  Requiere profundidad de al menos 5. Aplica a todo el conducto.
+                </Form.Text>
               </Form.Group>
             </Col>
           </Row>

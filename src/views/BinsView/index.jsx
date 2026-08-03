@@ -33,6 +33,7 @@ import {
   Table,
   Modal,
 } from "@/components/ui/bootstrap";
+import Select from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import { ConditionBadge } from "@/views/CavasView/cavaLabels";
@@ -48,7 +49,9 @@ import {
   printBinTag,
   exportBinsToExcel,
   almacenarBinsMasivo,
+  getCriteriosAlmacenamiento,
 } from "@/services/inventoryService";
+import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
@@ -62,7 +65,6 @@ import ModalConfirm from "./components/ModalConfirm";
 import ModalQRValidation from "./components/ModalQRValidation";
 import BinExpandedProducts from "./components/BinExpandedProducts";
 import { formatDate } from "@/lib/format";
-import { canCRUD } from "@/services/httpClient";
 import { statusBadgeVariant, statusLabels } from "./binLabels";
 
 const BinsView = () => {
@@ -97,6 +99,13 @@ const BinsView = () => {
 
   // Estado para modal de confirmación de almacenar masivo
   const [showAlmacenarModal, setShowAlmacenarModal] = useState(false);
+  const [selectedBinIds, setSelectedBinIds] = useState([]);
+  const [massStorePreview, setMassStorePreview] = useState([]);
+  const [massStoreStep, setMassStoreStep] = useState("idle"); // idle | calculating | preview | applying
+  const [massStoreStrategy, setMassStoreStrategy] = useState("");
+  const [massStoreCriteria, setMassStoreCriteria] = useState([]);
+  const [massStoreError, setMassStoreError] = useState(null);
+
 
   // Estado para la pestaña inicial del modal
   const [initialTab, setInitialTab] = useState("details");
@@ -379,30 +388,128 @@ const BinsView = () => {
     }
   };
 
-  // Almacenar bins masivamente (solo admin)
-  const handleAlmacenarMasivo = async () => {
-    if (isAlmacenando) return;
+  // Almacenamiento masivo: abrir modal → elegir criterio → sugerir → confirmar
+  const loadMassStorePreview = async (strategy) => {
+    if (selectedBinIds.length === 0 || !strategy) return;
 
     setIsAlmacenando(true);
-    setShowAlmacenarModal(false);
+    setMassStoreStep("calculating");
+    setMassStoreError(null);
     try {
-      const result = await almacenarBinsMasivo();
+      const result = await almacenarBinsMasivo({
+        binIds: selectedBinIds,
+        strategy,
+        confirm: false,
+      });
+
+      if (result.success) {
+        setMassStorePreview(result.assignments || []);
+        setMassStoreStep("preview");
+      } else {
+        setMassStorePreview([]);
+        setMassStoreError(result.message || "No se pudo sugerir posiciones");
+        setMassStoreStep("preview");
+      }
+    } catch (error) {
+      console.error("Error al sugerir almacenamiento:", error);
+      setMassStorePreview([]);
+      setMassStoreError(getApiErrorMessage(error, "Error al sugerir posiciones"));
+      setMassStoreStep("preview");
+    } finally {
+      setIsAlmacenando(false);
+    }
+  };
+
+  const openAlmacenarMasivo = async () => {
+    if (isAlmacenando || selectedBinIds.length === 0) return;
+
+    setMassStoreError(null);
+    setMassStorePreview([]);
+    setMassStoreStrategy("");
+    setMassStoreStep("idle");
+    setShowAlmacenarModal(true);
+
+    try {
+      const criteria = await getCriteriosAlmacenamiento();
+      const list = Array.isArray(criteria) ? criteria : [];
+      setMassStoreCriteria(list);
+    } catch (error) {
+      console.error("Error al cargar criterios:", error);
+      setMassStoreCriteria([
+        { id: "push", label: "Push (conducto)", description: "" },
+        {
+          id: "compact_sku_batch",
+          label: "Compactar SKU y lote",
+          description: "",
+        },
+      ]);
+    }
+  };
+
+  const handleMassStoreStrategyChange = async (nextStrategy) => {
+    const strategy = String(nextStrategy || "").trim();
+    setMassStoreStrategy(strategy);
+    setMassStorePreview([]);
+    setMassStoreError(null);
+    if (!strategy) {
+      setMassStoreStep("idle");
+      return;
+    }
+    await loadMassStorePreview(strategy);
+  };
+
+  const handleAlmacenarMasivo = async () => {
+    if (isAlmacenando || selectedBinIds.length === 0 || !massStoreStrategy) return;
+
+    setIsAlmacenando(true);
+    setMassStoreStep("applying");
+    setMassStoreError(null);
+    try {
+      const result = await almacenarBinsMasivo({
+        binIds: selectedBinIds,
+        strategy: massStoreStrategy,
+        confirm: true,
+        assignments: massStorePreview,
+      });
 
       if (result.success) {
         showAlert(
           "success",
-          result.message || `${result.updated} bins almacenados exitosamente`
+          result.message || `${result.updated} bins almacenados`
         );
-        // Recargar la lista
+        setShowAlmacenarModal(false);
+        setMassStorePreview([]);
+        setMassStoreStrategy("");
+        setMassStoreStep("idle");
+        setMassStoreError(null);
+        setSelectedBinIds([]);
         loadEntries();
       } else {
-        showAlert("danger", result.message || "Error al almacenar los bins");
+        setMassStoreError(result.message || "Error al almacenar los bins");
+        setMassStoreStep("preview");
       }
     } catch (error) {
       console.error("Error al almacenar masivamente:", error);
-      showAlert("danger", "Error al almacenar los bins");
+      setMassStoreError(getApiErrorMessage(error, "Error al almacenar los bins"));
+      setMassStoreStep("preview");
     } finally {
       setIsAlmacenando(false);
+    }
+  };
+
+  const toggleBinSelection = (binId) => {
+    setSelectedBinIds((prev) =>
+      prev.includes(binId) ? prev.filter((id) => id !== binId) : [...prev, binId]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = entries.map((e) => e.id);
+    const allSelected = visibleIds.every((id) => selectedBinIds.includes(id));
+    if (allSelected) {
+      setSelectedBinIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedBinIds((prev) => [...new Set([...prev, ...visibleIds])]);
     }
   };
 
@@ -554,18 +661,20 @@ const BinsView = () => {
                     Limpiar filtros
                   </Button>
                 )}
-                {filters.status === "en_recibo" && (user?.is_superuser || user?.is_staff) && (
+                {perms.change && selectedBinIds.length > 0 && (
                   <Button
                     variant="success"
                     size="sm"
                     icon={Archive}
-                    onClick={() => setShowAlmacenarModal(true)}
+                    onClick={openAlmacenarMasivo}
                     disabled={isAlmacenando}
-                    loading={isAlmacenando}
-                    title="Almacenar todos los bins en recibo que tengan posición asignada"
+                    loading={isAlmacenando && !showAlmacenarModal}
+                    title="Aplicar criterio de almacenamiento para los bins seleccionados"
                     className="shrink-0 whitespace-nowrap"
                   >
-                    {isAlmacenando ? "Almacenando…" : "Almacenar todos"}
+                    {isAlmacenando
+                      ? "Procesando…"
+                      : `Aplicar criterio (${selectedBinIds.length})`}
                   </Button>
                 )}
                 <div className="ml-auto shrink-0 pl-2">
@@ -594,6 +703,19 @@ const BinsView = () => {
                 <Table hover responsive className="mb-0 min-w-[980px]">
                   <Table.Head>
                     <tr>
+                      {perms.change && (
+                        <Table.HeaderCell className="w-10 normal-case tracking-normal">
+                          <Form.Check
+                            type="checkbox"
+                            checked={
+                              entries.length > 0 &&
+                              entries.every((e) => selectedBinIds.includes(e.id))
+                            }
+                            onChange={toggleSelectAllVisible}
+                            aria-label="Seleccionar todos"
+                          />
+                        </Table.HeaderCell>
+                      )}
                       <Table.HeaderCell className="min-w-[130px] normal-case tracking-normal">
                         Código
                       </Table.HeaderCell>
@@ -625,6 +747,16 @@ const BinsView = () => {
                       return (
                         <Fragment key={entry.id}>
                           <Table.Row>
+                            {perms.change && (
+                              <Table.Cell>
+                                <Form.Check
+                                  type="checkbox"
+                                  checked={selectedBinIds.includes(entry.id)}
+                                  onChange={() => toggleBinSelection(entry.id)}
+                                  aria-label={`Seleccionar ${entry.code}`}
+                                />
+                              </Table.Cell>
+                            )}
                             <Table.Cell>
                               <button
                                 type="button"
@@ -783,7 +915,7 @@ const BinsView = () => {
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.15 }}
                               >
-                                <td colSpan={7} className="p-0">
+                                <td colSpan={perms.change ? 8 : 7} className="p-0">
                                   <BinExpandedProducts
                                     entry={entry}
                                     user={user}
@@ -890,33 +1022,125 @@ const BinsView = () => {
         onProcessSuccess={handleQRProcessSuccess}
       />
 
-      <Modal show={showAlmacenarModal} onHide={() => setShowAlmacenarModal(false)} centered>
+      <Modal show={showAlmacenarModal} onHide={() => {
+        if (isAlmacenando) return;
+        setShowAlmacenarModal(false);
+        setMassStorePreview([]);
+        setMassStoreStrategy("");
+        setMassStoreStep("idle");
+        setMassStoreError(null);
+      }} centered size="lg">
         <Modal.Header closeButton>
           <Modal.Title className="flex items-center gap-2">
             <Archive className="h-5 w-5 text-emerald-600" />
-            Confirmar almacenamiento
+            Aplicar criterio
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p className="mb-2">
-            ¿Está seguro de almacenar todos los bins en recibo que tengan posición asignada?
-          </p>
-          <p className="mb-0 text-sm text-slate-500">
-            Esta acción cambiará el estado de los bins de &quot;En Recibo&quot; a &quot;Almacenado&quot;.
-          </p>
+          {massStoreError ? (
+            <Alert
+              variant="danger"
+              dismissible
+              onClose={() => setMassStoreError(null)}
+              className="mb-3"
+            >
+              {massStoreError}
+            </Alert>
+          ) : null}
+
+          <Form.Group className="mb-3">
+            <Form.Label>Criterio de almacenamiento</Form.Label>
+            <Select
+              inputId="mass-store-strategy"
+              size="sm"
+              value={massStoreStrategy}
+              isClearable
+              isDisabled={isAlmacenando}
+              placeholder="Seleccione un criterio"
+              options={(massStoreCriteria.length
+                ? massStoreCriteria
+                : [
+                    { id: "push", label: "Push (conducto)" },
+                    { id: "compact_sku_batch", label: "Compactar SKU y lote" },
+                  ]
+              ).map((c) => ({
+                value: c.id,
+                label: c.label,
+              }))}
+              onChange={(e) => handleMassStoreStrategyChange(e.target.value)}
+            />
+            {massStoreStrategy &&
+            massStoreCriteria.find((c) => c.id === massStoreStrategy)?.description ? (
+              <Form.Text className="text-muted">
+                {
+                  massStoreCriteria.find((c) => c.id === massStoreStrategy)
+                    .description
+                }
+              </Form.Text>
+            ) : null}
+          </Form.Group>
+
+          {massStoreStep === "calculating" ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-10">
+              <div
+                className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent"
+                role="status"
+                aria-label="Calculando"
+              />
+              <p className="mb-0 text-sm text-slate-500">Calculando posiciones…</p>
+            </div>
+          ) : massStorePreview.length > 0 ? (
+            <div className="max-h-72 overflow-y-auto rounded border border-[var(--border-subtle)]">
+              <Table hover responsive className="mb-0">
+                <Table.Head>
+                  <tr>
+                    <Table.HeaderCell className="normal-case">Bin</Table.HeaderCell>
+                    <Table.HeaderCell className="normal-case">Posición</Table.HeaderCell>
+                  </tr>
+                </Table.Head>
+                <Table.Body>
+                  {massStorePreview.map((row) => (
+                    <Table.Row key={`${row.bin_id}-${row.position_id}`}>
+                      <Table.Cell>{row.bin_code}</Table.Cell>
+                      <Table.Cell>{row.position_code}</Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table>
+            </div>
+          ) : massStoreStrategy ? (
+            <p className="mb-0 text-sm text-slate-500">Sin sugerencias.</p>
+          ) : null}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowAlmacenarModal(false)}>
+          <Button
+            variant="secondary"
+            icon={XCircle}
+            onClick={() => {
+              setShowAlmacenarModal(false);
+              setMassStorePreview([]);
+              setMassStoreStrategy("");
+              setMassStoreStep("idle");
+              setMassStoreError(null);
+            }}
+            disabled={isAlmacenando}
+          >
             Cancelar
           </Button>
           <Button
             variant="success"
             icon={Archive}
             onClick={handleAlmacenarMasivo}
-            disabled={isAlmacenando}
-            loading={isAlmacenando}
+            disabled={
+              isAlmacenando ||
+              !massStoreStrategy ||
+              massStorePreview.length === 0
+            }
+            loading={isAlmacenando && massStoreStep === "applying"}
           >
-            {isAlmacenando ? "Almacenando…" : "Almacenar todos"}
+            {isAlmacenando && massStoreStep === "applying"
+              ? "Almacenando…"
+              : `Confirmar (${massStorePreview.length})`}
           </Button>
         </Modal.Footer>
       </Modal>

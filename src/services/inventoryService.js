@@ -110,9 +110,29 @@ export async function printBinTag(binId) {
   return response.data;
 }
 
-export async function almacenarBinsMasivo() {
+export async function getCriteriosAlmacenamiento() {
+  const response = await httpClient.get("/api/bins/criterios-almacenamiento/");
+  return response.data;
+}
+
+export async function almacenarBinsMasivo({
+  binIds,
+  strategy = "push",
+  confirm = false,
+  assignments = null,
+  params = {},
+} = {}) {
   try {
-    const response = await httpClient.post("/api/bins/almacenar-masivo/");
+    const body = {
+      strategy,
+      bin_ids: binIds,
+      confirm,
+      params,
+    };
+    if (assignments) {
+      body.assignments = assignments;
+    }
+    const response = await httpClient.post("/api/bins/almacenar-masivo/", body);
     return response.data;
   } catch (error) {
     if (error.response && error.response.data) {
