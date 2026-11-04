@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
-  Bell,
   Building2,
   LogOut,
   Maximize,
@@ -14,6 +13,7 @@ import {
 
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { SidebarToggle } from "@/components/layout/SidebarToggle";
+import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
 
 import { cn } from "@/lib/cn";
 import {
@@ -26,7 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { getWorkspaceLogotypeUrl } from "@/lib/workspaceMedia";
 
-function HeaderIconButton({ children, className, badge, ...props }) {
+function HeaderIconButton({ children, className, ...props }) {
   return (
     <button
       type="button"
@@ -37,9 +37,6 @@ function HeaderIconButton({ children, className, badge, ...props }) {
       {...props}
     >
       {children}
-      {badge ? (
-        <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-pink-500 ring-2 ring-white" />
-      ) : null}
     </button>
   );
 }
@@ -114,11 +111,7 @@ export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
       <div className="flex items-center gap-2">
         <div className="hidden items-center gap-2 sm:flex">
           <ThemeToggle />
-          {!user?.client ? (
-            <HeaderIconButton aria-label="Notificaciones" badge>
-              <Bell className="h-4 w-4" strokeWidth={2} />
-            </HeaderIconButton>
-          ) : null}
+          {!user?.client ? <NotificationDropdown /> : null}
           <HeaderIconButton
             aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
             onClick={toggleFullscreen}

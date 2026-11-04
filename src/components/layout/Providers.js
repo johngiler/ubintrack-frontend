@@ -1,6 +1,7 @@
 "use client";
 
 import { AuthProvider } from "@/context/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { WorkspaceProvider } from "@/context/WorkspaceContext";
 import { WmsDocumentTitle } from "@/components/layout/WmsDocumentTitle";
@@ -14,9 +15,11 @@ export function Providers({ children }) {
       <WorkspaceProvider>
         <WorkspaceTheme />
         <AuthProvider>
-          <WmsDocumentTitle />
-          <WmsFavicon />
-          <WmsShell>{children}</WmsShell>
+          <NotificationProvider>
+            <WmsDocumentTitle />
+            <WmsFavicon />
+            <WmsShell>{children}</WmsShell>
+          </NotificationProvider>
         </AuthProvider>
       </WorkspaceProvider>
     </ThemeProvider>
