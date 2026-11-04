@@ -8,7 +8,7 @@ import { clientTenantSlug, envTenantSlugFallback, workspaceSlugRequestHeaders } 
 const WorkspaceContext = createContext(undefined);
 
 async function fetchWorkspace() {
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const base = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001";
   const headers = workspaceSlugRequestHeaders(
     typeof window !== "undefined" ? window.location.hostname : undefined,
   );

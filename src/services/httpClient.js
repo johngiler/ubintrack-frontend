@@ -6,7 +6,7 @@ import { clientTenantSlug, workspaceSlugRequestHeaders } from "@/lib/tenant";
 
 const baseURL =
   process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "");
+  (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8001" : "");
 
 const httpClient = axios.create({ baseURL });
 

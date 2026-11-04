@@ -86,7 +86,7 @@ export function storageKeySuffix() {
 }
 
 /**
- * Cabecera para el API cuando el Host del backend no lleva subdominio (p. ej. 127.0.0.1:8000).
+ * Cabecera para el API cuando el Host del backend no lleva subdominio (p. ej. 127.0.0.1:8001).
  * @param {string} [hostname] Host del navegador o de la petición Next (RSC); si se omite, solo aplica en cliente.
  */
 export function workspaceSlugRequestHeaders(hostname) {
