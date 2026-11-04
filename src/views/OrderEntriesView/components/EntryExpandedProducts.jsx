@@ -4,12 +4,16 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
+import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 import { useWmsNavigate } from "@/hooks/useWmsRouter";
 import { formatDate } from "@/lib/format";
 
 function BinsAccordion({ ep, expandedProducts, setExpandedProducts, navigate }) {
   const isOpen = Boolean(expandedProducts[`bins_${ep.id}`]);
   const bins = ep.related_bins || [];
+  const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
+    useVisibleSlice(bins, 12, 12);
 
   if (!bins.length) return null;
 
@@ -39,7 +43,7 @@ function BinsAccordion({ ep, expandedProducts, setExpandedProducts, navigate }) 
             className="overflow-hidden"
           >
             <div className="mt-2 space-y-1.5">
-              {bins.map((bin, index) => (
+              {visibleItems.map((bin, index) => (
                 <motion.button
                   key={bin.bin_id}
                   type="button"
@@ -61,6 +65,13 @@ function BinsAccordion({ ep, expandedProducts, setExpandedProducts, navigate }) 
                 </motion.button>
               ))}
             </div>
+            <LoadMoreFooter
+              hasMore={hasMore}
+              onLoadMore={loadMore}
+              loadedCount={visibleCount}
+              totalCount={totalCount}
+              itemLabel="bins"
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -154,6 +165,8 @@ const MotionTr = motion.tr;
 export default function EntryExpandedProducts({ entry, expandedProducts, setExpandedProducts }) {
   const navigate = useWmsNavigate();
   const products = entry.entry_products || [];
+  const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
+    useVisibleSlice(products, 12, 12);
 
   if (!products.length) return null;
 
@@ -175,7 +188,7 @@ export default function EntryExpandedProducts({ entry, expandedProducts, setExpa
         >
           <div className="border-t border-[var(--border-subtle)] px-4 py-3">
             <div className="flex flex-wrap gap-3">
-              {products.map((ep, index) => (
+              {visibleItems.map((ep, index) => (
                 <ProductCard
                   key={ep.id}
                   ep={ep}
@@ -186,6 +199,13 @@ export default function EntryExpandedProducts({ entry, expandedProducts, setExpa
                 />
               ))}
             </div>
+            <LoadMoreFooter
+              hasMore={hasMore}
+              onLoadMore={loadMore}
+              loadedCount={visibleCount}
+              totalCount={totalCount}
+              itemLabel="productos"
+            />
           </div>
         </motion.div>
       </td>

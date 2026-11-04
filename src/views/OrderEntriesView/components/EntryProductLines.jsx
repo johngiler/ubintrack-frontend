@@ -5,6 +5,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button, Form } from "@/components/ui/bootstrap";
 import { IconButton } from "@/components/ui/Button";
 import AsyncSelect from "@/components/ui/AsyncSelect";
+import VisibleSliceList from "@/components/ui/VisibleSliceList";
+
 
 function CompactFieldLabel({ children, required = false }) {
   return (
@@ -47,6 +49,7 @@ export default function EntryProductLines({
   setValidationErrors,
 }) {
   const canEditLines = !isViewMode && selectedEntry.status !== "completada";
+  const entryProducts = selectedEntry.entry_products || [];
 
   return (
     <>
@@ -54,10 +57,11 @@ export default function EntryProductLines({
         <p className="mb-2 text-xs text-red-600">{validationErrors.products.general}</p>
       ) : null}
 
-      <div className="space-y-2.5">
-        {selectedEntry.entry_products?.map((product, index) => (
+      <VisibleSliceList items={entryProducts} itemLabel="productos" className="space-y-2.5">
+        {(visibleProducts) =>
+          visibleProducts.map((product, index) => (
           <article
-            key={index}
+            key={product.id ?? index}
             className="rounded-lg border border-[var(--border-subtle)] bg-white/90 p-3 shadow-sm dark:bg-[var(--card)]/90"
           >
             <div className="mb-2.5 flex items-center justify-between gap-2">
@@ -271,8 +275,9 @@ export default function EntryProductLines({
               </div>
             ) : null}
           </article>
-        ))}
-      </div>
+          ))
+        }
+      </VisibleSliceList>
 
       {canEditLines ? (
         <div className="mt-3 flex justify-end border-t border-[var(--border-subtle)] pt-3">

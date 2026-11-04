@@ -3,6 +3,7 @@
 import { Fragment, useState, useEffect, useCallback } from "react";
 import { Building, Eye, FilterX, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Card,
@@ -35,23 +36,15 @@ export default function CavasView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "storage", "cava");
 
-  const [cavas, setCavas] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedCava, setSelectedCava] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -62,27 +55,25 @@ export default function CavasView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadCavas = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await getCavas(currentPage, debouncedSearchTerm, PAGE_SIZE);
-      setCavas(response.results || []);
-      setTotalItems(response.count || 0);
-      setTotalPages(Math.ceil((response.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar las cavas");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, showAlertMessage]);
+  const {
+    results: cavas,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadCavas,
+  } = usePaginatedList({
+    key: swrKeys.cavas(currentPage, debouncedSearchTerm),
+    fetcher: () => getCavas(currentPage, debouncedSearchTerm, PAGE_SIZE),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadCavas();
-  }, [loadCavas]);
+    if (error) showAlertMessage("danger", "Error al cargar las cavas");
+  }, [error, showAlertMessage]);
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
   };
 
   const handleShowModal = (cava, mode) => {

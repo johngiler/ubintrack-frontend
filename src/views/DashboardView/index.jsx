@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -14,6 +15,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/bootstrap";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
+import { swrKeys } from "@/lib/swr";
 import {
   getClientStats,
   getDashboardStats,
@@ -30,15 +32,20 @@ function formatMonthRange(start, end) {
   return `${fmt.format(start)} – ${fmt.format(end)}`;
 }
 
+async function fetchWarehouse() {
+  const response = await getWarehouseStructure();
+  if (response.success) {
+    return { data: response.data, missing: false, error: null };
+  }
+  return {
+    data: null,
+    missing: true,
+    error: response.error || "Error al cargar el almacén",
+  };
+}
+
 export default function DashboardView() {
   const { user } = useAuth();
-  const [dashboardData, setDashboardData] = useState(null);
-  const [clientStats, setClientStats] = useState(null);
-  const [warehouseData, setWarehouseData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [warehouseLoading, setWarehouseLoading] = useState(true);
-  const [warehouseError, setWarehouseError] = useState(null);
-  const [warehouseMissing, setWarehouseMissing] = useState(false);
 
   const [startDate] = useState(() => {
     const today = new Date();
@@ -49,48 +56,40 @@ export default function DashboardView() {
     return new Date(today.getFullYear(), today.getMonth() + 1, 0);
   });
 
-  const fetchWarehouse = useCallback(async () => {
-    setWarehouseLoading(true);
-    setWarehouseError(null);
-    setWarehouseMissing(false);
-    try {
-      const response = await getWarehouseStructure();
-      if (response.success) {
-        setWarehouseData(response.data);
-      } else {
-        setWarehouseData(null);
-        setWarehouseError(response.error || "Error al cargar el almacén");
-        setWarehouseMissing(true);
-      }
-    } catch (error) {
-      setWarehouseData(null);
-      setWarehouseError(getApiErrorMessage(error, "Error al cargar el almacén"));
-    } finally {
-      setWarehouseLoading(false);
-    }
-  }, []);
+  const {
+    data: dashboardData,
+    isLoading: statsLoading,
+  } = useSWR(swrKeys.dashboardStats, getDashboardStats, {
+    revalidateOnFocus: true,
+    dedupingInterval: 30_000,
+  });
 
-  const fetchDashboard = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [stats, clients] = await Promise.all([getDashboardStats(), getClientStats()]);
-      setDashboardData(stats);
-      setClientStats(clients);
-    } catch (error) {
-      console.error("Error al cargar dashboard:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: clientStats } = useSWR(swrKeys.dashboardClients, getClientStats, {
+    revalidateOnFocus: true,
+    dedupingInterval: 30_000,
+  });
 
-  useEffect(() => {
-    fetchDashboard();
-    fetchWarehouse();
-  }, [fetchDashboard, fetchWarehouse]);
+  const {
+    data: warehousePayload,
+    error: warehouseFetchError,
+    isLoading: warehouseLoading,
+    mutate: retryWarehouse,
+  } = useSWR(swrKeys.dashboardWarehouse, fetchWarehouse, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
 
+  const warehouseData = warehousePayload?.data ?? null;
+  const warehouseMissing = Boolean(warehousePayload?.missing);
+  const warehouseError =
+    warehousePayload?.error ||
+    (warehouseFetchError
+      ? getApiErrorMessage(warehouseFetchError, "Error al cargar el almacén")
+      : null);
+
+  const loading = statsLoading && !dashboardData;
   const stats = dashboardData?.stats;
   const positions = stats?.positions;
-
   const displayName = user?.full_name || user?.email || "Usuario";
 
   return (
@@ -129,6 +128,7 @@ export default function DashboardView() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiStatCard
               title="Entradas"
+              href="/order/entries"
               total={stats?.entries?.total_count}
               icon={ArrowDownToLine}
               iconTone="sky"
@@ -140,6 +140,7 @@ export default function DashboardView() {
             />
             <KpiStatCard
               title="Bins"
+              href="/inventory/bins"
               total={stats?.bins?.total_count}
               icon={Boxes}
               iconTone="slate"
@@ -151,6 +152,7 @@ export default function DashboardView() {
             />
             <KpiStatCard
               title="Salidas"
+              href="/order/exits"
               total={stats?.exits?.total_count}
               icon={ArrowUpFromLine}
               iconTone="emerald"
@@ -162,6 +164,7 @@ export default function DashboardView() {
             />
             <KpiStatCard
               title="Posiciones"
+              href="/storage/positions"
               total={positions?.total_count}
               icon={MapPin}
               iconTone="violet"
@@ -191,10 +194,10 @@ export default function DashboardView() {
 
           <WarehouseMapSection
             warehouseData={warehouseData}
-            loading={warehouseLoading}
+            loading={warehouseLoading && !warehousePayload}
             error={warehouseError}
             missingWarehouse={warehouseMissing}
-            onRetry={fetchWarehouse}
+            onRetry={() => retryWarehouse()}
           />
 
           <SeriesChart charts={dashboardData?.charts} />

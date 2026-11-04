@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo } from "react";
 import useSWR from "swr";
 
+import { swrKeys } from "@/lib/swr";
 import { clientTenantSlug, envTenantSlugFallback, workspaceSlugRequestHeaders } from "@/lib/tenant";
 
 const WorkspaceContext = createContext(undefined);
@@ -21,7 +22,7 @@ async function fetchWorkspace() {
 
 export function WorkspaceProvider({ children }) {
   const slug = typeof window !== "undefined" ? clientTenantSlug() : envTenantSlugFallback();
-  const { data, error, isLoading, mutate } = useSWR(`workspace-${slug}`, fetchWorkspace, {
+  const { data, error, isLoading, mutate } = useSWR(swrKeys.workspace(slug), fetchWorkspace, {
     revalidateOnFocus: false,
   });
 

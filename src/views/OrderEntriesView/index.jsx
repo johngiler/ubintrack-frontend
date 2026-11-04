@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 import Link from "next/link";
 import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
 import {
@@ -34,6 +35,7 @@ import { IconButton } from "@/components/ui/Button";
 
 import {
   getEntries,
+  getEntry,
   createEntry,
   updateEntry,
   patchEntry,
@@ -95,161 +97,85 @@ const Entries = () => {
   const perms = canCRUD(user, "order", "entry");
   const [searchParams, setSearchParams] = useWmsSearchParams();
   const navigate = useWmsNavigate();
-  const [entries, setEntries] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(
+    () => searchParams.get("entry_code") || ""
+  );
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState({});
   const [isExporting, setIsExporting] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [urlResolved, setUrlResolved] = useState(false);
+  const [ready, setReady] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [entryToComplete, setEntryToComplete] = useState(null);
 
   const PAGE_SIZE = 20;
 
-  // Carga inicial: verificar parámetros de URL primero
-  useEffect(() => {
-    // Evitar doble ejecución en StrictMode
-    if (isInitialized) return;
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 500);
 
-    const initializeComponent = async () => {
+  // Init desde URL: solo fija la búsqueda (entry_code ya viene en el estado inicial)
+  useEffect(() => {
+    let cancelled = false;
+
+    const initFromUrl = async () => {
       const entryId = searchParams.get("entry_id");
-      const entryCode = searchParams.get("entry_code");
-
-      if (entryCode) {
-        // Si hay código directamente, usarlo
-        setSearchTerm(entryCode);
-        setDebouncedSearchTerm(entryCode);
-        // Cargar con el filtro aplicado
+      if (entryId && !searchParams.get("entry_code")) {
         try {
-          const response = await getEntries(1, {}, entryCode);
-          setEntries(response.results);
-          setTotalItems(response.count);
-          setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-          setIsLoading(false);
-          setIsInitialized(true);
+          const entry = await getEntry(entryId);
+          if (!cancelled && entry?.code) setSearchTerm(entry.code);
         } catch (error) {
-          console.error("Error al cargar las entradas:", error);
-          await loadEntriesInitial();
+          console.error("Error al resolver la entrada:", error);
         }
-      } else if (entryId) {
-        // Hay un ID de entrada, buscar el código
-        try {
-          const response = await getEntries(1, {}, "");
-          const loadedEntries = response.results;
-          const entry = loadedEntries.find((e) => e.id === parseInt(entryId));
-          if (entry && entry.code) {
-            setSearchTerm(entry.code);
-            setDebouncedSearchTerm(entry.code);
-            // Cargar con el filtro aplicado
-            const filteredResponse = await getEntries(1, {}, entry.code);
-            setEntries(filteredResponse.results);
-            setTotalItems(filteredResponse.count);
-            setTotalPages(Math.ceil(filteredResponse.count / PAGE_SIZE));
-            setIsLoading(false);
-            setIsInitialized(true);
-          } else {
-            setEntries(loadedEntries);
-            setTotalItems(response.count);
-            setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-            setIsLoading(false);
-            setIsInitialized(true);
-          }
-        } catch (error) {
-          console.error("Error al cargar las entradas:", error);
-          await loadEntriesInitial();
-        }
-      } else {
-        // No hay parámetros de URL, cargar normal
-        await loadEntriesInitial();
       }
+      if (!cancelled) setUrlResolved(true);
     };
 
-    const loadEntriesInitial = async () => {
-      setIsLoading(true);
-      try {
-        const response = await getEntries(1, filters, "");
-        setEntries(response.results);
-        setTotalItems(response.count);
-        setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-      } catch (error) {
-        console.error("Error al cargar las entradas:", error);
-        showAlert("danger", "Error al cargar las entradas");
-      } finally {
-        setIsLoading(false);
-        setIsInitialized(true);
-      }
+    initFromUrl();
+    return () => {
+      cancelled = true;
     };
+  }, []);
 
-    initializeComponent();
-  }, [isInitialized]); // Depende de isInitialized para evitar doble ejecución
-
-  // Debounce para cambios manuales del usuario
+  // Listo cuando la URL se resolvió y el debounce ya refleja la búsqueda (evita doble fetch)
   useEffect(() => {
-    // No hacer nada si no está inicializado
-    if (!isInitialized) return;
-
-    // Para cambios manuales del usuario, aplicar debounce
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, isInitialized]);
-
-  // Efecto para cargar datos cuando cambian los filtros o la búsqueda (solo para cambios manuales)
-  useEffect(() => {
-    // No ejecutar hasta que esté inicializado
-    if (!isInitialized) return;
-
-    // Verificar si hay parámetros de URL activos
-    const entryId = searchParams.get("entry_id");
-    const entryCode = searchParams.get("entry_code");
-    if ((entryId || entryCode) && debouncedSearchTerm) {
-      // Ya se cargó desde la URL, no hacer nada extra
-      return;
+    if (urlResolved && !ready && debouncedSearchTerm === searchTerm) {
+      setReady(true);
     }
+  }, [urlResolved, ready, debouncedSearchTerm, searchTerm]);
 
-    setCurrentPage(1);
-    loadEntries();
-  }, [debouncedSearchTerm, filters]);
-
-  // Efecto para la paginación
   useEffect(() => {
-    if (!isInitialized) return;
-    if (currentPage === 1) return; // Ya se cargó en el useEffect anterior
-    loadEntries();
-  }, [currentPage]);
+    if (ready) setCurrentPage(1);
+  }, [debouncedSearchTerm, filters, ready]);
 
-  const loadEntries = async () => {
-    setIsLoading(true);
-    try {
-      const response = await getEntries(
-        currentPage,
-        filters,
-        debouncedSearchTerm
-      );
-      setEntries(response.results);
-      setTotalItems(response.count);
-      setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-    } catch (error) {
-      console.error("Error al cargar las entradas:", error);
+  const {
+    results: entries,
+    count: totalItems,
+    totalPages,
+    isLoading: isListLoading,
+    error: listError,
+    mutate: loadEntries,
+  } = usePaginatedList({
+    key: ready
+      ? swrKeys.entries(currentPage, debouncedSearchTerm, filters)
+      : null,
+    fetcher: () => getEntries(currentPage, filters, debouncedSearchTerm),
+    pageSize: PAGE_SIZE,
+  });
+  const isLoading = isListLoading || !ready;
+
+  useEffect(() => {
+    if (listError) {
+      console.error("Error al cargar las entradas:", listError);
       showAlert("danger", "Error al cargar las entradas");
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [listError]);
 
   const handleShowModal = (entry, mode) => {
     if (mode === "create") {
@@ -457,7 +383,6 @@ const Entries = () => {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters(EMPTY_FILTERS);
     setSearchParams({});
   };

@@ -28,7 +28,10 @@ if [[ -f "$PROD_ENV" ]]; then
   set +a
 fi
 export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-https://api.ubintrack.com}"
-echo "[deploy] Build con NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL (no uses solo .env.local para prod)"
+# .env.local suele traer WS en 127.0.0.1:9001; en prod hay que forzar el API (nginx /ws/).
+# Si no, el browser pide "Access other apps…" (Local Network Access) a cada rato.
+export NEXT_PUBLIC_WS_URL="${NEXT_PUBLIC_WS_URL:-https://api.ubintrack.com}"
+echo "[deploy] Build con NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL"
 
 echo "[deploy] Building (production, standalone)..."
 NODE_ENV=production npm run build

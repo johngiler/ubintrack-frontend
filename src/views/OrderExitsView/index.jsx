@@ -17,6 +17,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 import Link from "next/link";
 import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
 import {
@@ -91,19 +92,16 @@ const Exits = () => {
   const perms = canCRUD(user, "order", "exit");
   const isClientUser = !!user?.client && !user?.is_superuser;
   const isAdmin = user?.is_superuser || user?.is_staff;
-  const [exits, setExits] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedExit, setSelectedExit] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(
+    () => searchParams.get("exit_code") || ""
+  );
   const [filters, setFilters] = useState({ status: "", exit_date: "" });
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [completingExitId, setCompletingExitId] = useState(null);
@@ -128,7 +126,8 @@ const Exits = () => {
   const [selectedBinToDelete, setSelectedBinToDelete] = useState(null);
   const [isDeletingGroup, setIsDeletingGroup] = useState(false);
   const [isDeletingBin, setIsDeletingBin] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [urlResolved, setUrlResolved] = useState(false);
+  const [ready, setReady] = useState(false);
 
   // Estado para modal de confirmación de revertir operación
   const [showReverseModal, setShowReverseModal] = useState(false);
@@ -145,140 +144,69 @@ const Exits = () => {
 
   const PAGE_SIZE = 20;
 
-  // Carga inicial: verificar parámetros de URL primero
-  useEffect(() => {
-    // Evitar doble ejecución en StrictMode
-    if (isInitialized) return;
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 500);
 
-    const initializeComponent = async () => {
+  // Init desde URL: solo fija la búsqueda (exit_code ya viene en el estado inicial)
+  useEffect(() => {
+    let cancelled = false;
+
+    const initFromUrl = async () => {
       const exitId = searchParams.get("exit_id");
-      const exitCode = searchParams.get("exit_code");
-
-      if (exitCode) {
-        // Filtrar directamente por código
-        setSearchTerm(exitCode);
-        setDebouncedSearchTerm(exitCode);
+      if (exitId && !searchParams.get("exit_code")) {
         try {
-          const filteredResponse = await getExits(1, {}, exitCode);
-          setExits(filteredResponse.results);
-          setTotalItems(filteredResponse.count);
-          setTotalPages(Math.ceil(filteredResponse.count / PAGE_SIZE));
-          setIsLoading(false);
-          setIsInitialized(true);
+          const exit = await getExit(exitId);
+          if (!cancelled && exit?.code) setSearchTerm(exit.code);
         } catch (error) {
-          console.error("Error al cargar las salidas:", error);
-          await loadExitsInitial();
+          console.error("Error al resolver la salida:", error);
         }
-      } else if (exitId) {
-        // Hay un parámetro de URL por ID, buscar el código
-        try {
-          const response = await getExits(1, {}, "");
-          const loadedExits = response.results;
-          const exit = loadedExits.find((e) => e.id === parseInt(exitId));
-          if (exit && exit.code) {
-            // Encontrado: establecer filtro y cargar datos filtrados
-            setSearchTerm(exit.code);
-            setDebouncedSearchTerm(exit.code);
-            // Cargar con el filtro aplicado
-            const filteredResponse = await getExits(1, {}, exit.code);
-            setExits(filteredResponse.results);
-            setTotalItems(filteredResponse.count);
-            setTotalPages(Math.ceil(filteredResponse.count / PAGE_SIZE));
-            setIsLoading(false);
-            setIsInitialized(true);
-          } else {
-            // No se encontró, cargar normal
-            setExits(loadedExits);
-            setTotalItems(response.count);
-            setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-            setIsLoading(false);
-            setIsInitialized(true);
-          }
-        } catch (error) {
-          console.error("Error al cargar las salidas:", error);
-          await loadExitsInitial();
-        }
-      } else {
-        // No hay parámetros de URL, cargar normal
-        await loadExitsInitial();
       }
+      if (!cancelled) setUrlResolved(true);
     };
 
-    const loadExitsInitial = async () => {
-      setIsLoading(true);
-      try {
-        const response = await getExits(1, filters, "");
-        setExits(response.results);
-        setTotalItems(response.count);
-        setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-      } catch (error) {
-        console.error("Error al cargar las salidas:", error);
-        showAlert("danger", "Error al cargar las salidas");
-      } finally {
-        setIsLoading(false);
-        setIsInitialized(true);
-      }
+    initFromUrl();
+    return () => {
+      cancelled = true;
     };
+  }, []);
 
-    initializeComponent();
-  }, [isInitialized]); // Depende de isInitialized para evitar doble ejecución
-
-  // Debounce para cambios manuales del usuario
+  // Listo cuando la URL se resolvió y el debounce ya refleja la búsqueda (evita doble fetch)
   useEffect(() => {
-    // No hacer nada si no está inicializado
-    if (!isInitialized) return;
-
-    // Para cambios manuales del usuario, aplicar debounce
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchTerm, isInitialized]);
-
-  // Cargar datos cuando cambian los filtros o la búsqueda (solo para cambios manuales)
-  useEffect(() => {
-    // No ejecutar hasta que esté inicializado
-    if (!isInitialized) return;
-
-    // Verificar si el debouncedSearchTerm cambió realmente (no es la carga inicial)
-    // Si hay un exit_id o exit_code en la URL y el searchTerm coincide, no recargar
-    const exitId = searchParams.get("exit_id");
-    const exitCode = searchParams.get("exit_code");
-    if ((exitId || exitCode) && debouncedSearchTerm) {
-      // Ya se cargó desde la URL, no hacer nada extra
-      return;
+    if (urlResolved && !ready && debouncedSearchTerm === searchTerm) {
+      setReady(true);
     }
+  }, [urlResolved, ready, debouncedSearchTerm, searchTerm]);
 
-    setCurrentPage(1);
-    loadExits();
-  }, [debouncedSearchTerm, filters]);
-
-  // Cargar datos cuando cambia la página
   useEffect(() => {
-    if (!isInitialized) return;
-    if (currentPage === 1) return; // Ya se cargó en el useEffect anterior
-    loadExits();
-  }, [currentPage]);
+    if (ready) setCurrentPage(1);
+  }, [debouncedSearchTerm, filters, ready]);
 
-  const loadExits = async () => {
-    setIsLoading(true);
-    try {
-      const response = await getExits(
-        currentPage,
-        filters,
-        debouncedSearchTerm
-      );
-      setExits(response.results);
-      setTotalItems(response.count);
-      setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-      return response.results; // Retornar los resultados
-    } catch (error) {
-      console.error("Error al cargar las salidas:", error);
+  const {
+    results: exits,
+    count: totalItems,
+    totalPages,
+    isLoading: isListLoading,
+    error: listError,
+    mutate: mutateExits,
+  } = usePaginatedList({
+    key: ready
+      ? swrKeys.exits(currentPage, debouncedSearchTerm, filters)
+      : null,
+    fetcher: () => getExits(currentPage, filters, debouncedSearchTerm),
+    pageSize: PAGE_SIZE,
+  });
+  const isLoading = isListLoading || !ready;
+
+  useEffect(() => {
+    if (listError) {
+      console.error("Error al cargar las salidas:", listError);
       showAlert("danger", "Error al cargar las salidas");
-      return [];
-    } finally {
-      setIsLoading(false);
     }
+  }, [listError]);
+
+  // Revalida la lista y devuelve los resultados frescos
+  const loadExits = async () => {
+    const data = await mutateExits();
+    return data?.results ?? [];
   };
 
   const handleShowModal = (exit, mode, tab = "details") => {
@@ -491,11 +419,18 @@ const Exits = () => {
 
       // Si el exit estaba expandido en el listado, también actualizar sus datos
       if (exitWithGroup?.id && expandedGroups[exitWithGroup.id]) {
-        // Forzar re-render al actualizar el estado de exits con datos frescos
+        // Actualizar la salida en la caché de la lista con datos frescos
         const freshExit = await getExit(exitWithGroup.id);
         if (freshExit) {
-          setExits((prevExits) =>
-            prevExits.map((e) => (e.id === freshExit.id ? freshExit : e))
+          await mutateExits(
+            (prev) =>
+              prev && {
+                ...prev,
+                results: prev.results.map((e) =>
+                  e.id === freshExit.id ? freshExit : e
+                ),
+              },
+            { revalidate: false }
           );
         }
       }
@@ -792,7 +727,6 @@ const Exits = () => {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters({ status: "", exit_date: "" });
     setSearchParams({});
   };

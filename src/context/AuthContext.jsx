@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { login, logout as authLogout } from "@/services/authService";
 import { getMyProfile } from "@/services/coreService";
 import { getDefaultHomeRoute } from "@/lib/wmsRouteAccess";
+import { clearSwrCache, invalidateAllSwrCache } from "@/lib/swr";
 
 const AuthContext = createContext(undefined);
 
@@ -28,6 +29,7 @@ export function AuthProvider({ children }) {
     } catch {
       localStorage.removeItem("token");
       setUser(null);
+      await clearSwrCache();
       return null;
     } finally {
       setLoading(false);
@@ -42,18 +44,21 @@ export function AuthProvider({ children }) {
     async (credentials) => {
       const data = await login(credentials);
       localStorage.setItem("token", data.token);
+      await clearSwrCache();
       const fullUser = await getMyProfile().catch(() => data.user);
       setUser(fullUser || data.user);
       const u = fullUser || data.user;
+      await invalidateAllSwrCache();
       router.replace(getDefaultHomeRoute(u));
       return data;
     },
     [router],
   );
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback(async () => {
     authLogout();
     setUser(null);
+    await clearSwrCache();
     router.replace("/login");
   }, [router]);
 

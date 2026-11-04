@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Alert,
@@ -64,25 +65,17 @@ export default function TasksView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "task", "task");
 
-  const [tasks, setTasks] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [isLoading, setIsLoading] = useState(true);
   const [expandedLogs, setExpandedLogs] = useState({});
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 400);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -93,23 +86,22 @@ export default function TasksView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadTasks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await getTasks(currentPage, filters, debouncedSearchTerm);
-      setTasks(response.results || []);
-      setTotalItems(response.count || 0);
-      setTotalPages(Math.ceil((response.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar las tareas");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, filters, showAlertMessage]);
+  const {
+    results: tasks,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadTasks,
+  } = usePaginatedList({
+    key: swrKeys.tasks(currentPage, debouncedSearchTerm, filters),
+    fetcher: () => getTasks(currentPage, filters, debouncedSearchTerm),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadTasks();
-  }, [loadTasks]);
+    if (error) showAlertMessage("danger", "Error al cargar las tareas");
+  }, [error, showAlertMessage]);
 
   const handleShowModal = (task, mode) => {
     setSelectedTask(task);
@@ -152,7 +144,6 @@ export default function TasksView() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters(EMPTY_FILTERS);
   };
 

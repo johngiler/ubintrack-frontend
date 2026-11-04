@@ -13,7 +13,10 @@ import {
 import { Button } from "@/components/ui/bootstrap";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
+import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 import { formatDate } from "@/lib/format";
+
 
 const BIN_STATUS_VARIANT = {
   Almacenado: "success",
@@ -255,11 +258,21 @@ function ProductGroupCard({
     group.exit_products?.some((b) => !b.is_processed) &&
     group.exit_products[0]?.reserved_in_pending_orders !== undefined;
 
+  const exitProducts = group.exit_products || [];
+  const {
+    visibleItems: visibleBins,
+    visibleCount: visibleBinsCount,
+    totalCount: totalBinsCount,
+    hasMore: hasMoreBins,
+    loadMore: loadMoreBins,
+  } = useVisibleSlice(exitProducts, 12, 12);
+
   const unprocessedCount =
-    group.exit_products?.filter((b) => !b.is_processed).length ?? 0;
+    exitProducts.filter((b) => !b.is_processed).length ?? 0;
 
   return (
     <article className="w-[380px] max-w-full shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700/60 dark:bg-[var(--surface)]">
+
       <header className="border-b border-slate-100 px-3.5 py-3 dark:border-slate-700/60">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -339,9 +352,9 @@ function ProductGroupCard({
           </div>
         ) : null}
 
-        {group.exit_products?.length > 0 ? (
+        {exitProducts.length > 0 ? (
           <div className="space-y-2.5">
-            {group.exit_products.map((product) => (
+            {visibleBins.map((product) => (
               <ExitBinCard
                 key={product.id}
                 product={product}
@@ -357,6 +370,13 @@ function ProductGroupCard({
                 processingBinId={processingBinId}
               />
             ))}
+            <LoadMoreFooter
+              hasMore={hasMoreBins}
+              onLoadMore={loadMoreBins}
+              loadedCount={visibleBinsCount}
+              totalCount={totalBinsCount}
+              itemLabel="bins"
+            />
           </div>
         ) : (
           <p className="py-4 text-center text-sm text-slate-500 dark:text-slate-400">Sin bins asignados</p>
@@ -380,6 +400,8 @@ export default function ExitExpandedProducts({
   processingBinId,
 }) {
   const groups = exit.exit_product_groups || [];
+  const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
+    useVisibleSlice(groups, 12, 12);
 
   if (!groups.length) {
     return (
@@ -392,7 +414,7 @@ export default function ExitExpandedProducts({
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/30">
       <div className="flex gap-3 overflow-x-auto pb-1">
-        {groups.map((group) => (
+        {visibleItems.map((group) => (
           <ProductGroupCard
             key={group.id}
             exit={exit}
@@ -410,6 +432,13 @@ export default function ExitExpandedProducts({
           />
         ))}
       </div>
+      <LoadMoreFooter
+        hasMore={hasMore}
+        onLoadMore={loadMore}
+        loadedCount={visibleCount}
+        totalCount={totalCount}
+        itemLabel="productos"
+      />
     </div>
   );
 }

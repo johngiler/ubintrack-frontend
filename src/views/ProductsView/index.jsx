@@ -1,8 +1,10 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
+import useSWR from "swr";
 import { ChevronDown, ChevronUp, Download, Eye, FilterX, Package, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Card,
@@ -40,44 +42,23 @@ export default function ProductsView() {
   const perms = canCRUD(authUser, "inventory", "product");
   const [searchParams, setSearchParams] = useWmsSearchParams();
 
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get("search") || "");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [expandedInventory, setExpandedInventory] = useState({});
-  const [urlSearchInitialized, setUrlSearchInitialized] = useState(false);
 
-  useEffect(() => {
-    if (urlSearchInitialized) return;
-    const searchParam = searchParams.get("search");
-    if (searchParam) {
-      setSearchTerm(searchParam);
-      setDebouncedSearchTerm(searchParam);
-    }
-    setUrlSearchInitialized(true);
-  }, [urlSearchInitialized, searchParams]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
-  useEffect(() => {
-    getCategories()
-      .then((data) => setCategories(Array.isArray(data) ? data : data.results || []))
-      .catch(() => setCategories([]));
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const { data: categories = [] } = useSWR(swrKeys.categories, async () => {
+    const data = await getCategories();
+    return Array.isArray(data) ? data : data.results || [];
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -88,24 +69,22 @@ export default function ProductsView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadProducts = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await getProducts(currentPage, filters, debouncedSearchTerm);
-      setProducts(response.results || []);
-      setTotalItems(response.count || 0);
-      setTotalPages(Math.ceil((response.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar los productos");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, filters, showAlertMessage]);
+  const {
+    results: products,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadProducts,
+  } = usePaginatedList({
+    key: swrKeys.products(currentPage, debouncedSearchTerm, filters),
+    fetcher: () => getProducts(currentPage, filters, debouncedSearchTerm),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    if (!urlSearchInitialized) return;
-    loadProducts();
-  }, [loadProducts, urlSearchInitialized]);
+    if (error) showAlertMessage("danger", "Error al cargar los productos");
+  }, [error, showAlertMessage]);
 
   const clearUrlSearch = () => {
     if (searchParams.get("search")) {
@@ -125,7 +104,6 @@ export default function ProductsView() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters(EMPTY_FILTERS);
     clearUrlSearch();
   };

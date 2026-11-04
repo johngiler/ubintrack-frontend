@@ -15,7 +15,9 @@ import {
 import { IconButton } from "@/components/ui/Button";
 import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
 import AsyncSelect from "@/components/ui/AsyncSelect";
+import VisibleSliceList from "@/components/ui/VisibleSliceList";
 import BinProductLines from "./BinProductLines";
+
 import { getPositions } from "@/services/storageService";
 import { formatDate } from "@/lib/format";
 import {
@@ -750,22 +752,30 @@ const ModalEdit = ({
                     <Form.Label className="!text-xs !font-medium !text-slate-600">
                       Órdenes de salida relacionadas
                     </Form.Label>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedEntry.related_exits.map((exit) => (
-                        <Badge
-                          key={exit.exit_id}
-                          bg="info"
-                          className="cursor-pointer !px-2.5 !py-1.5 text-sm"
-                          onClick={() =>
-                            navigate(`/order/exits?exit_code=${exit.exit_code}`)
-                          }
-                          title={`Ver orden de salida: ${exit.exit_code}`}
-                        >
-                          {exit.exit_code}
-                          <ExternalLink className="ms-1 inline h-3.5 w-3.5" />
-                        </Badge>
-                      ))}
-                    </div>
+                    <VisibleSliceList
+                      items={selectedEntry.related_exits}
+                      itemLabel="órdenes"
+                      className="flex flex-wrap gap-2"
+                    >
+                      {(visibleExits) =>
+                        visibleExits.map((exit) => (
+                          <Badge
+                            key={exit.exit_id}
+                            bg="info"
+                            className="cursor-pointer !px-2.5 !py-1.5 text-sm"
+                            onClick={() =>
+                              navigate(
+                                `/order/exits?exit_code=${exit.exit_code}`,
+                              )
+                            }
+                            title={`Ver orden de salida: ${exit.exit_code}`}
+                          >
+                            {exit.exit_code}
+                            <ExternalLink className="ms-1 inline h-3.5 w-3.5" />
+                          </Badge>
+                        ))
+                      }
+                    </VisibleSliceList>
                   </Form.Group>
                 </Col>
               )}

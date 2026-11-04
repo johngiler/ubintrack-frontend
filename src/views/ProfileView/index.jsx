@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useSWR from "swr";
 import {
   Building2,
   Save,
@@ -13,6 +14,7 @@ import {
 import { Alert, Badge, Button, Card, Col, Form, Row } from "@/components/ui/bootstrap";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys } from "@/lib/swr";
 import {
   getUserModeKey,
   getUserRoleLabel,
@@ -37,8 +39,12 @@ function ReadOnlyField({ label, value }) {
 
 export default function ProfileView() {
   const { refreshUser } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: profile,
+    error: profileError,
+    isLoading: loading,
+    mutate: mutateProfile,
+  } = useSWR(swrKeys.myProfile, getMyProfile);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -50,28 +56,21 @@ export default function ProfileView() {
   });
 
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const data = await getMyProfile();
-        if (!active) return;
-        setProfile(data);
-        setForm({
-          full_name: data.full_name || "",
-          email: data.email || "",
-          password: "",
-          password_confirm: "",
-        });
-      } catch {
-        if (active) setError("No se pudo cargar la información del usuario.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
+    if (profile) {
+      setForm({
+        full_name: profile.full_name || "",
+        email: profile.email || "",
+        password: "",
+        password_confirm: "",
+      });
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (profileError) {
+      setError("No se pudo cargar la información del usuario.");
+    }
+  }, [profileError]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -96,7 +95,7 @@ export default function ProfileView() {
       }
 
       const updated = await updateMyProfile(payload);
-      setProfile(updated);
+      await mutateProfile(updated, { revalidate: false });
       setForm((prev) => ({ ...prev, password: "", password_confirm: "" }));
       setSuccess("Perfil actualizado correctamente.");
       await refreshUser();

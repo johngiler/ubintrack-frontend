@@ -15,8 +15,10 @@ import {
   TimelineUser,
 } from "@/components/timeline/TimelineIcons";
 import { Badge, Spinner } from "@/components/ui/bootstrap";
+import VisibleSliceList from "@/components/ui/VisibleSliceList";
 import { formatDateTime } from "@/lib/format";
 import { getExitMovements } from "@/services/orderService";
+
 
 const ExitMovementsTimeline = ({ exitId }) => {
   const [movements, setMovements] = useState([]);
@@ -178,8 +180,9 @@ const ExitMovementsTimeline = ({ exitId }) => {
   }
 
   return (
-    <div className="wms-movements-timeline">
-      {movements.map((movement) => (
+    <VisibleSliceList items={movements} itemLabel="movimientos" className="wms-movements-timeline">
+      {(visibleMovements) =>
+        visibleMovements.map((movement) => (
         <div key={movement.id} className="timeline-item">
           <div className="timeline-icon">
             <ExitMovementIcon movementType={movement.movement_type} />
@@ -476,8 +479,9 @@ const ExitMovementsTimeline = ({ exitId }) => {
             )}
           </div>
         </div>
-      ))}
-    </div>
+      ))
+      }
+    </VisibleSliceList>
   );
 };
 

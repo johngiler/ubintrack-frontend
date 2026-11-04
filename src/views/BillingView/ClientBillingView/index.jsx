@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
+import useSWR from "swr";
 import { useSearchParams } from "next/navigation";
 import {
   Calculator,
@@ -13,6 +14,7 @@ import {
 import { Alert, Button, Card, Col, Row } from "@/components/ui/bootstrap";
 import { Badge } from "@/components/ui/Badge";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
+import { swrKeys } from "@/lib/swr";
 import {
   calculateClientBilling,
   exportBillingReport,
@@ -35,10 +37,7 @@ export default function ClientBillingView({ clientId }) {
   const searchParams = useSearchParams();
   const defaultDates = getDefaultBillingDates();
 
-  const [billingData, setBillingData] = useState(null);
-  const [historyData, setHistoryData] = useState(null);
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
-  const [isLoading, setIsLoading] = useState(true);
   const [isExportingReport, setIsExportingReport] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [startDate, setStartDate] = useState(
@@ -57,32 +56,25 @@ export default function ClientBillingView({ clientId }) {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadClientBilling = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await calculateClientBilling(clientId, appliedStartDate, appliedEndDate);
-      setBillingData(data);
-    } catch {
-      showAlert("danger", "Error al cargar la facturación del cliente");
-      setBillingData(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [appliedStartDate, appliedEndDate, clientId, showAlert]);
+  const {
+    data: billingData,
+    error: billingError,
+    isLoading,
+  } = useSWR(
+    swrKeys.clientBilling(clientId, appliedStartDate, appliedEndDate),
+    () => calculateClientBilling(clientId, appliedStartDate, appliedEndDate),
+  );
 
-  const loadClientHistory = useCallback(async () => {
-    try {
-      const data = await getClientBillingHistory(clientId, 12);
-      setHistoryData(data);
-    } catch {
-      setHistoryData(null);
-    }
-  }, [clientId]);
+  const { data: historyData } = useSWR(
+    swrKeys.clientBillingHistory(clientId),
+    () => getClientBillingHistory(clientId, 12),
+  );
 
   useEffect(() => {
-    loadClientBilling();
-    loadClientHistory();
-  }, [loadClientBilling, loadClientHistory]);
+    if (billingError) {
+      showAlert("danger", "Error al cargar la facturación del cliente");
+    }
+  }, [billingError, showAlert]);
 
   const handleApplyFilter = () => {
     setAppliedStartDate(startDate);

@@ -20,6 +20,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
 
 import {
@@ -72,19 +73,16 @@ const BinsView = () => {
   const perms = canCRUD(user, "inventory", "bin");
   const [searchParams, setSearchParams] = useWmsSearchParams();
   const navigate = useWmsNavigate();
-  const [entries, setEntries] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(
+    () => searchParams.get("bin_code") || ""
+  );
   const [filters, setFilters] = useState({ status: "", is_active: "" });
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [printingBinId, setPrintingBinId] = useState(null);
@@ -111,110 +109,32 @@ const BinsView = () => {
   const [initialTab, setInitialTab] = useState("details");
 
   const PAGE_SIZE = 20;
-  const [isInitialized, setIsInitialized] = useState(false);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 500);
 
-  // Carga inicial: verificar parámetros de URL primero
+  // bin_code de la URL ya viene en el estado inicial de searchTerm (sin fetch aparte)
   useEffect(() => {
-    // Evitar doble ejecución en StrictMode
-    if (isInitialized) return;
-
-    const initializeComponent = async () => {
-      const binCode = searchParams.get("bin_code");
-
-      if (binCode) {
-        // Hay un código de bin, usarlo directamente
-        setSearchTerm(binCode);
-        setDebouncedSearchTerm(binCode);
-        // Cargar con el filtro aplicado
-        try {
-          const response = await getBins(1, {}, binCode);
-          setEntries(response.results);
-          setTotalItems(response.count);
-          setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-          setIsLoading(false);
-          setIsInitialized(true);
-        } catch (error) {
-          console.error("Error al cargar los bins:", error);
-          await loadEntriesInitial();
-        }
-      } else {
-        // No hay parámetros de URL, cargar normal
-        await loadEntriesInitial();
-      }
-    };
-
-    const loadEntriesInitial = async () => {
-      setIsLoading(true);
-      try {
-        const response = await getBins(1, filters, "");
-        setEntries(response.results);
-        setTotalItems(response.count);
-        setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-      } catch (error) {
-        console.error("Error al cargar los bins:", error);
-        showAlert("danger", "Error al cargar los bins");
-      } finally {
-        setIsLoading(false);
-        setIsInitialized(true);
-      }
-    };
-
-    initializeComponent();
-  }, [isInitialized]); // Depende de isInitialized para evitar doble ejecución
-
-  // Debounce para cambios manuales del usuario
-  useEffect(() => {
-    // No hacer nada si no está inicializado
-    if (!isInitialized) return;
-
-    // Para cambios manuales del usuario, aplicar debounce
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchTerm, isInitialized]);
-
-  // Cargar datos cuando cambian los filtros o la búsqueda (solo para cambios manuales)
-  useEffect(() => {
-    // No ejecutar hasta que esté inicializado
-    if (!isInitialized) return;
-
-    // Verificar si hay parámetros de URL activos
-    const binCode = searchParams.get("bin_code");
-    if (binCode && debouncedSearchTerm) {
-      // Ya se cargó desde la URL, no hacer nada extra
-      return;
-    }
-
     setCurrentPage(1);
-    loadEntries();
   }, [debouncedSearchTerm, filters]);
 
-  // Cargar datos cuando cambia la página
-  useEffect(() => {
-    if (!isInitialized) return;
-    if (currentPage === 1) return; // Ya se cargó en el useEffect anterior
-    loadEntries();
-  }, [currentPage]);
+  const {
+    results: entries,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error: listError,
+    mutate: loadEntries,
+  } = usePaginatedList({
+    key: swrKeys.bins(currentPage, debouncedSearchTerm, filters),
+    fetcher: () => getBins(currentPage, filters, debouncedSearchTerm),
+    pageSize: PAGE_SIZE,
+  });
 
-  const loadEntries = async () => {
-    setIsLoading(true);
-    try {
-      const response = await getBins(
-        currentPage,
-        filters,
-        debouncedSearchTerm
-      );
-      setEntries(response.results);
-      setTotalItems(response.count);
-      setTotalPages(Math.ceil(response.count / PAGE_SIZE));
-    } catch (error) {
-      console.error("Error al cargar los bins:", error);
+  useEffect(() => {
+    if (listError) {
+      console.error("Error al cargar los bins:", listError);
       showAlert("danger", "Error al cargar los bins");
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [listError]);
 
   const handleShowModal = (entry, mode, tab = "details") => {
     if (mode === "create") {
@@ -563,7 +483,6 @@ const BinsView = () => {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters({ status: "", is_active: "" });
     setSearchParams({});
   };

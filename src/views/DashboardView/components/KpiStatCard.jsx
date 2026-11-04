@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
+
 import { Card } from "@/components/ui/Card";
+import { cn } from "@/lib/cn";
 import ProgressRing from "./ProgressRing";
 
 function BreakdownCell({ label, value, subValue, tone = "slate" }) {
@@ -25,7 +28,15 @@ function BreakdownCell({ label, value, subValue, tone = "slate" }) {
   );
 }
 
-export default function KpiStatCard({ title, total, icon: Icon, iconTone, breakdown, ringValue }) {
+export default function KpiStatCard({
+  title,
+  total,
+  icon: Icon,
+  iconTone,
+  breakdown,
+  ringValue,
+  href,
+}) {
   const iconToneMap = {
     sky: "bg-sky-50 text-sky-600 ring-sky-100 dark:bg-sky-500/15 dark:text-sky-400 dark:ring-sky-500/20",
     slate: "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-500/20",
@@ -33,8 +44,14 @@ export default function KpiStatCard({ title, total, icon: Icon, iconTone, breakd
     violet: "bg-violet-50 text-violet-600 ring-violet-100 dark:bg-violet-500/15 dark:text-violet-400 dark:ring-violet-500/20",
   };
 
-  return (
-    <Card className="h-full">
+  const card = (
+    <Card
+      className={cn(
+        "h-full",
+        href &&
+          "transition-shadow hover:shadow-[var(--shadow-md)] hover:ring-1 hover:ring-[var(--border)]",
+      )}
+    >
       <div className="flex items-start justify-between gap-3 p-4 pb-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-[var(--foreground-muted)]">
@@ -62,5 +79,17 @@ export default function KpiStatCard({ title, total, icon: Icon, iconTone, breakd
         </div>
       ) : null}
     </Card>
+  );
+
+  if (!href) return card;
+
+  return (
+    <Link
+      href={href}
+      className="block h-full cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40"
+      aria-label={`Ir a ${title}`}
+    >
+      {card}
+    </Link>
   );
 }

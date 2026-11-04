@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Card,
@@ -47,25 +48,17 @@ export default function TariffsView() {
   const searchParams = useSearchParams();
   const perms = canCRUD(user, "finance", "tariff");
 
-  const [tariffs, setTariffs] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedTariff, setSelectedTariff] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [isLoading, setIsLoading] = useState(true);
   const [expandedTariffId, setExpandedTariffId] = useState(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -76,23 +69,22 @@ export default function TariffsView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadTariffs = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await getTariffs(currentPage, debouncedSearchTerm, filters);
-      setTariffs(data.results || []);
-      setTotalItems(data.count || 0);
-      setTotalPages(Math.ceil((data.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar las tarifas");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, filters, showAlertMessage]);
+  const {
+    results: tariffs,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadTariffs,
+  } = usePaginatedList({
+    key: swrKeys.tariffs(currentPage, debouncedSearchTerm, filters),
+    fetcher: () => getTariffs(currentPage, debouncedSearchTerm, filters),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadTariffs();
-  }, [loadTariffs]);
+    if (error) showAlertMessage("danger", "Error al cargar las tarifas");
+  }, [error, showAlertMessage]);
 
   useEffect(() => {
     if (searchParams.get("new") !== "1" || !perms.add) return;
@@ -107,7 +99,6 @@ export default function TariffsView() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters(EMPTY_FILTERS);
   };
 

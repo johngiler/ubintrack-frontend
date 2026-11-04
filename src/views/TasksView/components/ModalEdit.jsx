@@ -6,7 +6,9 @@ import { Save, X } from "lucide-react";
 import { Modal, Button, Form, Row, Col } from "@/components/ui/bootstrap";
 import { Badge } from "@/components/ui/Badge";
 import Select from "@/components/ui/Select";
+import VisibleSliceList from "@/components/ui/VisibleSliceList";
 import { formatDateTime } from "@/lib/format";
+
 import { getUsers } from "@/services/coreService";
 import { getEntries, getExits } from "@/services/orderService";
 import {
@@ -349,14 +351,22 @@ export default function ModalEdit({ show, onHide, task, mode, onSave, showAlert 
         {formData.task_logs?.length ? (
           <div className="mt-4 rounded-xl border border-slate-200 p-3">
             <h6 className="mb-2 text-sm font-semibold text-slate-800">Historial</h6>
-            <div className="max-h-40 space-y-2 overflow-y-auto">
-              {formData.task_logs.map((log) => (
-                <div key={log.id} className="border-b border-slate-100 pb-2 text-sm">
-                  <p className="mb-0 text-xs text-slate-500">{formatDateTime(log.created_at)}</p>
-                  <p className="mb-0 text-slate-700">{log.message}</p>
-                </div>
-              ))}
-            </div>
+            <VisibleSliceList
+              items={formData.task_logs}
+              itemLabel="eventos"
+              className="max-h-40 space-y-2 overflow-y-auto"
+            >
+              {(visibleLogs) =>
+                visibleLogs.map((log) => (
+                  <div key={log.id} className="border-b border-slate-100 pb-2 text-sm">
+                    <p className="mb-0 text-xs text-slate-500">
+                      {formatDateTime(log.created_at)}
+                    </p>
+                    <p className="mb-0 text-slate-700">{log.message}</p>
+                  </div>
+                ))
+              }
+            </VisibleSliceList>
           </div>
         ) : null}
       </Modal.Body>

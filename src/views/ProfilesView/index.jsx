@@ -3,6 +3,7 @@
 import { Fragment, useState, useEffect, useCallback } from "react";
 import { Eye, FilterX, Pencil, Plus, Shield, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Card,
@@ -36,24 +37,16 @@ export default function ProfilesView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "core", "profile");
 
-  const [profiles, setProfiles] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -64,23 +57,22 @@ export default function ProfilesView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadProfiles = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await getProfiles(currentPage, debouncedSearchTerm, filters);
-      setProfiles(response.results || []);
-      setTotalItems(response.count || 0);
-      setTotalPages(Math.ceil((response.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar los perfiles");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, filters, showAlertMessage]);
+  const {
+    results: profiles,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadProfiles,
+  } = usePaginatedList({
+    key: swrKeys.profiles(currentPage, debouncedSearchTerm, filters),
+    fetcher: () => getProfiles(currentPage, debouncedSearchTerm, filters),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadProfiles();
-  }, [loadProfiles]);
+    if (error) showAlertMessage("danger", "Error al cargar los perfiles");
+  }, [error, showAlertMessage]);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -88,7 +80,6 @@ export default function ProfilesView() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters(EMPTY_FILTERS);
   };
 

@@ -1,8 +1,10 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
+import useSWR from "swr";
 import { Download, Eye, FilterX, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Card,
@@ -37,32 +39,20 @@ export default function ClientsView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "core", "client");
 
-  const [clients, setClients] = useState([]);
-  const [tariffs, setTariffs] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    getTariffs(1, "")
-      .then((response) => setTariffs(response.results || []))
-      .catch(() => setTariffs([]));
-  }, []);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const { data: tariffsData } = useSWR(swrKeys.tariffsAll, () => getTariffs(1, ""));
+  const tariffs = tariffsData?.results || [];
 
   useEffect(() => {
     setCurrentPage(1);
@@ -73,23 +63,22 @@ export default function ClientsView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadClients = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await getClients(currentPage, debouncedSearchTerm, filters);
-      setClients(response.results || []);
-      setTotalItems(response.count || 0);
-      setTotalPages(Math.ceil((response.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar los clientes");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, filters, showAlertMessage]);
+  const {
+    results: clients,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadClients,
+  } = usePaginatedList({
+    key: swrKeys.clients(currentPage, debouncedSearchTerm, filters),
+    fetcher: () => getClients(currentPage, debouncedSearchTerm, filters),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadClients();
-  }, [loadClients]);
+    if (error) showAlertMessage("danger", "Error al cargar los clientes");
+  }, [error, showAlertMessage]);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -97,7 +86,6 @@ export default function ClientsView() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters(EMPTY_FILTERS);
   };
 

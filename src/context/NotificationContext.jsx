@@ -12,10 +12,11 @@ import {
 import useSWR from "swr";
 
 import { useAuth } from "@/context/AuthContext";
+import { useNotificationsInfinite } from "@/hooks/useNotificationsInfinite";
+import { swrKeys } from "@/lib/swr";
 import { wsNotificationsUrl } from "@/lib/wsUrl";
 import {
   fetchNotificationUnreadCount,
-  fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/services/notificationService";
@@ -33,6 +34,14 @@ function mergeLive(base, live) {
   return out;
 }
 
+function patchNotificationPages(pages, mapper) {
+  if (!pages) return pages;
+  return pages.map((page) => ({
+    ...page,
+    results: (page.results || []).map(mapper),
+  }));
+}
+
 export function NotificationProvider({ children }) {
   const { user } = useAuth();
   const canSee = Boolean(user) && !user?.client;
@@ -43,32 +52,39 @@ export function NotificationProvider({ children }) {
   const reconnectTimer = useRef(null);
   const [liveItems, setLiveItems] = useState([]);
 
-  const { data: listData, mutate: mutateList, isLoading } = useSWR(
-    canSee ? "notifications-list" : null,
-    () => fetchNotifications({ page: 1 }),
-    { refreshInterval: 60_000, revalidateOnFocus: true },
-  );
+  const {
+    items: baseResults,
+    totalCount,
+    loadedCount,
+    hasMore,
+    loading,
+    loadingMore,
+    loadMore,
+    refresh: refreshList,
+    mutate: mutateList,
+    setSize,
+  } = useNotificationsInfinite(canSee);
 
   const { data: unreadCount = 0, mutate: mutateUnread } = useSWR(
-    canSee ? "notifications-unread" : null,
+    canSee ? swrKeys.notificationsUnread : null,
     fetchNotificationUnreadCount,
     { refreshInterval: 60_000, revalidateOnFocus: true },
   );
 
-  const baseResults = listData?.results || [];
   const notifications = useMemo(
     () => mergeLive(baseResults, liveItems),
     [baseResults, liveItems],
   );
 
   const refresh = useCallback(() => {
-    mutateList();
-    mutateUnread();
-  }, [mutateList, mutateUnread]);
+    void refreshList();
+    void mutateUnread();
+  }, [refreshList, mutateUnread]);
 
   useEffect(() => {
     if (!canSee || !token) {
       setLiveItems([]);
+      void setSize(1);
       return undefined;
     }
 
@@ -132,7 +148,7 @@ export function NotificationProvider({ children }) {
       }
       wsRef.current = null;
     };
-  }, [canSee, token, mutateUnread]);
+  }, [canSee, token, mutateUnread, setSize]);
 
   const markRead = useCallback(
     async (id) => {
@@ -140,7 +156,13 @@ export function NotificationProvider({ children }) {
       setLiveItems((prev) =>
         prev.map((n) => (n.id === id ? { ...n, ...updated, is_read: true } : n)),
       );
-      await mutateList();
+      void mutateList(
+        (pages) =>
+          patchNotificationPages(pages, (item) =>
+            item.id === id ? { ...item, ...updated, is_read: true } : item,
+          ),
+        { revalidate: false },
+      );
       await mutateUnread();
     },
     [mutateList, mutateUnread],
@@ -149,17 +171,34 @@ export function NotificationProvider({ children }) {
   const markAllRead = useCallback(async () => {
     await markAllNotificationsRead();
     setLiveItems((prev) =>
-      prev.map((n) => ({ ...n, is_read: true, read_at: n.read_at || new Date().toISOString() })),
+      prev.map((n) => ({
+        ...n,
+        is_read: true,
+        read_at: n.read_at || new Date().toISOString(),
+      })),
     );
-    await mutateList();
-    await mutateUnread();
+    void mutateList(
+      (pages) =>
+        patchNotificationPages(pages, (item) => ({
+          ...item,
+          is_read: true,
+          read_at: item.read_at || new Date().toISOString(),
+        })),
+      { revalidate: false },
+    );
+    void mutateUnread(0, { revalidate: false });
   }, [mutateList, mutateUnread]);
 
   const value = useMemo(
     () => ({
       notifications,
       unreadCount: canSee ? unreadCount : 0,
-      loading: canSee && isLoading,
+      loading: canSee && loading,
+      loadingMore,
+      hasMore,
+      loadedCount: Math.max(loadedCount, notifications.length),
+      totalCount: Math.max(totalCount, notifications.length),
+      loadMore,
       markRead,
       markAllRead,
       refresh,
@@ -168,7 +207,12 @@ export function NotificationProvider({ children }) {
     [
       notifications,
       unreadCount,
-      isLoading,
+      loading,
+      loadingMore,
+      hasMore,
+      loadedCount,
+      totalCount,
+      loadMore,
       markRead,
       markAllRead,
       refresh,

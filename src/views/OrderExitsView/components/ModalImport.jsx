@@ -11,10 +11,12 @@ import {
   Card,
   Table,
 } from "@/components/ui/bootstrap";
+import VisibleSliceList from "@/components/ui/VisibleSliceList";
 import {
   validateExitImport,
   importExitsFromExcel,
 } from "@/services/orderService";
+
 
 const ModalImport = ({ showModal, handleCloseModal, onImportSuccess }) => {
   const [file, setFile] = useState(null);
@@ -350,39 +352,46 @@ const ModalImport = ({ showModal, handleCloseModal, onImportSuccess }) => {
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      maxHeight: "300px",
-                      overflowY: "auto",
-                    }}
+                  <VisibleSliceList
+                    items={validationResult.summary.orders || []}
+                    itemLabel="órdenes"
+                    className="max-h-[300px] overflow-y-auto"
                   >
-                    {validationResult.summary.orders.map((order, idx) => (
-                      <Card key={idx} className="mb-2">
-                        <Card.Body className="p-2">
-                          <div className="d-flex justify-content-between align-items-center mb-2">
-                            <div>
-                              <strong>{order.client}</strong>
-                              <span className="text-muted mx-2">→</span>
-                              <Badge bg="info">{order.branch}</Badge>
-                            </div>
-                            <div>
-                              <Badge bg="secondary">{order.exit_date}</Badge>
-                              <Badge bg="primary" className="ms-2">
-                                {order.products_count} productos
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="small">
-                            {order.products.map((p, pIdx) => (
-                              <div key={pIdx} className="text-muted">
-                                • {p.sku}: {p.name} ({p.quantity})
+                    {(visibleOrders) =>
+                      visibleOrders.map((order, idx) => (
+                        <Card key={idx} className="mb-2">
+                          <Card.Body className="p-2">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                              <div>
+                                <strong>{order.client}</strong>
+                                <span className="text-muted mx-2">→</span>
+                                <Badge bg="info">{order.branch}</Badge>
                               </div>
-                            ))}
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    ))}
-                  </div>
+                              <div>
+                                <Badge bg="secondary">{order.exit_date}</Badge>
+                                <Badge bg="primary" className="ms-2">
+                                  {order.products_count} productos
+                                </Badge>
+                              </div>
+                            </div>
+                            <VisibleSliceList
+                              items={order.products || []}
+                              itemLabel="productos"
+                              className="small"
+                            >
+                              {(visibleProducts) =>
+                                visibleProducts.map((p, pIdx) => (
+                                  <div key={pIdx} className="text-muted">
+                                    • {p.sku}: {p.name} ({p.quantity})
+                                  </div>
+                                ))
+                              }
+                            </VisibleSliceList>
+                          </Card.Body>
+                        </Card>
+                      ))
+                    }
+                  </VisibleSliceList>
                 </Card.Body>
               </Card>
             )}

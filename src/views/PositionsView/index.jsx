@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
+import useSWR from "swr";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ChevronDown,
@@ -14,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 import { useWmsSearchParams } from "@/hooks/useWmsRouter";
 
 import {
@@ -52,40 +54,27 @@ export default function PositionsView() {
   const perms = canCRUD(user, "storage", "position");
   const [searchParams, setSearchParams] = useWmsSearchParams();
 
-  const [positions, setPositions] = useState([]);
-  const [cavas, setCavas] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get("search") || "");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [isLoading, setIsLoading] = useState(true);
   const [expandedPositions, setExpandedPositions] = useState({});
 
   useEffect(() => {
     const initialSearch = searchParams.get("search") || "";
     if (initialSearch) {
       setSearchTerm(initialSearch);
-      setDebouncedSearchTerm(initialSearch);
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    getCavas(1, "", 200)
-      .then((response) => setCavas(response.results || []))
-      .catch(() => setCavas([]));
-  }, []);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 400);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const { data: cavasData } = useSWR(["cavas", "options"], () => getCavas(1, "", 200));
+  const cavas = cavasData?.results || [];
 
   useEffect(() => {
     setCurrentPage(1);
@@ -96,35 +85,34 @@ export default function PositionsView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadPositions = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const apiFilters = {
-        ...filters,
-        page_size: PAGE_SIZE,
-        is_active:
-          filters.is_active === ""
-            ? undefined
-            : filters.is_active === "true" || filters.is_active === true,
-      };
-      const response = await getPositions(currentPage, apiFilters, debouncedSearchTerm);
-      setPositions(response.results || []);
-      setTotalItems(response.count || 0);
-      setTotalPages(Math.ceil((response.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar las posiciones");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, filters, showAlertMessage]);
+  const apiFilters = {
+    ...filters,
+    page_size: PAGE_SIZE,
+    is_active:
+      filters.is_active === ""
+        ? undefined
+        : filters.is_active === "true" || filters.is_active === true,
+  };
+
+  const {
+    results: positions,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadPositions,
+  } = usePaginatedList({
+    key: swrKeys.positions(currentPage, debouncedSearchTerm, apiFilters),
+    fetcher: () => getPositions(currentPage, apiFilters, debouncedSearchTerm),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadPositions();
-  }, [loadPositions]);
+    if (error) showAlertMessage("danger", "Error al cargar las posiciones");
+  }, [error, showAlertMessage]);
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters(EMPTY_FILTERS);
     setSearchParams({});
   };

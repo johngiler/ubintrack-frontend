@@ -3,6 +3,7 @@
 import { Fragment, useState, useEffect, useCallback } from "react";
 import { Eye, FilterX, Pencil, Plus, Trash2, UserCog } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Card,
@@ -37,24 +38,16 @@ export default function UsersView() {
   const authUser = useAuth().user;
   const perms = canCRUD(authUser, "core", "customuser");
 
-  const [users, setUsers] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -65,26 +58,24 @@ export default function UsersView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadUsers = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await getUsers(currentPage, debouncedSearchTerm, {
-        ...filters,
-        staff_only: true,
-      });
-      setUsers(response.results || []);
-      setTotalItems(response.count || 0);
-      setTotalPages(Math.ceil((response.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar los usuarios");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, filters, showAlertMessage]);
+  const listFilters = { ...filters, staff_only: true };
+
+  const {
+    results: users,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadUsers,
+  } = usePaginatedList({
+    key: swrKeys.users(currentPage, debouncedSearchTerm, listFilters),
+    fetcher: () => getUsers(currentPage, debouncedSearchTerm, listFilters),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+    if (error) showAlertMessage("danger", "Error al cargar los usuarios");
+  }, [error, showAlertMessage]);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -92,7 +83,6 @@ export default function UsersView() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
     setFilters(EMPTY_FILTERS);
   };
 

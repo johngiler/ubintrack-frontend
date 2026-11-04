@@ -1,7 +1,9 @@
 import httpClient from "@/services/httpClient";
 
-export async function fetchNotifications({ page = 1 } = {}) {
-  const { data } = await httpClient.get(`/api/notifications/?page=${page}`);
+export async function fetchNotifications({ page = 1, pageSize = 12 } = {}) {
+  const { data } = await httpClient.get("/api/notifications/", {
+    params: { page, page_size: pageSize },
+  });
   return data;
 }
 

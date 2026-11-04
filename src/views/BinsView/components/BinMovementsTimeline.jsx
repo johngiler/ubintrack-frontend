@@ -17,8 +17,10 @@ import {
   TimelineUser,
 } from "@/components/timeline/TimelineIcons";
 import { Badge, Spinner } from "@/components/ui/bootstrap";
+import VisibleSliceList from "@/components/ui/VisibleSliceList";
 import { formatDateTime } from "@/lib/format";
 import { getBinMovements } from "@/services/inventoryService";
+
 
 const BinMovementsTimeline = ({ binId }) => {
   const [movements, setMovements] = useState([]);
@@ -148,8 +150,9 @@ const BinMovementsTimeline = ({ binId }) => {
   }
 
   return (
-    <div className="wms-movements-timeline">
-      {movements.map((movement) => (
+    <VisibleSliceList items={movements} itemLabel="movimientos" className="wms-movements-timeline">
+      {(visibleMovements) =>
+        visibleMovements.map((movement) => (
         <div key={movement.id} className="timeline-item">
           <div className="timeline-icon">
             <BinMovementIcon
@@ -611,8 +614,9 @@ const BinMovementsTimeline = ({ binId }) => {
               )}
           </div>
         </div>
-      ))}
-    </div>
+      ))
+      }
+    </VisibleSliceList>
   );
 };
 

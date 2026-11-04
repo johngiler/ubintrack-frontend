@@ -2,6 +2,8 @@
 
 import { Form } from "@/components/ui/bootstrap";
 import AsyncSelect from "@/components/ui/AsyncSelect";
+import VisibleSliceList from "@/components/ui/VisibleSliceList";
+
 
 function CompactFieldLabel({ children, required = false }) {
   return (
@@ -78,10 +80,12 @@ export default function BinProductLines({
   const fieldsDisabled =
     isViewMode ||
     (selectedEntry?.id && selectedEntry?.status !== "en_recibo");
+  const products = selectedEntry?.bin_products || [];
 
   return (
-    <div className="space-y-2.5">
-      {selectedEntry?.bin_products?.map((product, index) => (
+    <VisibleSliceList items={products} itemLabel="productos" className="space-y-2.5">
+      {(visibleProducts) =>
+        visibleProducts.map((product, index) => (
         <article
           key={product.id || `product-${product.tempId || index}`}
           className="rounded-lg border border-[var(--border-subtle)] bg-white/90 p-3 shadow-sm dark:bg-[var(--card)]/90"
@@ -196,7 +200,8 @@ export default function BinProductLines({
             </div>
           </div>
         </article>
-      ))}
-    </div>
+        ))
+      }
+    </VisibleSliceList>
   );
 }

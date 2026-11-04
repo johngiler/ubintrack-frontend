@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import useSWR from "swr";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowDown,
@@ -23,6 +24,7 @@ import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import { useTheme } from "@/context/ThemeContext";
 import { useWmsNavigate } from "@/hooks/useWmsRouter";
+import { swrKeys, usePaginatedList } from "@/lib/swr";
 import { getBillingClients, getBillingSummary } from "@/services/financeService";
 import BillingKpiCard from "./components/BillingKpiCard";
 import BillingPeriodFilter from "./components/BillingPeriodFilter";
@@ -49,14 +51,8 @@ export default function BillingView() {
     searchParams.get("start_date") || defaultDates.start;
   const initialEnd = searchParams.get("end_date") || defaultDates.end;
 
-  const [summary, setSummary] = useState(null);
-  const [clients, setClients] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalItems, setTotalItems] = useState(0);
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
   const [appliedStartDate, setAppliedStartDate] = useState(initialStart);
@@ -67,53 +63,40 @@ export default function BillingView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadClients = useCallback(
-    async (page, start, end) => {
-      setIsLoadingClients(true);
-      try {
-        const clientsData = await getBillingClients(page, PAGE_SIZE, start, end);
-        setClients(clientsData.results || []);
-        setTotalItems(clientsData.count || 0);
-        setTotalPages(Math.ceil((clientsData.count || 0) / PAGE_SIZE));
-      } catch {
-        showAlert("danger", "Error al cargar los clientes");
-      } finally {
-        setIsLoadingClients(false);
-      }
-    },
-    [showAlert],
+  const {
+    data: summary,
+    error: summaryError,
+    isLoading: summaryLoading,
+  } = useSWR(
+    swrKeys.billingSummary(appliedStartDate, appliedEndDate),
+    () => getBillingSummary(appliedStartDate, appliedEndDate),
   );
 
-  const loadData = useCallback(
-    async (start, end, page = 1) => {
-      setIsLoading(true);
-      try {
-        const [summaryData, clientsData] = await Promise.all([
-          getBillingSummary(start, end),
-          getBillingClients(page, PAGE_SIZE, start, end),
-        ]);
-        setSummary(summaryData);
-        setClients(clientsData.results || []);
-        setTotalItems(clientsData.count || 0);
-        setTotalPages(Math.ceil((clientsData.count || 0) / PAGE_SIZE));
-        setCurrentPage(page);
-      } catch {
-        showAlert("danger", "Error al cargar los datos de facturación");
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [showAlert],
-  );
+  const {
+    results: clients,
+    count: totalItems,
+    totalPages,
+    isLoading: clientsLoading,
+    error: clientsError,
+  } = usePaginatedList({
+    key: swrKeys.billingClients(currentPage, appliedStartDate, appliedEndDate),
+    fetcher: () =>
+      getBillingClients(currentPage, PAGE_SIZE, appliedStartDate, appliedEndDate),
+    pageSize: PAGE_SIZE,
+  });
+
+  const isLoading = summaryLoading && !summary;
+  const isLoadingClients = clientsLoading && clients.length === 0 && !clientsError;
 
   useEffect(() => {
-    loadData(appliedStartDate, appliedEndDate, 1);
-  }, [appliedStartDate, appliedEndDate, loadData]);
+    if (summaryError || clientsError) {
+      showAlert("danger", "Error al cargar los datos de facturación");
+    }
+  }, [summaryError, clientsError, showAlert]);
 
   useEffect(() => {
-    if (currentPage === 1) return;
-    loadClients(currentPage, appliedStartDate, appliedEndDate);
-  }, [currentPage, appliedStartDate, appliedEndDate, loadClients]);
+    setCurrentPage(1);
+  }, [appliedStartDate, appliedEndDate]);
 
   const handleApplyFilter = () => {
     if (startDate === appliedStartDate && endDate === appliedEndDate) return;

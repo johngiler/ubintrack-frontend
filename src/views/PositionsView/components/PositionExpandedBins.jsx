@@ -1,8 +1,13 @@
 "use client";
 
 import { Badge } from "@/components/ui/Badge";
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
+import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 
 export default function PositionExpandedBins({ bins = [] }) {
+  const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
+    useVisibleSlice(bins, 12, 12);
+
   if (!bins.length) {
     return <div className="px-4 py-3 text-sm text-slate-500">Sin historial</div>;
   }
@@ -10,7 +15,7 @@ export default function PositionExpandedBins({ bins = [] }) {
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3">
       <div className="flex flex-wrap gap-3">
-        {bins.map((bin) => (
+        {visibleItems.map((bin) => (
           <div
             key={bin.id}
             className="w-full max-w-[350px] rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
@@ -45,6 +50,13 @@ export default function PositionExpandedBins({ bins = [] }) {
           </div>
         ))}
       </div>
+      <LoadMoreFooter
+        hasMore={hasMore}
+        onLoadMore={loadMore}
+        loadedCount={visibleCount}
+        totalCount={totalCount}
+        itemLabel="bins"
+      />
     </div>
   );
 }

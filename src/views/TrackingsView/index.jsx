@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, FilterX, Pencil, Plus, Timer, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Alert,
@@ -41,23 +42,15 @@ export default function TrackingsView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "task", "usertasktracking");
 
-  const [trackings, setTrackings] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedTracking, setSelectedTracking] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 400);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -68,23 +61,22 @@ export default function TrackingsView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadTrackings = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await getTaskTrackings(currentPage, {}, PAGE_SIZE);
-      setTrackings(data.results || []);
-      setTotalItems(data.count || 0);
-      setTotalPages(Math.ceil((data.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar los seguimientos");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, showAlertMessage]);
+  const {
+    results: trackings,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadTrackings,
+  } = usePaginatedList({
+    key: swrKeys.trackings(currentPage),
+    fetcher: () => getTaskTrackings(currentPage, {}, PAGE_SIZE),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadTrackings();
-  }, [loadTrackings]);
+    if (error) showAlertMessage("danger", "Error al cargar los seguimientos");
+  }, [error, showAlertMessage]);
 
   const filteredTrackings = useMemo(() => {
     if (!debouncedSearchTerm) return trackings;

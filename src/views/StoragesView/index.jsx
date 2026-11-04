@@ -4,6 +4,7 @@ import { Fragment, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Building2, Eye, FilterX, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
 import {
   Card,
@@ -31,23 +32,15 @@ export default function StoragesView() {
   const searchParams = useSearchParams();
   const perms = canCRUD(user, "storage", "storage");
 
-  const [storages, setStorages] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedStorage, setSelectedStorage] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -58,23 +51,22 @@ export default function StoragesView() {
     setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
   }, []);
 
-  const loadStorages = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await getStorages(currentPage, debouncedSearchTerm, PAGE_SIZE);
-      setStorages(response.results || []);
-      setTotalItems(response.count || 0);
-      setTotalPages(Math.ceil((response.count || 0) / PAGE_SIZE));
-    } catch {
-      showAlertMessage("danger", "Error al cargar las bodegas");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPage, debouncedSearchTerm, showAlertMessage]);
+  const {
+    results: storages,
+    count: totalItems,
+    totalPages,
+    isLoading,
+    error,
+    mutate: loadStorages,
+  } = usePaginatedList({
+    key: swrKeys.storages(currentPage, debouncedSearchTerm),
+    fetcher: () => getStorages(currentPage, debouncedSearchTerm, PAGE_SIZE),
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
-    loadStorages();
-  }, [loadStorages]);
+    if (error) showAlertMessage("danger", "Error al cargar las bodegas");
+  }, [error, showAlertMessage]);
 
   useEffect(() => {
     if (searchParams.get("new") !== "1" || !perms.add) return;
@@ -85,7 +77,6 @@ export default function StoragesView() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDebouncedSearchTerm("");
   };
 
   const handleShowModal = (storage, mode) => {

@@ -2,11 +2,15 @@
 
 import { Archive } from "lucide-react";
 
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
+import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 import { useWmsNavigate } from "@/hooks/useWmsRouter";
 
 export default function ProductInventoryBins({ product }) {
   const navigate = useWmsNavigate();
   const bins = product.inventory_bins || [];
+  const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
+    useVisibleSlice(bins, 12, 12);
 
   if (!bins.length) return null;
 
@@ -16,10 +20,11 @@ export default function ProductInventoryBins({ product }) {
         <div className="border-t border-[var(--border-subtle)] px-4 py-3">
           <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
             <Archive className="h-4 w-4" />
-            {bins.length} bin{bins.length > 1 ? "s" : ""} almacenado{bins.length > 1 ? "s" : ""}
+            {bins.length} bin{bins.length > 1 ? "s" : ""} almacenado
+            {bins.length > 1 ? "s" : ""}
           </div>
           <div className="flex flex-wrap gap-2">
-            {bins.map((bin) => (
+            {visibleItems.map((bin) => (
               <div
                 key={bin.bep_id || bin.id}
                 className="min-w-[220px] max-w-[300px] rounded-lg border border-[var(--border-subtle)] bg-white p-3 text-sm shadow-sm"
@@ -27,7 +32,9 @@ export default function ProductInventoryBins({ product }) {
                 <button
                   type="button"
                   className="font-semibold text-sky-600 hover:underline"
-                  onClick={() => navigate(`/inventory/bins?bin_code=${encodeURIComponent(bin.code)}`)}
+                  onClick={() =>
+                    navigate(`/inventory/bins?bin_code=${encodeURIComponent(bin.code)}`)
+                  }
                 >
                   {bin.code}
                 </button>
@@ -38,7 +45,9 @@ export default function ProductInventoryBins({ product }) {
                       type="button"
                       className="text-sky-600 hover:underline"
                       onClick={() =>
-                        navigate(`/storage/positions?search=${encodeURIComponent(bin.position)}`)
+                        navigate(
+                          `/storage/positions?search=${encodeURIComponent(bin.position)}`,
+                        )
                       }
                     >
                       {bin.position}
@@ -52,7 +61,8 @@ export default function ProductInventoryBins({ product }) {
                 )}
                 {bin.expiration_date && (
                   <p className="mt-1 text-slate-600">
-                    <span className="font-medium text-slate-700">Vence:</span> {bin.expiration_date}
+                    <span className="font-medium text-slate-700">Vence:</span>{" "}
+                    {bin.expiration_date}
                   </p>
                 )}
                 <p className="mt-1 text-slate-600">
@@ -62,8 +72,8 @@ export default function ProductInventoryBins({ product }) {
                 {bin.reserved > 0 && (
                   <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
                     <p className="text-slate-600">
-                      <span className="font-medium text-slate-700">Reservado:</span> {bin.reserved}{" "}
-                      {product.uom}
+                      <span className="font-medium text-slate-700">Reservado:</span>{" "}
+                      {bin.reserved} {product.uom}
                     </p>
                     {bin.reservations?.map((res) => (
                       <p key={res.exit_id} className="text-xs text-slate-500">
@@ -86,6 +96,13 @@ export default function ProductInventoryBins({ product }) {
               </div>
             ))}
           </div>
+          <LoadMoreFooter
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            loadedCount={visibleCount}
+            totalCount={totalCount}
+            itemLabel="bins"
+          />
         </div>
       </td>
     </tr>

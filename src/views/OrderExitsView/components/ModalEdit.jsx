@@ -20,7 +20,11 @@ import { useAuth } from "@/context/AuthContext";
 import { getBinProducts } from "@/services/inventoryService";
 import { updateExit } from "@/services/orderService";
 import AsyncSelect from "@/components/ui/AsyncSelect";
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
+import VisibleSliceList from "@/components/ui/VisibleSliceList";
+import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 import ExitMovementsTimeline from "./ExitMovementsTimeline";
+
 
 const ModalEdit = ({
   showModal,
@@ -65,6 +69,15 @@ const ModalEdit = ({
   const [duplicateErrors, setDuplicateErrors] = useState({});
   const [processingBinId, setProcessingBinId] = useState(null);
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  const productGroups = selectedExit?.exit_product_groups || [];
+  const {
+    visibleCount: visibleGroupsCount,
+    totalCount: totalGroupsCount,
+    hasMore: hasMoreGroups,
+    loadMore: loadMoreGroups,
+  } = useVisibleSlice(productGroups, 12, 12);
+
 
   // Actualizar la pestaña activa cuando cambie initialTab o se abra el modal
   useEffect(() => {
@@ -1289,11 +1302,12 @@ const ModalEdit = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedExit.exit_product_groups &&
-                          selectedExit.exit_product_groups.map(
-                            (group, index) => (
-                              <React.Fragment key={index}>
+                        {productGroups
+                          .slice(0, visibleGroupsCount)
+                          .map((group, index) => (
+                              <React.Fragment key={group.id ?? index}>
                                 <tr className="product-row">
+
                                   <td>
                                     <Form.Group
                                       controlId={`product-${index}`}
@@ -1992,10 +2006,14 @@ const ModalEdit = ({
                                                 </div>
                                               </Alert>
                                             )}
-                                            {group.exit_products.map(
-                                              (bin, binIndex) => (
+                                            <VisibleSliceList
+                                              items={group.exit_products || []}
+                                              itemLabel="bins"
+                                            >
+                                              {(visibleBins) =>
+                                                visibleBins.map((bin, binIndex) => (
                                                 <div
-                                                  key={binIndex}
+                                                  key={bin.id ?? binIndex}
                                                   className={`bin-card p-3 ${
                                                     bin.has_stock_conflict &&
                                                     !bin.is_processed
@@ -2314,18 +2332,25 @@ const ModalEdit = ({
                                                       )}
                                                   </div>
                                                 </div>
-                                              )
-                                            )}
+                                              ))
+                                              }
+                                            </VisibleSliceList>
                                           </div>
                                         </div>
                                       </td>
                                     </tr>
                                   )}
                               </React.Fragment>
-                            )
-                          )}
+                            ))}
                       </tbody>
                     </table>
+                    <LoadMoreFooter
+                      hasMore={hasMoreGroups}
+                      onLoadMore={loadMoreGroups}
+                      loadedCount={Math.min(visibleGroupsCount, totalGroupsCount)}
+                      totalCount={totalGroupsCount}
+                      itemLabel="productos"
+                    />
                   </div>
                     {!isViewMode &&
                       (isCreateMode ||

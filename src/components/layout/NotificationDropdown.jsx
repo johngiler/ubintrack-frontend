@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import { useNotifications } from "@/context/NotificationContext";
 import { notificationHref } from "@/lib/wsUrl";
 import { cn } from "@/lib/cn";
+
 
 function formatWhen(iso) {
   if (!iso) return "";
@@ -26,8 +28,20 @@ function formatWhen(iso) {
 
 export function NotificationDropdown() {
   const router = useRouter();
-  const { notifications, unreadCount, loading, markRead, markAllRead, canSee } =
-    useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    loadingMore,
+    hasMore,
+    loadedCount,
+    totalCount,
+    loadMore,
+    markRead,
+    markAllRead,
+    canSee,
+  } = useNotifications();
+
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -142,6 +156,17 @@ export function NotificationDropdown() {
                   </span>
                 </button>
               ))}
+              {!loading && notifications.length > 0 ? (
+                <LoadMoreFooter
+                  hasMore={hasMore}
+                  loading={loadingMore}
+                  onLoadMore={loadMore}
+                  loadedCount={loadedCount}
+                  totalCount={totalCount}
+                  itemLabel="notificaciones"
+                  className="border-t border-[var(--border)] py-3"
+                />
+              ) : null}
             </div>
           </motion.div>
         ) : null}

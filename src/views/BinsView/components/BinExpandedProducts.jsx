@@ -4,9 +4,12 @@ import { ExternalLink, QrCode } from "lucide-react";
 
 import { Button } from "@/components/ui/bootstrap";
 import { Badge } from "@/components/ui/Badge";
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
+import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 import { ConditionBadge } from "@/views/CavasView/cavaLabels";
 import { formatDate } from "@/lib/format";
 import { statusBadgeVariant, statusLabels } from "../binLabels";
+
 
 function BinProductCard({ entry, bep, user, navigate, onStoreBin }) {
   const canStore =
@@ -182,6 +185,8 @@ function BinProductCard({ entry, bep, user, navigate, onStoreBin }) {
 
 export default function BinExpandedProducts({ entry, user, navigate, onStoreBin }) {
   const products = entry.bin_products || [];
+  const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
+    useVisibleSlice(products, 12, 12);
 
   if (!products.length) {
     return (
@@ -194,7 +199,7 @@ export default function BinExpandedProducts({ entry, user, navigate, onStoreBin 
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3">
       <div className="flex gap-3 overflow-x-auto pb-1">
-        {products.map((bep) => (
+        {visibleItems.map((bep) => (
           <BinProductCard
             key={bep.id}
             entry={entry}
@@ -205,6 +210,13 @@ export default function BinExpandedProducts({ entry, user, navigate, onStoreBin 
           />
         ))}
       </div>
+      <LoadMoreFooter
+        hasMore={hasMore}
+        onLoadMore={loadMore}
+        loadedCount={visibleCount}
+        totalCount={totalCount}
+        itemLabel="productos"
+      />
     </div>
   );
 }
