@@ -20,6 +20,7 @@ import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import StoragesViewSkeleton from "./StoragesViewSkeleton";
 import { getStorages } from "@/services/storageService";
 import { canCRUD } from "@/services/httpClient";
 import ModalEdit from "./components/ModalEdit";
@@ -159,11 +160,7 @@ export default function StoragesView() {
 
             <Card.Body className="p-0">
               {isLoading ? (
-                <div className="text-center p-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando…</span>
-                  </div>
-                </div>
+                <StoragesViewSkeleton />
               ) : storages.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[480px]">
                   <Table.Head>

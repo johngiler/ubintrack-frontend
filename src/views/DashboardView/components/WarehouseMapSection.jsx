@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/bootstrap";
+import Skeleton from "@/components/ui/Skeleton";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { getBarToneClass, getConditionBadgeVariant } from "../dashboardUtils";
@@ -241,13 +242,37 @@ export default function WarehouseMapSection({
         </nav>
 
         {loading ? (
-          <div className="py-16 text-center">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Cargando mapa…</span>
-            </div>
-            <p className="mt-3 text-sm text-slate-500 dark:text-[var(--foreground-muted)]">
-              Cargando mapa del almacén…
-            </p>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Cargando">
+            {Array.from({ length: 3 }).map((_, card) => (
+              <div
+                key={card}
+                className="rounded-xl border border-slate-200 bg-white p-4 dark:border-[var(--border-subtle)] dark:bg-[var(--surface)]"
+              >
+                <div className="mb-3 flex items-start justify-between">
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                </div>
+                <div className="mb-3 space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i}>
+                      <div className="mb-1 flex justify-between">
+                        <Skeleton className="h-2.5 w-16" />
+                        <Skeleton className="h-2.5 w-12" />
+                      </div>
+                      <Skeleton className="h-1.5 w-full rounded-full" />
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="py-12 text-center">

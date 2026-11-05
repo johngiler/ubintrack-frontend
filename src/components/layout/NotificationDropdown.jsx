@@ -6,6 +6,7 @@ import { Bell } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
 import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
+import WmsFeedSkeleton from "@/components/wms/WmsFeedSkeleton";
 import { useNotifications } from "@/context/NotificationContext";
 import { notificationHref } from "@/lib/wsUrl";
 import { cn } from "@/lib/cn";
@@ -111,9 +112,7 @@ export function NotificationDropdown() {
 
             <div className="max-h-80 overflow-y-auto">
               {loading && notifications.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-[var(--foreground-muted)]">
-                  Cargando…
-                </p>
+                <WmsFeedSkeleton rows={4} variant="notification" />
               ) : null}
               {!loading && notifications.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-[var(--foreground-muted)]">

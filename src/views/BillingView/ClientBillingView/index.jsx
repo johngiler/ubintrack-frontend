@@ -24,6 +24,7 @@ import {
 } from "@/services/financeService";
 import BillingKpiCard from "../components/BillingKpiCard";
 import BillingPeriodFilter from "../components/BillingPeriodFilter";
+import BillingViewSkeleton from "../BillingViewSkeleton";
 import {
   BILLING_COLORS,
   downloadBlob,
@@ -181,10 +182,7 @@ export default function ClientBillingView({ clientId }) {
       />
 
       {isLoading ? (
-        <div className="py-16 text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-[3px] border-sky-600 border-t-transparent" />
-          <p className="mt-3 text-sm text-slate-500 dark:text-[var(--foreground-muted)]">Calculando facturación…</p>
-        </div>
+        <BillingViewSkeleton />
       ) : billingData ? (
         <>
           <Card

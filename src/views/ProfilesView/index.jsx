@@ -20,6 +20,7 @@ import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import ProfilesViewSkeleton from "./ProfilesViewSkeleton";
 import { getProfiles } from "@/services/coreService";
 import { getProfileUserTypeLabel } from "@/lib/wmsUserDisplay";
 import { canCRUD } from "@/services/httpClient";
@@ -192,11 +193,7 @@ export default function ProfilesView() {
 
             <Card.Body className="p-0">
               {isLoading ? (
-                <div className="text-center p-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando…</span>
-                  </div>
-                </div>
+                <ProfilesViewSkeleton />
               ) : profiles.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[720px]">
                   <Table.Head>

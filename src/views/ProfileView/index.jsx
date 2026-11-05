@@ -21,6 +21,7 @@ import {
   USER_MODE_INFO,
 } from "@/lib/wmsUserDisplay";
 import { getMyProfile, updateMyProfile } from "@/services/coreService";
+import ProfileViewSkeleton from "./ProfileViewSkeleton";
 
 const MODE_ICONS = {
   administrador: Shield,
@@ -148,9 +149,7 @@ export default function ProfileView() {
             </Card.Header>
             <Card.Body>
               {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
-                </div>
+                <ProfileViewSkeleton />
               ) : (
                 <Form onSubmit={handleSubmit}>
                   <Row>

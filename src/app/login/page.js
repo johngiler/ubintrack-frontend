@@ -135,6 +135,10 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
+  if (loading || user) {
+    return <div className="min-h-screen bg-[#070b14]" />;
+  }
+
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-[#070b14]">
       <LoginBackground />

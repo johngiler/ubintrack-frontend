@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import {
-  Building2,
-  LogOut,
-  Maximize,
-  Minimize,
-  User,
-} from "lucide-react";
+import { Building2, LogOut, User } from "lucide-react";
 
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { SidebarToggle } from "@/components/layout/SidebarToggle";
@@ -24,37 +18,13 @@ import {
 } from "@/lib/wmsUserDisplay";
 import { useAuth } from "@/context/AuthContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
-import { getWorkspaceLogotypeUrl } from "@/lib/workspaceMedia";
-
-function HeaderIconButton({ children, className, ...props }) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-[var(--surface)] text-[var(--foreground-muted)] shadow-sm ring-1 ring-[var(--border)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
 
 export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { workspace, displayName } = useWorkspace();
-  const logotypeUrl = getWorkspaceLogotypeUrl(workspace);
+  const { displayName } = useWorkspace();
   const [profileOpen, setProfileOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const profileRef = useRef(null);
-
-  useEffect(() => {
-    const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
 
   useEffect(() => {
     const onDocClick = (event) => {
@@ -66,18 +36,6 @@ export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const toggleFullscreen = async () => {
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await document.documentElement.requestFullscreen();
-      }
-    } catch {
-      /* ignore */
-    }
-  };
-
   const orgName = getHeaderOrgName(user, displayName);
   const roleLabel = getUserRoleLabel(user);
   const permissionsBadge = getPermissionsBadge(user);
@@ -88,12 +46,6 @@ export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
         <SidebarToggle collapsed={sidebarCollapsed} onClick={onMenuClick} />
 
         <div className="hidden min-w-0 items-center gap-3 md:flex">
-          {logotypeUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logotypeUrl} alt="" className="h-10 w-10 shrink-0 object-contain" />
-          ) : (
-            <Building2 className="h-5 w-5 shrink-0 text-[var(--brand-primary)]" strokeWidth={2} />
-          )}
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
               {orgName}
@@ -112,16 +64,6 @@ export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
         <div className="hidden items-center gap-2 sm:flex">
           <ThemeToggle />
           {!user?.client ? <NotificationDropdown /> : null}
-          <HeaderIconButton
-            aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? (
-              <Minimize className="h-4 w-4" strokeWidth={2} />
-            ) : (
-              <Maximize className="h-4 w-4" strokeWidth={2} />
-            )}
-          </HeaderIconButton>
         </div>
 
         <div className="relative" ref={profileRef}>

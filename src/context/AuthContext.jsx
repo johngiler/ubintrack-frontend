@@ -26,10 +26,13 @@ export function AuthProvider({ children }) {
       const data = await getMyProfile();
       setUser(data);
       return data;
-    } catch {
-      localStorage.removeItem("token");
-      setUser(null);
-      await clearSwrCache();
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        localStorage.removeItem("token");
+        setUser(null);
+        void clearSwrCache();
+      }
       return null;
     } finally {
       setLoading(false);
@@ -44,21 +47,23 @@ export function AuthProvider({ children }) {
     async (credentials) => {
       const data = await login(credentials);
       localStorage.setItem("token", data.token);
-      await clearSwrCache();
       const fullUser = await getMyProfile().catch(() => data.user);
-      setUser(fullUser || data.user);
       const u = fullUser || data.user;
-      await invalidateAllSwrCache();
+      setUser(u);
+      setLoading(false);
       router.replace(getDefaultHomeRoute(u));
+      void clearSwrCache();
+      void invalidateAllSwrCache();
       return data;
     },
     [router],
   );
 
   const signOut = useCallback(async () => {
-    authLogout();
+    await authLogout();
     setUser(null);
-    await clearSwrCache();
+    setLoading(false);
+    void clearSwrCache();
     router.replace("/login");
   }, [router]);
 

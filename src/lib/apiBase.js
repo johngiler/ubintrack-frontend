@@ -19,3 +19,26 @@ export function apiBase() {
   }
   return "";
 }
+
+/**
+ * En el navegador, `*.localhost` llama al API por el mismo origen (`/api` de Next).
+ * Ir directo a 127.0.0.1 deja la petición pendiente en Chrome y el panel no sale de "Cargando".
+ * En el servidor y en producción se usa la URL absoluta del API.
+ */
+export function clientApiBase() {
+  if (typeof window === "undefined") return apiBase();
+  const host = window.location.hostname;
+  if (host === "localhost" || host.endsWith(".localhost")) return "";
+  return apiBase();
+}
+
+/**
+ * En local el navegador no llama `/api/...`: Chrome cacheó el 308/301 de esa ruta
+ * y entra en ERR_TOO_MANY_REDIRECTS sin volver a preguntar al servidor.
+ * `/apibff/` es el mismo reenvío, con una URL que no está en esa caché.
+ */
+export function rewriteLocalApiPath(url) {
+  if (typeof url !== "string" || !url.startsWith("/api/")) return url;
+  if (typeof window === "undefined" || clientApiBase() !== "") return url;
+  return `/apibff/${url.slice("/api/".length)}`;
+}

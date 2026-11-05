@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { Alert, Badge, Button, Card, Col, Row, Table } from "@/components/ui/bootstrap";
+import Skeleton from "@/components/ui/Skeleton";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/context/ThemeContext";
 import { formatDate } from "@/lib/format";
@@ -545,7 +546,10 @@ export default function ClientBillingTabs({
           height={350}
         />
       ) : (
-        <p className={MUTED}>Cargando historial…</p>
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-white p-4 dark:bg-[var(--surface)]">
+          <Skeleton className="mb-4 h-4 w-48" />
+          <Skeleton className="h-72 w-full rounded-xl" />
+        </div>
       )}
       {historyData ? (
         <div className="mt-4 overflow-x-auto">

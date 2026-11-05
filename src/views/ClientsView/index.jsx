@@ -21,6 +21,7 @@ import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import ClientsViewSkeleton from "./ClientsViewSkeleton";
 import { getClients, exportClientsToExcel } from "@/services/coreService";
 import { getTariffs } from "@/services/financeService";
 import { canCRUD } from "@/services/httpClient";
@@ -235,11 +236,7 @@ export default function ClientsView() {
 
             <Card.Body className="p-0">
               {isLoading ? (
-                <div className="text-center p-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando…</span>
-                  </div>
-                </div>
+                <ClientsViewSkeleton />
               ) : clients.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[920px]">
                   <Table.Head>

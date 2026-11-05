@@ -42,6 +42,6 @@ export function notificationHref(item) {
         ? `/inventory/bins?search=${encodeURIComponent(item.resource_code)}`
         : "/inventory/bins";
     default:
-      return "/dashboards/sales";
+      return "/dashboard";
   }
 }

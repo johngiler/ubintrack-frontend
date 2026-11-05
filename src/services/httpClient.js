@@ -1,17 +1,20 @@
 "use client";
 
 import axios from "axios";
+import { apiBase, clientApiBase, rewriteLocalApiPath } from "@/lib/apiBase";
 import { hasUserPermission } from "@/lib/userPermissions";
 import { clientTenantSlug, workspaceSlugRequestHeaders } from "@/lib/tenant";
 
-const baseURL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8001" : "");
-
-const httpClient = axios.create({ baseURL });
+const httpClient = axios.create({
+  baseURL: typeof window === "undefined" ? apiBase() : clientApiBase(),
+  timeout: 12000,
+});
 
 httpClient.interceptors.request.use(
   (config) => {
+    if (typeof config.url === "string") {
+      config.url = rewriteLocalApiPath(config.url);
+    }
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("token");
       if (token) {
@@ -22,6 +25,25 @@ httpClient.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error),
+);
+
+httpClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = String(error?.config?.url || "");
+    if (
+      status === 401 &&
+      typeof window !== "undefined" &&
+      !url.includes("/auth/login/") &&
+      window.location.pathname !== "/login"
+    ) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user_id");
+      window.location.replace("/login");
+    }
+    return Promise.reject(error);
+  },
 );
 
 export default httpClient;

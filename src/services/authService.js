@@ -6,7 +6,12 @@ export async function login(credentials) {
   return { token, user };
 }
 
-export function logout() {
+export async function logout() {
+  try {
+    await httpClient.post("/api/auth/logout/");
+  } catch {
+    /* La sesión local se cierra aunque el API no responda. */
+  }
   localStorage.removeItem("token");
   localStorage.removeItem("user_id");
 }

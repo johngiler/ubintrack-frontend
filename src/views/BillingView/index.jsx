@@ -28,6 +28,7 @@ import { swrKeys, usePaginatedList } from "@/lib/swr";
 import { getBillingClients, getBillingSummary } from "@/services/financeService";
 import BillingKpiCard from "./components/BillingKpiCard";
 import BillingPeriodFilter from "./components/BillingPeriodFilter";
+import BillingViewSkeleton, { BillingClientsSkeleton } from "./BillingViewSkeleton";
 import {
   BILLING_COLORS,
   formatBillingCurrency,
@@ -232,10 +233,7 @@ export default function BillingView() {
       />
 
       {isLoading ? (
-        <div className="py-16 text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-[3px] border-sky-600 border-t-transparent" />
-          <p className="mt-3 text-sm text-slate-500">Calculando facturación…</p>
-        </div>
+        <BillingViewSkeleton />
       ) : (
         <>
           <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -357,10 +355,8 @@ export default function BillingView() {
             </Card.Header>
             <Card.Body className="relative !p-0">
               {isLoadingClients ? (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
-                </div>
-              ) : null}
+                <BillingClientsSkeleton />
+              ) : (
               <div className="overflow-x-auto">
                 <Table
                   hover
@@ -478,6 +474,7 @@ export default function BillingView() {
                   </tbody>
                 </Table>
               </div>
+              )}
             </Card.Body>
             <Card.Footer className="flex flex-wrap items-center justify-between gap-3">
               <p className="mb-0 text-sm text-slate-600">

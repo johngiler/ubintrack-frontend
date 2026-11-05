@@ -178,9 +178,15 @@ export function buildReactSelectStyles({
       withFont("clearIndicator", base, state, {
         color: foregroundMuted,
       }),
+    // Los puntos son 1em. El fontSize del input (~14px) los agranda de más;
+    // react-select usa 4px a propósito.
     loadingIndicator: (base, state) =>
       withFont("loadingIndicator", base, state, {
         color: accent,
+        fontSize: size === "sm" ? 3 : 4,
+        lineHeight: 1,
+        padding: size === "sm" ? 2 : 4,
+        marginRight: size === "sm" ? 2 : 4,
       }),
   };
 }

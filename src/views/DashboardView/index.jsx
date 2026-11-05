@@ -26,6 +26,7 @@ import KpiStatCard from "./components/KpiStatCard";
 import WarehouseMapSection from "./components/WarehouseMapSection";
 import SeriesChart from "./components/SeriesChart";
 import ClientInventoryTable from "./components/ClientInventoryTable";
+import DashboardViewSkeleton from "./DashboardViewSkeleton";
 
 function formatMonthRange(start, end) {
   const fmt = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" });
@@ -117,12 +118,7 @@ export default function DashboardView() {
       />
 
       {loading ? (
-        <div className="py-20 text-center">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Cargando dashboard…</span>
-          </div>
-          <p className="mt-3 text-sm text-slate-500">Cargando datos del dashboard…</p>
-        </div>
+        <DashboardViewSkeleton />
       ) : (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

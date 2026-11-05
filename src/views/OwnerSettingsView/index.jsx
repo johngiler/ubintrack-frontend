@@ -17,6 +17,7 @@ import {
   SIDEBAR_LOGO_GRADIENT_MODES,
 } from "@/lib/workspaceMedia";
 import { getOwnerSettings, updateOwnerSettings } from "@/services/workspaceService";
+import OwnerSettingsSkeleton from "./OwnerSettingsSkeleton";
 
 const GRADIENT_MODE_OPTIONS = [
   { value: SIDEBAR_LOGO_GRADIENT_MODES.NONE, label: "Desactivado" },
@@ -112,7 +113,7 @@ export default function OwnerSettingsView() {
   useEffect(() => {
     if (!user) return;
     if (!isAdmin) {
-      router.replace("/dashboards/sales");
+      router.replace("/dashboard");
     }
   }, [user, isAdmin, router]);
 
@@ -255,9 +256,7 @@ export default function OwnerSettingsView() {
       ) : null}
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
-        </div>
+        <OwnerSettingsSkeleton />
       ) : (
         <Form onSubmit={handleSubmit}>
           <Row>

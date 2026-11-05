@@ -17,6 +17,7 @@ import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import TrackingsViewSkeleton from "./TrackingsViewSkeleton";
 import { formatDateTime } from "@/lib/format";
 import {
   createTaskTracking,
@@ -166,9 +167,7 @@ export default function TrackingsView() {
 
         <Card.Body className="!p-0">
           {isLoading ? (
-            <div className="py-16 text-center">
-              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
-            </div>
+            <TrackingsViewSkeleton />
           ) : filteredTrackings.length ? (
             <div className="overflow-x-auto">
               <Table hover responsive className="mb-0">

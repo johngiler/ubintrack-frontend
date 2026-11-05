@@ -54,6 +54,7 @@ import {
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import ExitsViewSkeleton from "./ExitsViewSkeleton";
 import {
   WmsExpandItemsButton,
   WmsExpandItemsEmpty,
@@ -882,11 +883,7 @@ const Exits = () => {
             </Card.Header>
             <Card.Body className="p-0">
               {isLoading ? (
-                <div className="text-center p-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                </div>
+                <ExitsViewSkeleton />
               ) : exits.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[1040px]">
                   <Table.Head>

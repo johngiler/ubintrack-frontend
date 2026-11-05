@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Save, X } from "lucide-react";
 
 import { Modal, Button, Form, Row, Col } from "@/components/ui/bootstrap";
+import Skeleton from "@/components/ui/Skeleton";
 import { Badge } from "@/components/ui/Badge";
 import { getProfileUserTypeLabel } from "@/lib/wmsUserDisplay";
 import {
@@ -264,10 +265,20 @@ export default function ModalEdit({ show, onHide, profile, mode, onSave, showAle
               </Form.Text>
             )}
             {isLoadingPermissions ? (
-              <div className="text-center py-4">
-                <div className="spinner-border spinner-border-sm text-primary" role="status">
-                  <span className="visually-hidden">Cargando permisos…</span>
-                </div>
+              <div className="space-y-4" aria-busy="true" aria-label="Cargando">
+                {Array.from({ length: 3 }).map((_, group) => (
+                  <div key={group}>
+                    <Skeleton className="mb-3 h-3 w-24" />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <Skeleton className="h-4 w-4 rounded" />
+                          <Skeleton className="h-3.5 w-32" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : permissionGroups.length === 0 ? (
               <p className="mb-0 text-sm text-slate-500">No hay permisos disponibles.</p>

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/bootstrap";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
+import EntriesViewSkeleton from "./EntriesViewSkeleton";
 
 import {
   getEntries,
@@ -545,11 +546,7 @@ const Entries = () => {
             </Card.Header>
             <Card.Body className="p-0">
               {isLoading ? (
-                <div className="text-center p-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando…</span>
-                  </div>
-                </div>
+                <EntriesViewSkeleton />
               ) : entries.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[1040px]">
                   <Table.Head>

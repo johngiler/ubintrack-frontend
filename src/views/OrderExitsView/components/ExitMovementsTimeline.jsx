@@ -14,7 +14,8 @@ import {
   TimelineUndo,
   TimelineUser,
 } from "@/components/timeline/TimelineIcons";
-import { Badge, Spinner } from "@/components/ui/bootstrap";
+import { Badge } from "@/components/ui/bootstrap";
+import WmsFeedSkeleton from "@/components/wms/WmsFeedSkeleton";
 import VisibleSliceList from "@/components/ui/VisibleSliceList";
 import { formatDateTime } from "@/lib/format";
 import { getExitMovements } from "@/services/orderService";
@@ -154,12 +155,7 @@ const ExitMovementsTimeline = ({ exitId }) => {
   };
 
   if (isLoading) {
-    return (
-      <div className="text-center py-4">
-        <Spinner animation="border" variant="primary" className="me-2" />
-        <span>Cargando historial de movimientos...</span>
-      </div>
-    );
+    return <WmsFeedSkeleton rows={5} className="py-2" />;
   }
 
   if (error) {

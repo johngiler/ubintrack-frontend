@@ -31,7 +31,7 @@ export const WMS_NAV_GROUPS = [
   {
     label: "Dashboards",
     items: [
-      { href: "/dashboards/sales", label: "Movimientos", icon: BarChart3, adminOnly: true },
+      { href: "/dashboard", label: "Movimientos", icon: BarChart3, adminOnly: true },
     ],
   },
   {

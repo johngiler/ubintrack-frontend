@@ -19,6 +19,7 @@ import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import CavasViewSkeleton from "./CavasViewSkeleton";
 import { getCavas } from "@/services/storageService";
 import { canCRUD } from "@/services/httpClient";
 import { ConditionBadge } from "./cavaLabels";
@@ -156,11 +157,7 @@ export default function CavasView() {
 
             <Card.Body className="p-0">
               {isLoading ? (
-                <div className="text-center p-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando…</span>
-                  </div>
-                </div>
+                <CavasViewSkeleton />
               ) : cavas.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[900px]">
                   <Table.Head>

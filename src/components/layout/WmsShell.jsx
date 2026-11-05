@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { AdminHeader } from "@/components/layout/AdminHeader";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
@@ -13,6 +13,25 @@ import { canAccessRoute } from "@/lib/wmsRouteAccess";
 
 const SIDEBAR_KEY = "ubintrack-sidebar-collapsed";
 
+function PanelSpinner() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100">
+      <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-sky-600 border-t-transparent" />
+      <p className="text-sm text-slate-500">Cargando panel…</p>
+    </div>
+  );
+}
+
+function GoToLogin() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/login");
+  }, [router]);
+
+  return <PanelSpinner />;
+}
+
 export function WmsShell({ children }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
@@ -20,7 +39,7 @@ export function WmsShell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const isAuthRoute = pathname === "/login" || pathname === "/";
+  const isAuthRoute = pathname === "/login";
 
   useEffect(() => {
     try {
@@ -54,19 +73,9 @@ export function WmsShell({ children }) {
     return <>{children}</>;
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100">
-        <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-sky-600 border-t-transparent" />
-        <p className="text-sm text-slate-500">Cargando panel…</p>
-      </div>
-    );
-  }
+  if (loading) return <PanelSpinner />;
 
-  if (!user) {
-    if (typeof window !== "undefined") window.location.replace("/login");
-    return null;
-  }
+  if (!user) return <GoToLogin />;
 
   if (workspaceStatus === "missing") {
     return (

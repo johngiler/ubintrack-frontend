@@ -38,10 +38,21 @@ function resolveApiBaseForMediaRewrites() {
 const nextConfig = {
   // Rutas dinámicas impiden `output: "export"` (solo estático). Standalone + Nginx proxy en prod.
   output: "standalone",
+  // Django exige la barra final. Sin esto Next responde 308 y el API entra en bucle.
+  skipTrailingSlashRedirect: true,
+  async redirects() {
+    return [
+      { source: "/", destination: "/dashboard", permanent: false },
+      { source: "/dashboards", destination: "/dashboard", permanent: false },
+      { source: "/dashboards/:path*", destination: "/dashboard", permanent: false },
+    ];
+  },
   async rewrites() {
     const api = resolveApiBaseForMediaRewrites();
     if (!api) return [];
-    return [{ source: "/media/:path*", destination: `${api}/media/:path*` }];
+    return [
+      { source: "/media/:path*", destination: `${api}/media/:path*` },
+    ];
   },
   images: {
     // Next 14+ bloquea IPs privadas en el optimizador (SSRF). En `next dev` el media en 127.0.0.1 falla sin esto.

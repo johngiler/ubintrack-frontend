@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Check, ScanLine, X } from "lucide-react";
 import { Modal, Button, Form, Alert } from "@/components/ui/bootstrap";
+import WmsDetailSkeleton from "@/components/wms/WmsDetailSkeleton";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import { Scanner } from "@yudiel/react-qr-scanner";
@@ -206,14 +207,7 @@ const ModalQRValidation = ({
 
           <Modal.Section title="Detalle del bin" className="!p-3.5">
             {isLoadingBinData ? (
-              <div className="flex items-center justify-center gap-2 py-4 text-sm text-slate-500">
-                <span
-                  className="spinner-border spinner-border-sm"
-                  role="status"
-                  aria-hidden="true"
-                />
-                Cargando datos del bin…
-              </div>
+              <WmsDetailSkeleton rows={4} />
             ) : (
               <dl className="grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-2">
                 <div>

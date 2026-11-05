@@ -10,11 +10,11 @@ import { WorkspaceTheme } from "@/components/layout/WorkspaceTheme";
 import { WmsShell } from "@/components/layout/WmsShell";
 import { SwrProvider } from "@/lib/swr";
 
-export function Providers({ children }) {
+export function Providers({ children, initialTenantSlug, initialWorkspace = null }) {
   return (
     <ThemeProvider>
       <SwrProvider>
-        <WorkspaceProvider>
+        <WorkspaceProvider initialTenantSlug={initialTenantSlug} initialWorkspace={initialWorkspace}>
           <WorkspaceTheme />
           <AuthProvider>
             <NotificationProvider>
