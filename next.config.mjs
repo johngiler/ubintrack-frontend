@@ -38,6 +38,9 @@ function resolveApiBaseForMediaRewrites() {
 const nextConfig = {
   // Rutas dinámicas impiden `output: "export"` (solo estático). Standalone + Nginx proxy en prod.
   output: "standalone",
+  env: {
+    NEXT_PUBLIC_APP_BUILD_ID: process.env.NEXT_PUBLIC_APP_BUILD_ID || "local-dev",
+  },
   // Django exige la barra final. Sin esto Next responde 308 y el API entra en bucle.
   skipTrailingSlashRedirect: true,
   async redirects() {

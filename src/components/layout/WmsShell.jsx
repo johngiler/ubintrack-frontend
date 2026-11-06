@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { AdminHeader } from "@/components/layout/AdminHeader";
+import { AppUpdateBanner } from "@/components/layout/AppUpdateBanner";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { WmsBackgroundVortex } from "@/components/layout/WmsBackgroundVortex";
 import WmsAccessDenied from "@/components/layout/WmsAccessDenied";
@@ -105,6 +106,7 @@ export function WmsShell({ children }) {
           <main className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">
             {routeAllowed ? children : <WmsAccessDenied pathname={pathname} user={user} />}
           </main>
+          <AppUpdateBanner />
         </div>
       </div>
     </div>

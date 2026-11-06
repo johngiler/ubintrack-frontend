@@ -31,7 +31,12 @@ export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-https://api.ubintrack.com}"
 # .env.local suele traer WS en 127.0.0.1:9001; en prod hay que forzar el API (nginx /ws/).
 # Si no, el browser pide "Access other apps…" (Local Network Access) a cada rato.
 export NEXT_PUBLIC_WS_URL="${NEXT_PUBLIC_WS_URL:-https://api.ubintrack.com}"
-echo "[deploy] Build con NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL"
+BUILD_ID="$(git -C "$FRONTEND_DIR" rev-parse --short HEAD 2>/dev/null || true)"
+if [[ -z "$BUILD_ID" ]]; then
+  BUILD_ID="$(date -u +%Y%m%d%H%M%S)"
+fi
+export NEXT_PUBLIC_APP_BUILD_ID="$BUILD_ID"
+echo "[deploy] Build con NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL BUILD_ID=$BUILD_ID"
 
 echo "[deploy] Building (production, standalone)..."
 NODE_ENV=production npm run build
@@ -82,5 +87,17 @@ ssh "$REMOTE_HOST" "set -e
   sudo systemctl is-active --quiet ubintrack-frontend
   echo '[deploy] ubintrack-frontend activo'
 "
+
+if [[ -n "${FRONTEND_BUILD_PUBLISH_TOKEN:-}" ]]; then
+  echo "[deploy] Avisando la versión nueva a las sesiones abiertas..."
+  curl -fsS -X POST "${NEXT_PUBLIC_API_URL}/api/notifications/frontend-build/" \
+    -H "Content-Type: application/json" \
+    -H "X-Ubintrack-Build-Token: ${FRONTEND_BUILD_PUBLISH_TOKEN}" \
+    -d "{\"build_id\": \"${BUILD_ID}\"}" \
+    >/dev/null
+  echo "[deploy] Versión publicada: $BUILD_ID"
+else
+  echo "[deploy] WARN: FRONTEND_BUILD_PUBLISH_TOKEN vacío — no se avisa la actualización."
+fi
 
 echo "[deploy] Listo."

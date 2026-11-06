@@ -8,6 +8,7 @@ import { Building2, LogOut, User } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { SidebarToggle } from "@/components/layout/SidebarToggle";
 import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
+import { OnlineUsersDropdown } from "@/components/layout/OnlineUsersDropdown";
 
 import { cn } from "@/lib/cn";
 import {
@@ -63,6 +64,7 @@ export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
       <div className="flex items-center gap-2">
         <div className="hidden items-center gap-2 sm:flex">
           <ThemeToggle />
+          {!user?.client ? <OnlineUsersDropdown /> : null}
           {!user?.client ? <NotificationDropdown /> : null}
         </div>
 
