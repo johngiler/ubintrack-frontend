@@ -11,8 +11,14 @@ export function WmsDocumentTitle() {
   const { displayName } = useWorkspace();
 
   useEffect(() => {
-    const viewTitle = getViewTitleFromPath(pathname);
-    document.title = formatDocumentTitle(viewTitle, displayName);
+    const nextTitle = formatDocumentTitle(getViewTitleFromPath(pathname), displayName);
+    const apply = () => {
+      if (document.title !== nextTitle) document.title = nextTitle;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
+    return () => observer.disconnect();
   }, [pathname, displayName]);
 
   return null;

@@ -60,6 +60,31 @@ export async function deleteCava(id) {
   return response.data;
 }
 
+export async function getPositionNomenclature() {
+  const response = await httpClient.get("/api/position-nomenclature/");
+  return response.data;
+}
+
+export async function updatePositionNomenclature(data) {
+  const response = await httpClient.patch("/api/position-nomenclature/", data);
+  return response.data;
+}
+
+export async function generateCavaPositions(id) {
+  const response = await httpClient.post(`/api/cavas/${id}/generate/`);
+  return response.data;
+}
+
+export async function getCavaOccupancy(id) {
+  const response = await httpClient.get(`/api/cavas/${id}/occupancy/`);
+  return response.data;
+}
+
+export async function getCavaGeneration(id) {
+  const response = await httpClient.get(`/api/cavas/${id}/generation/`);
+  return response.data;
+}
+
 // Positions
 export async function getPositions(page = 1, filters = {}, search = "") {
   // Construir la URL base
@@ -92,6 +117,19 @@ export async function getPositions(page = 1, filters = {}, search = "") {
   return response.data;
 }
 
+export async function getCellPositions({ cavaId, hall = "", rack, place, page = 1 }) {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: "100",
+    cava: String(cavaId),
+    hall: hall ?? "",
+    rack: String(rack ?? ""),
+    place: String(place ?? ""),
+  });
+  const response = await httpClient.get(`/api/positions/?${params.toString()}`);
+  return response.data;
+}
+
 export async function getPosition(id) {
   const response = await httpClient.get(`/api/positions/${id}/`);
   return response.data;
@@ -104,6 +142,11 @@ export async function createPosition(data) {
 
 export async function updatePosition(id, data) {
   const response = await httpClient.put(`/api/positions/${id}/`, data);
+  return response.data;
+}
+
+export async function patchPosition(id, data) {
+  const response = await httpClient.patch(`/api/positions/${id}/`, data);
   return response.data;
 }
 

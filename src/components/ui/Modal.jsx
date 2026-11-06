@@ -10,7 +10,7 @@ import { IconButton } from "@/components/ui/Button";
 
 const ModalContext = createContext({ onHide: null });
 
-export function Modal({ show, onHide, children, size = "lg", className, centered }) {
+export function Modal({ show, onHide, children, size = "lg", className, centered, layerClassName }) {
   useEffect(() => {
     if (!show) return;
     const prev = document.body.style.overflow;
@@ -39,6 +39,7 @@ export function Modal({ show, onHide, children, size = "lg", className, centered
           <div
             className={cn(
               "fixed inset-0 z-50 flex justify-center p-4",
+              layerClassName,
               centered !== false ? "items-center" : "items-end sm:items-center",
             )}
           >

@@ -26,5 +26,5 @@ export function getViewTitleFromPath(pathname = "/") {
 export function formatDocumentTitle(viewTitle, ownerName) {
   const owner = (ownerName || "WMS").trim();
   if (!viewTitle) return owner;
-  return `${viewTitle} | ${owner}`;
+  return `${owner} | ${viewTitle}`;
 }

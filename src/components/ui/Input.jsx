@@ -24,7 +24,7 @@ export function Input(props) {
           "flex h-10 w-full disabled:cursor-not-allowed disabled:opacity-50",
           Icon ? "pl-10 pr-3" : "px-3",
           rest.type === "search" &&
-            "[appearance:textfield] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden",
+            "appearance-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden",
           className,
         )}
         {...rest}

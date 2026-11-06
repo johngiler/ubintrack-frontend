@@ -36,7 +36,7 @@ import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import PositionsViewSkeleton from "./PositionsViewSkeleton";
 import { getPositions, getCavas, printPosition } from "@/services/storageService";
 import { canCRUD } from "@/services/httpClient";
-import { DEFAULT_HALLS, formatLocation, statusBadgeVariant, statusLabels } from "./positionLabels";
+import { cavaTitleOf, formatLocation, statusBadgeVariant, statusLabels } from "./positionLabels";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
 import PositionExpandedBins from "./components/PositionExpandedBins";
@@ -189,7 +189,7 @@ export default function PositionsView() {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
+              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto p-0.5">
                 <WmsSearchBar
                   id="search-position"
                   value={searchTerm}
@@ -219,21 +219,14 @@ export default function PositionsView() {
                     </option>
                   ))}
                 </Form.Select>
-                <Form.Select
+                <Form.Control
                   size="sm"
                   value={filters.hall}
                   onChange={(e) => handleFilterChange("hall", e.target.value)}
                   aria-label="Filtrar por pasillo"
-                  className="!w-[120px] shrink-0"
-                  style={{ minWidth: "120px" }}
-                >
-                  <option value="">Pasillo</option>
-                  {DEFAULT_HALLS.map((hall) => (
-                    <option key={hall} value={hall}>
-                      {hall}
-                    </option>
-                  ))}
-                </Form.Select>
+                  placeholder="Pasillo"
+                  className="!h-8 !w-[120px] shrink-0"
+                />
                 <Form.Select
                   size="sm"
                   value={filters.status}
@@ -349,7 +342,7 @@ export default function PositionsView() {
                             <Table.Cell>
                               <div className="flex flex-col">
                                 <span className="font-medium text-slate-800">
-                                  {position.cava?.name} ({position.cava?.condition})
+                                  {cavaTitleOf(position.cava?.name, position.cava?.code)} ({position.cava?.condition})
                                 </span>
                                 <span className="text-xs text-slate-500">
                                   {position.cava?.storage?.name || "—"}

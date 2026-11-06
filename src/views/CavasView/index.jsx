@@ -22,6 +22,7 @@ import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import CavasViewSkeleton from "./CavasViewSkeleton";
 import { getCavas } from "@/services/storageService";
 import { canCRUD } from "@/services/httpClient";
+import { cavaTitleOf } from "./cavaPlan";
 import { ConditionBadge } from "./cavaLabels";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
@@ -118,7 +119,7 @@ export default function CavasView() {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
+              <div className="flex w-full flex-nowrap items-center gap-2">
                 <WmsSearchBar
                   id="search-cava"
                   value={searchTerm}
@@ -175,7 +176,7 @@ export default function CavasView() {
                         Temperatura
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[90px] normal-case tracking-normal">
-                        Posiciones
+                        Ubicaciones
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[100px] normal-case tracking-normal">
                         Estado
@@ -189,7 +190,7 @@ export default function CavasView() {
                     {cavas.map((cava) => (
                       <Table.Row key={cava.id}>
                         <Table.Cell>
-                          <span className="font-medium text-slate-900">{cava.name}</span>
+                          <span className="font-medium text-slate-900">{cavaTitleOf(cava.name, cava.code)}</span>
                         </Table.Cell>
                         <Table.Cell className="text-slate-600">
                           {cava.storage?.name || "—"}
@@ -201,7 +202,7 @@ export default function CavasView() {
                           {formatTemperature(cava.current_temp)}
                         </Table.Cell>
                         <Table.Cell className="text-slate-600">
-                          {cava.total_levels ?? 0}
+                          {cava.slot_count ?? 0}
                         </Table.Cell>
                         <Table.Cell>
                           <Badge variant={cava.is_active ? "success" : "danger"} dot={false}>

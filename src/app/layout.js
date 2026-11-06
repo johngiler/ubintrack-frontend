@@ -27,7 +27,7 @@ export async function generateMetadata() {
   return {
     title: {
       default: owner,
-      template: `%s | ${owner}`,
+      template: `${owner} | %s`,
     },
     description: "Sistema de gestión de almacén multi-tenant.",
   };

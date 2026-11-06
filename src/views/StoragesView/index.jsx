@@ -121,7 +121,7 @@ export default function StoragesView() {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
+              <div className="flex w-full flex-nowrap items-center gap-2">
                 <WmsSearchBar
                   id="search-storage"
                   value={searchTerm}

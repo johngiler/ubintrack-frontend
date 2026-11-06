@@ -5,6 +5,7 @@ import { Trash2, X } from "lucide-react";
 
 import { Modal, Button } from "@/components/ui/bootstrap";
 import { deleteCava } from "@/services/storageService";
+import { cavaTitleOf } from "../cavaPlan";
 
 export default function ModalConfirm({ show, onHide, cava, onDelete, showAlert }) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -29,7 +30,7 @@ export default function ModalConfirm({ show, onHide, cava, onDelete, showAlert }
         <Modal.Title>Confirmar eliminación</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        ¿Está seguro que desea eliminar la cava <strong>{cava?.name}</strong>?
+        ¿Está seguro que desea eliminar la cava <strong>{cavaTitleOf(cava?.name, cava?.code)}</strong>?
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={onHide} disabled={isDeleting}>

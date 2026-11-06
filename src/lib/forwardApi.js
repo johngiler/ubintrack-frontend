@@ -62,6 +62,12 @@ export async function forwardApi(request, djangoPath) {
     if (!HOP_BY_HOP.has(key.toLowerCase())) out.set(key, value);
   });
   out.set("cache-control", "no-store");
+  // 204, 205 y 304 no admiten cuerpo. Django borra con 204.
+  if (upstream.status === 204 || upstream.status === 205 || upstream.status === 304) {
+    out.delete("content-length");
+    out.delete("content-type");
+    return new Response(null, { status: upstream.status, headers: out });
+  }
   const body = await upstream.arrayBuffer();
   return new Response(body, { status: upstream.status, headers: out });
 }

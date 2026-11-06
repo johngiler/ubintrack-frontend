@@ -9,14 +9,16 @@ export default function WmsSearchBar({ id, value, onChange, onClear, placeholder
   return (
     <div
       className={cn(
-        "relative w-full sm:max-w-md sm:min-w-[320px] lg:min-w-[400px]",
+        "relative w-full p-0.5 sm:max-w-md sm:min-w-[320px] lg:min-w-[400px]",
         className,
       )}
     >
       <Input
         id={id}
         icon={Search}
-        type="search"
+        type="text"
+        enterKeyHint="search"
+        autoComplete="off"
         value={value}
         onChange={onChange}
         placeholder={placeholder}
