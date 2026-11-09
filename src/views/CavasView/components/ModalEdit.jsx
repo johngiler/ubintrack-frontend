@@ -512,7 +512,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
   const busy = isSaving || isGenerating;
 
   return (
-    <Modal show={show} onHide={onHide} size="xl" className="max-w-[min(96vw,1300px)]">
+    <Modal show={show} onHide={onHide} size="xl" className="max-w-[min(96vw,1480px)]">
       <Modal.Header closeButton>
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>

@@ -5,7 +5,7 @@
  * fit-content: solo crece si el contenido supera FRAME_MIN.
  */
 export const PLAN_VIEW_FRAME_MIN = 720;
-export const PLAN_VIEW_MAX_WIDTH = 1300;
+export const PLAN_VIEW_MAX_WIDTH = 1480;
 /** @deprecated usar PLAN_VIEW_FRAME_MIN */
 export const PLAN_VIEW_MIN_HEIGHT = PLAN_VIEW_FRAME_MIN;
 
