@@ -508,9 +508,9 @@ const BinsView = () => {
         description="Gestiona los bins de inventario en el almacén."
         icon={Boxes}
         breadcrumbs={[
-          { title: "Inventario", active: true },
+            { title: "Inventario", active: true },
           { title: "Bins", active: true },
-        ]}
+          ]}
         actions={
           <Button
             variant="secondary"
@@ -532,76 +532,76 @@ const BinsView = () => {
               <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
                 <WmsSearchBar
                   id="search-bin"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    if (searchParams.toString()) {
-                      setSearchParams({});
-                    }
-                  }}
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        if (searchParams.toString()) {
+                          setSearchParams({});
+                        }
+                      }}
                   onClear={() => {
-                    setSearchTerm("");
-                    setSearchParams({});
-                  }}
+                          setSearchTerm("");
+                          setSearchParams({});
+                        }}
                   placeholder="Buscar por código de bin, entrada o sku…"
                   className="!w-[280px] !min-w-[280px] !max-w-[280px] shrink-0"
                 />
-                <Form.Select
-                  id="status-filter"
-                  name="status-filter"
-                  size="sm"
-                  value={filters.status}
+                    <Form.Select
+                      id="status-filter"
+                      name="status-filter"
+                      size="sm"
+                      value={filters.status}
                   onChange={(e) => handleFilterChange("status", e.target.value)}
-                  aria-label="Filtrar por estado"
+                      aria-label="Filtrar por estado"
                   className="!w-[160px] shrink-0"
-                  style={{ minWidth: "160px" }}
-                >
-                  <option value="">Todos los estados</option>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Select
-                  id="is-active-filter"
-                  size="sm"
-                  value={filters.is_active}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFilters((f) => ({
-                      ...f,
-                      is_active: val === "" ? "" : val === "true",
-                    }));
-                    setCurrentPage(1);
-                  }}
+                      style={{ minWidth: "160px" }}
+                    >
+                      <option value="">Todos los estados</option>
+                      {Object.entries(statusLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </Form.Select>
+                    <Form.Select
+                        id="is-active-filter"
+                      size="sm"
+                      value={filters.is_active}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFilters((f) => ({
+                          ...f,
+                          is_active: val === "" ? "" : val === "true",
+                        }));
+                        setCurrentPage(1);
+                      }}
                   aria-label="Filtrar por activo"
                   className="!w-[150px] shrink-0"
                   style={{ minWidth: "150px" }}
-                >
-                  <option value="">Activo/Inactivo</option>
-                  <option value="true">Activo</option>
-                  <option value="false">Inactivo</option>
-                </Form.Select>
+                    >
+                      <option value="">Activo/Inactivo</option>
+                      <option value="true">Activo</option>
+                      <option value="false">Inactivo</option>
+                    </Form.Select>
                 {hasFilters && (
-                  <Button
+                    <Button
                     variant="outline"
-                    size="sm"
+                      size="sm"
                     icon={FilterX}
                     onClick={clearFilters}
                     title="Limpiar filtros"
                     className="shrink-0 whitespace-nowrap"
                   >
-                    Limpiar filtros
-                  </Button>
-                )}
+                          Limpiar filtros
+                    </Button>
+                    )}
                 {perms.change && selectedBinIds.length > 0 && (
-                  <Button
-                    variant="success"
-                    size="sm"
+                          <Button
+                            variant="success"
+                            size="sm"
                     icon={Archive}
                     onClick={openAlmacenarMasivo}
-                    disabled={isAlmacenando}
+                            disabled={isAlmacenando}
                     loading={isAlmacenando && !showAlmacenarModal}
                     title="Aplicar criterio de almacenamiento para los bins seleccionados"
                     className="shrink-0 whitespace-nowrap"
@@ -609,8 +609,8 @@ const BinsView = () => {
                     {isAlmacenando && !showAlmacenarModal
                       ? "Procesando…"
                       : `Aplicar criterio (${selectedBinIds.length})`}
-                  </Button>
-                )}
+                          </Button>
+                      )}
                 <div className="ml-auto shrink-0 pl-2">
                   {perms.add && !user?.client && (
                     <Button
@@ -649,27 +649,27 @@ const BinsView = () => {
                         </Table.HeaderCell>
                       )}
                       <Table.HeaderCell className="min-w-[130px] normal-case tracking-normal">
-                        Código
+                                          Código
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[220px] normal-case tracking-normal">
-                        Entrada / Cliente
+                                          Entrada / Cliente
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[130px] normal-case tracking-normal">
-                        Productos
+                                          Productos
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[120px] normal-case tracking-normal">
-                        Condición
+                                          Condición
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[130px] normal-case tracking-normal">
-                        Posición
+                                          Posición
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[120px] normal-case tracking-normal">
-                        Estado
+                                          Estado
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[150px] normal-case tracking-normal">
-                        Acciones
+                                          Acciones
                       </Table.HeaderCell>
-                    </tr>
+                                      </tr>
                   </Table.Head>
                   <Table.Body>
                     {entries.map((entry) => {
@@ -696,12 +696,12 @@ const BinsView = () => {
                               <button
                                 type="button"
                                 className="inline-flex items-center gap-1 font-medium text-slate-900 hover:text-sky-700"
-                                onClick={() => toggleProductGroup(entry.id)}
-                              >
+                              onClick={() => toggleProductGroup(entry.id)}
+                            >
                                 {entry.is_active === false && (
                                   <XCircle className="h-4 w-4 shrink-0 text-red-500" title="Bin inactivo" />
                                 )}
-                                {entry.code}
+                                  {entry.code}
                                 {isExpanded ? (
                                   <ChevronUp className="h-4 w-4 text-slate-400" />
                                 ) : (
@@ -721,7 +721,7 @@ const BinsView = () => {
                                         `/order/entries?entry_code=${encodeURIComponent(entry.entry.code)}`,
                                       )
                                     }
-                                  >
+                                >
                                     {entry.entry.code}
                                     <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                                   </button>
@@ -731,7 +731,7 @@ const BinsView = () => {
                                 <span className="truncate text-xs text-slate-500">
                                   {entry.client?.name || "—"}
                                 </span>
-                              </div>
+                                </div>
                             </Table.Cell>
                             <Table.Cell>
                               {entry.bin_products?.length > 0 ? (
@@ -857,7 +857,7 @@ const BinsView = () => {
                                     navigate={navigate}
                                     onStoreBin={handleShowQRModal}
                                   />
-                                </td>
+                              </td>
                               </motion.tr>
                             )}
                           </AnimatePresence>
@@ -865,7 +865,7 @@ const BinsView = () => {
                       );
                     })}
                   </Table.Body>
-                </Table>
+                  </Table>
               ) : (
                 <WmsListEmptyState
                   hasFilters={hasFilters}
@@ -884,8 +884,8 @@ const BinsView = () => {
               <Card.Footer>
                 <div className="d-flex flex-column flex-md-row align-items-center gap-3">
                   <div className="text-sm text-slate-600 text-center text-md-start">
-                    Mostrando del{" "}
-                    <strong>{(currentPage - 1) * PAGE_SIZE + 1}</strong> al{" "}
+                      Mostrando del{" "}
+                      <strong>{(currentPage - 1) * PAGE_SIZE + 1}</strong> al{" "}
                     <strong>{Math.min(currentPage * PAGE_SIZE, totalItems)}</strong> de{" "}
                     <strong>{totalItems}</strong> registros
                   </div>

@@ -544,9 +544,9 @@ const ModalEdit = ({
   };
 
   const modalTitle = isViewMode
-    ? "Ver bin"
-    : selectedEntry?.id
-      ? "Modificar bin"
+            ? "Ver bin"
+            : selectedEntry?.id
+            ? "Modificar bin"
       : "Nuevo bin";
 
   const binDetailsForm = (
@@ -557,16 +557,16 @@ const ModalEdit = ({
                 <Form.Group controlId="entry-select" className="mb-0">
                   <Form.Label className="!text-xs !font-medium !text-slate-600">
                     Orden de entrada <span className="text-danger">*</span>
-                  </Form.Label>
-                  <AsyncSelect
-                    inputId="entry-select"
-                    name="entry"
-                    value={selectedEntry?.entry}
-                    loadOptions={loadEntryOptions}
-                    defaultOptions={defaultEntries}
+                        </Form.Label>
+                        <AsyncSelect
+                          inputId="entry-select"
+                          name="entry"
+                          value={selectedEntry?.entry}
+                          loadOptions={loadEntryOptions}
+                          defaultOptions={defaultEntries}
                     isDisabled={isViewMode || !isCreateMode}
-                    isLoading={isLoadingData}
-                    onChange={(selected) => {
+                          isLoading={isLoadingData}
+                          onChange={(selected) => {
                       if (isViewMode) return;
                       handleChange("entry", selected);
 
@@ -698,7 +698,7 @@ const ModalEdit = ({
                         ? "Cargando posiciones..."
                         : isViewMode
                           ? "Sin posición asignada"
-                          : "Seleccione una posición libre"
+                        : "Seleccione una posición libre"
                     }
                     isClearable={!isViewMode}
                     noOptionsMessage={({ inputValue }) =>
@@ -717,7 +717,7 @@ const ModalEdit = ({
                     <Form.Text className="!mt-1.5 block text-xs leading-relaxed text-slate-500">
                       Solo se muestran posiciones con estado{" "}
                       <span className="font-medium text-slate-700">Libre</span>
-                    </Form.Text>
+                  </Form.Text>
                   )}
                   {validationErrors.position && (
                     <Form.Text className="text-danger">
@@ -776,7 +776,7 @@ const ModalEdit = ({
                         ))
                       }
                     </VisibleSliceList>
-                  </Form.Group>
+                            </Form.Group>
                 </Col>
               )}
             </Row>
@@ -800,18 +800,18 @@ const ModalEdit = ({
                 <div className="mb-3 flex justify-end gap-2">
                   <IconButton
                     variant="ghost"
-                    size="sm"
+                        size="sm"
                     className="h-8 w-8 text-sky-600 hover:bg-sky-50"
-                    onClick={handlePrintTag}
-                    disabled={isPrinting || !selectedEntry?.id}
-                    title="Imprimir etiqueta"
+                        onClick={handlePrintTag}
+                        disabled={isPrinting || !selectedEntry?.id}
+                        title="Imprimir etiqueta"
                     aria-label="Imprimir etiqueta"
-                  >
-                    {isPrinting ? (
-                      <span
-                        className="spinner-border spinner-border-sm"
-                        role="status"
-                        aria-hidden="true"
+                      >
+                        {isPrinting ? (
+                          <span
+                            className="spinner-border spinner-border-sm"
+                            role="status"
+                            aria-hidden="true"
                       />
                     ) : (
                       <Printer className="h-4 w-4" />
@@ -819,38 +819,38 @@ const ModalEdit = ({
                   </IconButton>
                   <IconButton
                     variant="ghost"
-                    size="sm"
+                        size="sm"
                     className="h-8 w-8 text-sky-600 hover:bg-sky-50"
-                    onClick={handleRegenerateTag}
-                    disabled={isRegenerating || !selectedEntry?.id}
-                    title="Regenerar etiqueta"
+                        onClick={handleRegenerateTag}
+                        disabled={isRegenerating || !selectedEntry?.id}
+                        title="Regenerar etiqueta"
                     aria-label="Regenerar etiqueta"
-                  >
-                    {isRegenerating ? (
-                      <span
-                        className="spinner-border spinner-border-sm"
-                        role="status"
-                        aria-hidden="true"
+                      >
+                        {isRegenerating ? (
+                          <span
+                            className="spinner-border spinner-border-sm"
+                            role="status"
+                            aria-hidden="true"
                       />
-                    ) : (
+                        ) : (
                       <RefreshCw className="h-4 w-4" />
-                    )}
+                        )}
                   </IconButton>
-                </div>
+                    </div>
                 <div className="text-center">
-                  <a
-                    href={selectedEntry.tag_image}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                      <a
+                        href={selectedEntry.tag_image}
+                        target="_blank"
+                        rel="noopener noreferrer"
                     className="inline-block"
-                  >
-                    <img
-                      src={selectedEntry.tag_image}
+                      >
+                        <img
+                          src={selectedEntry.tag_image}
                       alt="Etiqueta del bin"
                       className="mx-auto max-h-[400px] w-auto rounded-md border border-[var(--border-subtle)] object-contain"
-                    />
-                  </a>
-                </div>
+                        />
+                      </a>
+                    </div>
               </Modal.Section>
             )}
           </Form>

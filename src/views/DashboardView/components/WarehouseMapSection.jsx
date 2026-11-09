@@ -19,11 +19,14 @@ import { Modal } from "@/components/ui/Modal";
 import { getPositionNomenclature } from "@/services/storageService";
 import { cavaTitleOf } from "@/views/CavasView/cavaPlan";
 import CavaPlan from "@/views/CavasView/components/CavaPlan";
+import { hydratePlanLayout } from "@/views/CavasView/planLayout";
 import { getConditionBadgeVariant } from "../dashboardUtils";
 
 function blocksOf(cava) {
-  return (cava.blocks || []).map((block) => ({
-    key: block.id ? `id-${block.id}` : `${block.kind}-${block.code}`,
+  return (cava.blocks || []).map((block, index) => ({
+    key: block.id ? `id-${block.id}` : `${block.kind}-${block.code}-${index}`,
+    id: block.id,
+    sort_order: block.sort_order ?? index,
     kind: block.kind,
     code: block.code || "",
     rack_count: block.rack_count || 1,
@@ -109,8 +112,10 @@ function CavaSummaryCard({ cava, onSelect }) {
 }
 
 function CavaHeatmapModal({ cava, nomenclature, onHide }) {
+  const blocks = cava ? blocksOf(cava) : [];
+  const planLayout = cava ? hydratePlanLayout(cava.plan_layout, blocks) : null;
   return (
-    <Modal show={Boolean(cava)} onHide={onHide} size="xl" className="max-w-[1103px]">
+    <Modal show={Boolean(cava)} onHide={onHide} size="xl" className="max-w-[min(96vw,1250px)]">
       {cava ? (
         <>
           <Modal.Header>
@@ -128,8 +133,9 @@ function CavaHeatmapModal({ cava, nomenclature, onHide }) {
               cavaId={cava.id}
               name={cava.name}
               code={cava.code}
-              blocks={blocksOf(cava)}
+              blocks={blocks}
               nomenclature={nomenclature}
+              planLayout={planLayout}
               readOnly
               showTitle={false}
             />
