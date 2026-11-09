@@ -68,6 +68,8 @@ const AISLE_SIZE = UI_AISLE_SIZE;
 /** V↔H al lado y arriba/abajo: mismo valor (también en SVG zoom). */
 const CROSS_ORIENTATION_GAP = UI_CROSS_GAP;
 const HILERA_KPI_INNER_GAP = PIECE_GAP;
+/** Ancho del badge KPI girado (w-6) en hilera horizontal. */
+const HILERA_KPI_SIDE_W = 24;
 const AXIS_SIDE = 16; // w-4
 const AXIS_TOP = 14;
 const MARK = 10;
@@ -86,6 +88,13 @@ function horizontalRackSpan(block) {
   const places = depthCodesOf(block);
   if (!tokens.length || !places.length) return 0;
   return AXIS_SIDE + AXIS_GAP + tokens.length * CELL + Math.max(tokens.length - 1, 0) * PIECE_GAP;
+}
+
+/** Ancho total de la fila horizontal: KPI izquierdo + eje + racks (mismo que el pasillo). */
+function horizontalRowSpan(block) {
+  const rack = horizontalRackSpan(block);
+  if (!rack) return 0;
+  return HILERA_KPI_SIDE_W + HILERA_KPI_INNER_GAP + rack;
 }
 
 /** Alto de hilera vertical (eje superior + mb + gap + racks apilados). */
@@ -991,7 +1000,12 @@ export default function CavaPlan({
     const gridH = Math.max(drawnAxis.length, 1) * CELL;
     return (
       <div key={block.key} className={`flex w-full items-start ${justifyClass(align)}`}>
-        <div className="flex w-max shrink-0 items-start" style={{ gap: HILERA_KPI_INNER_GAP }}>
+        <div
+          ref={(node) => setRackSpanRef(block.key, node)}
+          data-rack-span={block.key}
+          className="flex w-max shrink-0 items-start"
+          style={{ gap: HILERA_KPI_INNER_GAP }}
+        >
           {/* Horizontal: contador a la izquierda, pill vertical (girado). */}
           <div className="flex shrink-0 flex-col">
             {labelAbove ? <div style={{ height: RACK_LABEL_H + RACK_LABEL_GAP }} aria-hidden /> : null}
@@ -1004,12 +1018,7 @@ export default function CavaPlan({
               />
             </div>
           </div>
-          <div
-            ref={(node) => setRackSpanRef(block.key, node)}
-            data-rack-span={block.key}
-            className="flex w-max shrink-0 items-start"
-            style={{ gap: AXIS_GAP }}
-          >
+          <div className="flex w-max shrink-0 items-start" style={{ gap: AXIS_GAP }}>
             {showAxis ? (
               <DepthAxis
                 places={drawnAxis}
@@ -1025,7 +1034,8 @@ export default function CavaPlan({
   }
 
   function renderMiddleGroups(middle) {
-    const estimated = Math.max(trackSpanFor(middle, horizontalRackSpan), 1);
+    // Incluye KPI izquierdo: si no, el pasillo queda corto a la derecha.
+    const estimated = Math.max(trackSpanFor(middle, horizontalRowSpan), 1);
     const trackW = Math.max(estimated, measuredTrackW);
     const groups = contiguousBlockGroups(middle);
     // Mismos huecos que columnas verticales (PIECE_GAP + divisor hermano).
