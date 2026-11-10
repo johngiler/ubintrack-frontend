@@ -20,7 +20,7 @@ export const EMPTY_PLAN_LAYOUT = {
   depth_axes: {},
   row_aligns: {},
   stack_aligns: {},
-  show_aisle_positions: false,
+  show_floor_positions: false,
 };
 
 const ROW_ALIGN_VALUES = new Set(["start", "center", "end"]);
@@ -125,7 +125,9 @@ export function normalizePlanLayout(raw, blocks = []) {
     depth_axes,
     row_aligns,
     stack_aligns,
-    show_aisle_positions: Boolean(source.show_aisle_positions),
+    show_floor_positions: Boolean(
+      source.show_floor_positions ?? source.show_aisle_positions,
+    ),
   };
 }
 
@@ -169,7 +171,7 @@ export function hydratePlanLayout(raw, blocks = []) {
     depth_axes,
     row_aligns,
     stack_aligns,
-    show_aisle_positions: normalized.show_aisle_positions,
+    show_floor_positions: normalized.show_floor_positions,
   };
 }
 
@@ -196,7 +198,7 @@ export function planLayoutPayload(layout, blocks = []) {
     depth_axes,
     row_aligns,
     stack_aligns,
-    show_aisle_positions: Boolean(normalized.show_aisle_positions),
+    show_floor_positions: Boolean(normalized.show_floor_positions),
   };
 }
 

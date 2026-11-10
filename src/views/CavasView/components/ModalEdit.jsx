@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, DoorOpen, GripVertical, LayoutGrid, Plus, Save, Trash2, X } from "lucide-react";
 
 import { Modal, Button, Form, Alert } from "@/components/ui/bootstrap";
+import NumberInput from "@/components/ui/NumberInput";
 import Select from "@/components/ui/Select";
 import { getApiErrorMessage } from "@/services/httpClient";
 import {
@@ -21,7 +22,13 @@ import {
   aisleSelectValue,
   blocksPayload,
   cavaTitleOf,
-  rackTokensOf,
+  floorAcrossOf,
+  floorIsActive,
+  isFloorBlock,
+  isNamedSection,
+  isSectionBlock,
+  normalizeSectionType,
+  SECTION_TYPES,
   uniqueAisleToken,
 } from "../cavaPlan";
 import {
@@ -49,14 +56,18 @@ const ORIENTATION_OPTIONS = [
   { value: "horizontal", label: "Horizontal" },
   { value: "vertical", label: "Vertical" },
 ];
-const RACK_GRID =
-  "w-full grid-cols-[1.5rem_5.5rem_3.25rem_3.25rem_4rem_4.75rem_7.75rem_6.75rem_5.5rem_7.5rem_auto] justify-items-start";
-/** Misma pista izquierda que rack: drag + nombre (+ token), luego campos pegados. */
-const AISLE_GRID =
-  "w-full grid-cols-[1.5rem_minmax(9rem,12rem)_7.75rem_6.75rem_max-content_3.25rem_auto] justify-items-start";
 const FIELD_CLASS = "rounded-md";
 const COMPACT_HEIGHT = 32;
 const COMPACT_FIELD = "!h-8 rounded-md px-2 py-0 text-xs leading-none";
+const KIND_LABEL_CLASS =
+  "w-[4.75rem] shrink-0 truncate text-left text-xs font-bold leading-tight text-slate-800";
+const NUM_W = "w-[3.25rem] shrink-0";
+const SEL_SM = "w-[5.75rem] shrink-0";
+const SEL_MD = "w-[6.75rem] shrink-0";
+const SEL_LG = "w-[7.5rem] shrink-0";
+const SEL_TYPE = "w-[6.5rem] shrink-0";
+const NAME_W = "w-[9rem] shrink-0";
+const FIELDS_ROW = "flex min-w-0 flex-1 flex-wrap items-center justify-start gap-1";
 const LABEL_CLASS = "!mb-1.5 !text-xs !font-medium !text-slate-500";
 const SELECT_STYLES = {
   control: (base) => ({ ...base, borderRadius: 6 }),
@@ -129,53 +140,85 @@ function emptyRack(orientation = "horizontal") {
   };
 }
 
-function nextAisleName(blocks) {
+function nextSectionName(blocks, sectionType = "pasillo") {
+  const type = normalizeSectionType(sectionType);
+  const label = type === "tunel" ? "Tunel" : type === "division" ? "Linea" : "Pasillo";
+  const pattern = new RegExp(`^${label}\\s+(\\d+)$`, "i");
   const used = new Set();
   (blocks || []).forEach((block) => {
-    if (block.kind !== "aisle") return;
-    const match = /^Pasillo\s+(\d+)$/i.exec(String(block.name || "").trim());
+    if (!isSectionBlock(block)) return;
+    if (normalizeSectionType(block.section_type) !== type) return;
+    const match = pattern.exec(String(block.name || "").trim());
     if (match) used.add(Number(match[1]));
   });
   let next = 1;
   while (used.has(next)) next += 1;
-  return `Pasillo ${next}`;
+  return `${label} ${next}`;
 }
 
-function emptyAisle(orientation = "horizontal", blocks = []) {
+function emptySection(orientation = "horizontal", blocks = [], sectionType = "pasillo") {
   const axis = orientation === "vertical" ? "vertical" : "horizontal";
-  const name = nextAisleName(blocks);
-  const used = (blocks || []).filter((block) => block.kind === "aisle").map((block) => block.code);
+  const section_type = normalizeSectionType(sectionType);
+  const name = nextSectionName(blocks, section_type);
+  const used = (blocks || []).filter(isNamedSection).map((block) => block.code);
   return {
     key: newKey(),
-    kind: "aisle",
+    kind: "section",
+    section_type,
     name,
     code: uniqueAisleToken(name, used),
-    create_aisle_positions: false,
     rack_count: 0,
+    orientation: axis,
+  };
+}
+
+function emptyFloor(orientation = "horizontal") {
+  const axis = orientation === "vertical" ? "vertical" : "horizontal";
+  return {
+    key: newKey(),
+    kind: "floor",
+    rack_count: 1,
+    depth: 3,
+    overlap: false,
+    always_visible: false,
     orientation: axis,
   };
 }
 
 function blocksFromApi(blocks) {
   const mapped = (blocks || []).map((block, index) => {
-    const aisleCount =
-      block.kind === "aisle" ? Math.max(0, Number(block.rack_count) || 0) : 0;
+    const kind =
+      block.kind === "aisle" ? "section" : block.kind === "floor" ? "floor" : block.kind;
     const code = block.code || "";
+    const section_type =
+      kind === "section"
+        ? normalizeSectionType(block.section_type || "pasillo")
+        : "";
     const name =
-      block.kind === "aisle"
-        ? String(block.name || "").trim() || aisleDisplayName({ code })
+      kind === "section"
+        ? String(block.name || "").trim() || aisleDisplayName({ code, section_type })
         : "";
     return {
       key: block.id ? `id-${block.id}` : newKey(),
       id: block.id,
       sort_order: block.sort_order ?? index,
-      kind: block.kind,
+      kind,
+      section_type,
       name,
       code,
-      create_aisle_positions: block.kind === "aisle" ? aisleCount > 0 : false,
-      rack_count: block.kind === "aisle" ? aisleCount : block.rack_count || 1,
+      rack_count:
+        kind === "section"
+          ? 0
+          : kind === "floor"
+            ? Math.max(0, Number(block.rack_count) || 0)
+            : block.rack_count || 1,
       levels: block.levels || "",
-      depth: block.depth || "",
+      depth:
+        kind === "floor"
+          ? floorAcrossOf(block)
+          : block.depth || "",
+      overlap: kind === "floor" ? block.overlap === true : false,
+      always_visible: kind === "floor" ? block.always_visible === true : false,
       orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
       label_side: block.label_side === "above" ? "above" : "below",
       aisle_code: block.aisle_code || "",
@@ -183,8 +226,10 @@ function blocksFromApi(blocks) {
   });
   const used = [];
   mapped.forEach((block) => {
-    if (block.kind !== "aisle") return;
-    if (!String(block.name || "").trim()) block.name = nextAisleName(mapped);
+    if (!isSectionBlock(block)) return;
+    if (!String(block.name || "").trim()) {
+      block.name = nextSectionName(mapped, block.section_type);
+    }
     if (!String(block.code || "").trim()) {
       block.code = uniqueAisleToken(block.name, used);
     }
@@ -193,26 +238,26 @@ function blocksFromApi(blocks) {
   return mapped;
 }
 
-function blockTitle(block, nomenclature) {
-  if (block.kind === "aisle") {
-    return aisleDisplayName(block);
+/** Etiqueta fija a la izquierda para reconocer el widget. */
+function blockKindLabel(block) {
+  if (isFloorBlock(block)) return "Piso";
+  if (isSectionBlock(block)) {
+    const type = normalizeSectionType(block.section_type);
+    if (type === "tunel") return "Túnel";
+    if (type === "division") return "División";
+    return "Pasillo";
   }
-  const tokens = rackTokensOf(block);
-  const prefix = nomenclature?.rack_prefix || "R";
-  if (!tokens.length) return "Grupo de racks";
-  const first = `${prefix}${tokens[0]}`;
-  const last = `${prefix}${tokens[tokens.length - 1]}`;
-  return tokens.length === 1 ? first : `${first} a ${last}`;
+  return "Rack";
 }
 
-/** Renombra pasillo, recalcula token y actualiza aisle_code de racks ligados. */
-function renameAisleBlocks(blocks, key, nextName) {
+/** Renombra sección, recalcula token y actualiza aisle_code de racks ligados. */
+function renameSectionBlocks(blocks, key, nextName) {
   const list = blocks || [];
   const target = list.find((block) => block.key === key);
-  if (!target || target.kind !== "aisle") return list;
+  if (!target || !isSectionBlock(target)) return list;
   const oldCode = String(target.code || "").trim();
   const used = list
-    .filter((block) => block.kind === "aisle" && block.key !== key)
+    .filter((block) => isNamedSection(block) && block.key !== key)
     .map((block) => block.code);
   const newCode = uniqueAisleToken(nextName, used);
   return list.map((block) => {
@@ -286,9 +331,9 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
   const watchToken = useRef(0);
   const aisleChoices = useMemo(() => {
     const seen = new Set();
-    const options = [{ value: "", label: "Sin pasillo" }];
+    const options = [{ value: "", label: "Sin sección" }];
     for (const block of formData.blocks) {
-      if (block.kind !== "aisle") continue;
+      if (!isNamedSection(block)) continue;
       const code = String(block.code || "").trim();
       if (!code || seen.has(code)) continue;
       seen.add(code);
@@ -594,22 +639,26 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
             </Form.Group>
             <Form.Group className="col-span-2 mb-0">
               <Form.Label className={LABEL_CLASS}>Mínima (°C)</Form.Label>
-              <Form.Control
-                className={FIELD_CLASS}
-                type="number"
+              <NumberInput
+                className={`${FIELD_CLASS} h-10 px-3 text-sm`}
                 value={formData.temp_min ?? ""}
                 readOnly={readOnly}
-                onChange={(event) => setFormData({ ...formData, temp_min: event.target.value })}
+                placeholder="Mín."
+                commitEmptyAs=""
+                emptyValue=""
+                onChange={(next) => setFormData({ ...formData, temp_min: next === "" ? "" : next })}
               />
             </Form.Group>
             <Form.Group className="col-span-2 mb-0">
               <Form.Label className={LABEL_CLASS}>Máxima (°C)</Form.Label>
-              <Form.Control
-                className={FIELD_CLASS}
-                type="number"
+              <NumberInput
+                className={`${FIELD_CLASS} h-10 px-3 text-sm`}
                 value={formData.temp_max ?? ""}
                 readOnly={readOnly}
-                onChange={(event) => setFormData({ ...formData, temp_max: event.target.value })}
+                placeholder="Máx."
+                commitEmptyAs=""
+                emptyValue=""
+                onChange={(next) => setFormData({ ...formData, temp_max: next === "" ? "" : next })}
               />
             </Form.Group>
           </div>
@@ -633,7 +682,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                       }))
                     }
                   >
-                    Agregar rack
+                    Agregar hilera de racks
                   </Button>
                   <Button
                     variant="outline"
@@ -644,7 +693,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                         ...current,
                         blocks: [
                           ...current.blocks,
-                          emptyAisle(
+                          emptySection(
                             defaultOrientationOf(current.plan_layout, current.blocks),
                             current.blocks,
                           ),
@@ -652,7 +701,25 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                       }))
                     }
                   >
-                    Agregar pasillo
+                    Agregar sección
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={Plus}
+                    onClick={() =>
+                      setFormData((current) => ({
+                        ...current,
+                        blocks: [
+                          ...current.blocks,
+                          emptyFloor(
+                            defaultOrientationOf(current.plan_layout, current.blocks),
+                          ),
+                        ],
+                      }))
+                    }
+                  >
+                    Agregar posiciones de piso
                   </Button>
                   <Button
                     variant="outline"
@@ -817,92 +884,106 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
             {formData.blocks.length ? (
               <div className="space-y-0.5">
                 {formData.blocks.map((block, index) => {
-                  const showRackHeader =
-                    block.kind === "rack" &&
-                    (index === 0 || formData.blocks[index - 1].kind !== "rack");
-                  const showAisleHeader =
-                    block.kind === "aisle" &&
-                    (index === 0 || formData.blocks[index - 1].kind !== "aisle");
+                  const floorActive = isFloorBlock(block)
+                    ? floorIsActive(formData.blocks, block)
+                    : true;
                   const isFirst = index === 0;
                   const isLast = index === formData.blocks.length - 1;
+                  const rowBg = isSectionBlock(block)
+                    ? "bg-amber-50 dark:bg-amber-950/25"
+                    : isFloorBlock(block)
+                      ? "bg-emerald-50 dark:bg-emerald-950/25"
+                      : "bg-slate-100/80 dark:bg-slate-800/50";
+                  const kindLabel = blockKindLabel(block);
                   return (
-                    <div key={block.key}>
-                      {showRackHeader ? (
-                        <div className={`grid ${RACK_GRID} items-end gap-x-1 px-1.5 pb-0.5 text-left text-[11px] font-medium text-slate-400`}>
-                          <span />
-                          <span>Rack</span>
-                          <span>Cantidad</span>
-                          <span>Niveles</span>
-                          <span>Profundidad</span>
-                          <span>Orden</span>
-                          <span>Orientación</span>
-                          <span>Alineación</span>
-                          <span>Etiqueta</span>
-                          <span>Pasillo</span>
-                          <span />
-                        </div>
-                      ) : null}
-                      {showAisleHeader ? (
-                        <div className={`grid ${AISLE_GRID} items-end gap-x-1 px-1.5 pb-0.5 text-left text-[11px] font-medium text-slate-400`}>
-                          <span />
-                          <span>Nombre</span>
-                          <span>Orientación</span>
-                          <span>Alineación</span>
-                          <span>Posiciones</span>
-                          <span>Cant.</span>
-                          <span />
-                        </div>
-                      ) : null}
-                      <div
-                        onDragOver={(event) => {
-                          if (readOnly || !dragKey || dragKey === block.key) return;
-                          event.preventDefault();
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          if (readOnly) return;
-                          moveBlock(dragKey, block.key);
-                          setDragKey(null);
-                        }}
-                        className={`grid items-center gap-x-1 rounded-md px-1.5 py-1 ${
-                          dragKey === block.key ? "opacity-60 ring-1 ring-sky-400" : ""
-                        } ${
-                          block.kind === "aisle"
-                            ? `${AISLE_GRID} bg-amber-50 dark:bg-amber-950/25`
-                            : `${RACK_GRID} bg-slate-100/80 dark:bg-slate-800/50`
-                        }`}
-                      >
-                        {!readOnly ? (
-                          <button
-                            type="button"
-                            draggable
-                            title="Arrastrar para reordenar"
-                            className="cursor-grab justify-self-center text-slate-400 active:cursor-grabbing"
-                            onDragStart={(event) => {
-                              event.dataTransfer.effectAllowed = "move";
-                              event.dataTransfer.setData("text/plain", block.key);
-                              setDragKey(block.key);
-                            }}
-                            onDragEnd={() => setDragKey(null)}
-                          >
-                            <GripVertical className="h-4 w-4" />
-                          </button>
-                        ) : (
-                          <span />
-                        )}
-                        {block.kind === "aisle" ? (
-                          <div className="flex w-full min-w-0 items-center gap-1">
+                    <div
+                      key={block.key}
+                      onDragOver={(event) => {
+                        if (readOnly || !dragKey || dragKey === block.key) return;
+                        event.preventDefault();
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (readOnly) return;
+                        moveBlock(dragKey, block.key);
+                        setDragKey(null);
+                      }}
+                      className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 ${
+                        dragKey === block.key ? "opacity-60 ring-1 ring-sky-400" : ""
+                      } ${rowBg} ${!floorActive ? "opacity-60" : ""}`}
+                    >
+                      {!readOnly ? (
+                        <button
+                          type="button"
+                          draggable
+                          title="Arrastrar para reordenar"
+                          className="shrink-0 cursor-grab text-slate-400 active:cursor-grabbing"
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("text/plain", block.key);
+                            setDragKey(block.key);
+                          }}
+                          onDragEnd={() => setDragKey(null)}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <span className="w-4 shrink-0" />
+                      )}
+                      <span className={KIND_LABEL_CLASS} title={kindLabel}>
+                        {kindLabel}
+                      </span>
+                      <div className={FIELDS_ROW}>
+                        {isSectionBlock(block) ? (
+                          <>
+                            <Select
+                              inputId={`cava-section-type-${block.key}`}
+                              className={`${SEL_TYPE} text-left`}
+                              size="sm"
+                              styles={COMPACT_SELECT_STYLES}
+                              isDisabled={readOnly}
+                              placeholder="Tipo"
+                              options={SECTION_TYPES}
+                              value={normalizeSectionType(block.section_type)}
+                              onChange={(event) => {
+                                const section_type = normalizeSectionType(event.target.value);
+                                setFormData((current) => {
+                                  const target = current.blocks.find((item) => item.key === block.key);
+                                  if (!target) return current;
+                                  const nextName = nextSectionName(
+                                    current.blocks.filter((item) => item.key !== block.key),
+                                    section_type,
+                                  );
+                                  const used = current.blocks
+                                    .filter((item) => isNamedSection(item) && item.key !== block.key)
+                                    .map((item) => item.code);
+                                  return {
+                                    ...current,
+                                    blocks: current.blocks.map((item) =>
+                                      item.key === block.key
+                                        ? {
+                                            ...item,
+                                            section_type,
+                                            name: nextName,
+                                            code: uniqueAisleToken(nextName, used),
+                                          }
+                                        : item,
+                                    ),
+                                  };
+                                });
+                              }}
+                            />
                             <Form.Control
                               size="sm"
-                              className={`${COMPACT_FIELD} w-full min-w-0 text-left`}
+                              className={`${COMPACT_FIELD} ${NAME_W} text-left`}
                               value={block.name || ""}
                               readOnly={readOnly}
-                              placeholder="Pasillo 1"
-                              title="Nombre del pasillo"
+                              placeholder="Nombre"
+                              title="Nombre de la sección"
                               onChange={(event) =>
                                 setFormData((current) => ({
                                   ...current,
-                                  blocks: renameAisleBlocks(
+                                  blocks: renameSectionBlocks(
                                     current.blocks,
                                     block.key,
                                     event.target.value,
@@ -916,47 +997,100 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                             >
                               {block.code || "—"}
                             </span>
-                          </div>
-                        ) : (
-                          <span className="truncate text-left text-xs font-semibold text-slate-600">
-                            {blockTitle(block, nomenclature)}
-                          </span>
-                        )}
+                            <Select
+                              inputId={`cava-orientation-${block.key}`}
+                              className={`${SEL_MD} text-left`}
+                              size="sm"
+                              styles={COMPACT_SELECT_STYLES}
+                              isDisabled={readOnly}
+                              placeholder="Orientación"
+                              options={ORIENTATION_OPTIONS}
+                              value={block.orientation === "vertical" ? "vertical" : "horizontal"}
+                              onChange={(event) =>
+                                updateBlock(block.key, { orientation: event.target.value || "horizontal" })
+                              }
+                            />
+                            <Select
+                              inputId={`cava-align-${block.key}`}
+                              className={`${SEL_SM} text-left`}
+                              size="sm"
+                              styles={COMPACT_SELECT_STYLES}
+                              isDisabled={readOnly}
+                              placeholder="Alineación"
+                              options={blockAlignOptions(
+                                defaultOrientationOf(formData.plan_layout, formData.blocks),
+                                block.orientation,
+                              )}
+                              value={blockAlignOf(
+                                formData.plan_layout,
+                                block,
+                                defaultOrientationOf(formData.plan_layout, formData.blocks),
+                              )}
+                              onChange={(event) =>
+                                setFormData((current) => ({
+                                  ...current,
+                                  plan_layout: setBlockAlign(
+                                    current.plan_layout,
+                                    block,
+                                    defaultOrientationOf(current.plan_layout, current.blocks),
+                                    event.target.value,
+                                  ),
+                                }))
+                              }
+                            />
+                          </>
+                        ) : null}
                         {block.kind === "rack" ? (
                           <>
-                            <Form.Control
-                              size="sm"
-                              className={`${COMPACT_FIELD} w-full min-w-0 text-left`}
-                              type="number"
-                              min={1}
+                            <NumberInput
+                              className={`${COMPACT_FIELD} ${NUM_W} text-left`}
+                              min={0}
                               value={block.rack_count}
                               readOnly={readOnly}
-                              onChange={(event) => updateBlock(block.key, { rack_count: event.target.value })}
+                              placeholder="Cantidad"
+                              commitEmptyAs={0}
+                              emptyValue=""
+                              onChange={(next) =>
+                                updateBlock(block.key, {
+                                  rack_count: next === "" ? "" : next,
+                                })
+                              }
                             />
-                            <Form.Control
-                              size="sm"
-                              className={`${COMPACT_FIELD} w-full min-w-0 text-left`}
-                              type="number"
-                              min={1}
+                            <NumberInput
+                              className={`${COMPACT_FIELD} ${NUM_W} text-left`}
+                              min={0}
                               value={block.levels}
                               readOnly={readOnly}
-                              onChange={(event) => updateBlock(block.key, { levels: event.target.value })}
+                              placeholder="Niveles"
+                              commitEmptyAs={0}
+                              emptyValue=""
+                              onChange={(next) =>
+                                updateBlock(block.key, {
+                                  levels: next === "" ? "" : next,
+                                })
+                              }
                             />
-                            <Form.Control
-                              size="sm"
-                              className={`${COMPACT_FIELD} w-full min-w-0 text-left`}
-                              type="number"
-                              min={1}
+                            <NumberInput
+                              className={`${COMPACT_FIELD} ${NUM_W} text-left`}
+                              min={0}
                               value={block.depth}
                               readOnly={readOnly}
-                              onChange={(event) => updateBlock(block.key, { depth: event.target.value })}
+                              placeholder="Profundidad"
+                              commitEmptyAs={0}
+                              emptyValue=""
+                              onChange={(next) =>
+                                updateBlock(block.key, {
+                                  depth: next === "" ? "" : next,
+                                })
+                              }
                             />
                             <Select
                               inputId={`cava-depth-axis-${block.key}`}
-                              className="w-full min-w-0 text-left"
+                              className={`${SEL_SM} text-left`}
                               size="sm"
                               styles={COMPACT_SELECT_STYLES}
                               isDisabled={readOnly || Number(block.depth) < 2}
+                              placeholder="Orden"
                               options={depthAxisOptions(block.depth)}
                               value={depthAxisOf(formData.plan_layout, block)}
                               onChange={(event) =>
@@ -972,10 +1106,11 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                             />
                             <Select
                               inputId={`cava-orientation-${block.key}`}
-                              className="w-full min-w-0 text-left"
+                              className={`${SEL_MD} text-left`}
                               size="sm"
                               styles={COMPACT_SELECT_STYLES}
                               isDisabled={readOnly}
+                              placeholder="Orientación"
                               options={ORIENTATION_OPTIONS}
                               value={block.orientation === "vertical" ? "vertical" : "horizontal"}
                               onChange={(event) =>
@@ -984,10 +1119,11 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                             />
                             <Select
                               inputId={`cava-align-${block.key}`}
-                              className="w-full min-w-0 text-left"
+                              className={`${SEL_SM} text-left`}
                               size="sm"
                               styles={COMPACT_SELECT_STYLES}
                               isDisabled={readOnly}
+                              placeholder="Alineación"
                               options={blockAlignOptions(
                                 defaultOrientationOf(formData.plan_layout, formData.blocks),
                                 block.orientation,
@@ -1011,10 +1147,11 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                             />
                             <Select
                               inputId={`cava-label-side-${block.key}`}
-                              className="w-full min-w-0 text-left"
+                              className={`${SEL_SM} text-left`}
                               size="sm"
                               styles={COMPACT_SELECT_STYLES}
                               isDisabled={readOnly}
+                              placeholder="Etiqueta"
                               options={labelSideOptions(block.orientation)}
                               value={block.label_side === "above" ? "above" : "below"}
                               onChange={(event) =>
@@ -1023,11 +1160,11 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                             />
                             <Select
                               inputId={`cava-aisle-${block.key}`}
-                              className="w-full min-w-0 text-left"
+                              className={`${SEL_LG} text-left`}
                               size="sm"
                               styles={COMPACT_SELECT_STYLES}
                               isDisabled={readOnly}
-                              placeholder="Sin pasillo"
+                              placeholder="Sección"
                               options={aisleChoices}
                               value={aisleSelectValue(formData.blocks, block)}
                               onChange={(event) =>
@@ -1041,14 +1178,56 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                               }
                             />
                           </>
-                        ) : (
+                        ) : null}
+                        {isFloorBlock(block) ? (
                           <>
+                            <NumberInput
+                              className={`${COMPACT_FIELD} ${NUM_W} text-left`}
+                              min={0}
+                              title={
+                                floorActive
+                                  ? "Cantidad total de posiciones de piso"
+                                  : "Coloque el piso junto a una sección con nombre"
+                              }
+                              value={block.rack_count ?? ""}
+                              readOnly={readOnly}
+                              disabled={readOnly || !floorActive}
+                              placeholder="Cant."
+                              commitEmptyAs={0}
+                              emptyValue=""
+                              onChange={(next) =>
+                                updateBlock(block.key, {
+                                  rack_count: next === "" ? "" : next,
+                                })
+                              }
+                            />
+                            <NumberInput
+                              className={`${COMPACT_FIELD} ${NUM_W} text-left`}
+                              min={0}
+                              max={12}
+                              title={
+                                floorActive
+                                  ? "Cuántas caben por grupo en la hilera"
+                                  : "Coloque el piso junto a una sección con nombre"
+                              }
+                              value={block.depth === "" || block.depth == null ? "" : block.depth}
+                              readOnly={readOnly}
+                              disabled={readOnly || !floorActive}
+                              placeholder="Dim."
+                              commitEmptyAs={0}
+                              emptyValue=""
+                              onChange={(next) =>
+                                updateBlock(block.key, {
+                                  depth: next === "" ? "" : next,
+                                })
+                              }
+                            />
                             <Select
                               inputId={`cava-orientation-${block.key}`}
-                              className="w-full min-w-0 text-left"
+                              className={`${SEL_MD} text-left`}
                               size="sm"
                               styles={COMPACT_SELECT_STYLES}
-                              isDisabled={readOnly}
+                              isDisabled={readOnly || !floorActive}
                               placeholder="Orientación"
                               options={ORIENTATION_OPTIONS}
                               value={block.orientation === "vertical" ? "vertical" : "horizontal"}
@@ -1058,10 +1237,11 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                             />
                             <Select
                               inputId={`cava-align-${block.key}`}
-                              className="w-full min-w-0 text-left"
+                              className={`${SEL_SM} text-left`}
                               size="sm"
                               styles={COMPACT_SELECT_STYLES}
-                              isDisabled={readOnly}
+                              isDisabled={readOnly || !floorActive}
+                              placeholder="Alineación"
                               options={blockAlignOptions(
                                 defaultOrientationOf(formData.plan_layout, formData.blocks),
                                 block.orientation,
@@ -1085,84 +1265,72 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                             />
                             <Form.Check
                               type="checkbox"
-                              id={`cava-aisle-create-${block.key}`}
-                              className="!mb-0 justify-self-start whitespace-nowrap text-[11px] leading-tight"
-                              label="Crear posiciones de pasillo"
-                              checked={Boolean(block.create_aisle_positions)}
-                              disabled={readOnly}
+                              id={`cava-floor-overlap-${block.key}`}
+                              className="!mb-0 whitespace-nowrap text-[11px] leading-tight"
+                              label="Solapar"
+                              title="Dibujar las posiciones sobre el pasillo/túnel vecino"
+                              checked={Boolean(block.overlap)}
+                              disabled={readOnly || !floorActive}
                               onChange={(event) =>
-                                updateBlock(block.key, {
-                                  create_aisle_positions: event.target.checked,
-                                  rack_count: event.target.checked
-                                    ? Math.max(0, Number(block.rack_count) || 0)
-                                    : 0,
-                                })
+                                updateBlock(block.key, { overlap: event.target.checked })
                               }
                             />
-                            {block.create_aisle_positions ? (
-                              <Form.Control
-                                size="sm"
-                                className={`${COMPACT_FIELD} w-full min-w-0 text-left`}
-                                type="number"
-                                min={0}
-                                title="Cantidad"
-                                value={block.rack_count ?? 0}
-                                readOnly={readOnly}
-                                placeholder="Cant."
-                                onChange={(event) => {
-                                  const next = Math.max(0, Number(event.target.value) || 0);
-                                  updateBlock(block.key, { rack_count: next });
-                                }}
-                              />
-                            ) : (
-                              <span />
-                            )}
+                            <Form.Check
+                              type="checkbox"
+                              id={`cava-floor-always-visible-${block.key}`}
+                              className="!mb-0 whitespace-nowrap text-[11px] leading-tight"
+                              label="Siempre visible"
+                              title="Mostrar este piso aunque «Ver posiciones de piso» esté apagado"
+                              checked={Boolean(block.always_visible)}
+                              disabled={readOnly || !floorActive}
+                              onChange={(event) =>
+                                updateBlock(block.key, { always_visible: event.target.checked })
+                              }
+                            />
                           </>
-                        )}
-                        {!readOnly ? (
-                          <div className="flex shrink-0 items-center justify-self-end gap-0.5">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              icon={ChevronUp}
-                              className="px-1.5"
-                              disabled={isFirst}
-                              title="Subir"
-                              onClick={() => moveBlockBy(block.key, -1)}
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              icon={ChevronDown}
-                              className="px-1.5"
-                              disabled={isLast}
-                              title="Bajar"
-                              onClick={() => moveBlockBy(block.key, 1)}
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              icon={Trash2}
-                              className="px-1.5"
-                              title="Quitar"
-                              onClick={() =>
-                                setFormData((current) => ({
-                                  ...current,
-                                  blocks: current.blocks.filter((item) => item.key !== block.key),
-                                }))
-                              }
-                            />
-                          </div>
-                        ) : (
-                          <span />
-                        )}
+                        ) : null}
                       </div>
+                      {!readOnly ? (
+                        <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            icon={ChevronUp}
+                            className="px-1.5"
+                            disabled={isFirst}
+                            title="Subir"
+                            onClick={() => moveBlockBy(block.key, -1)}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            icon={ChevronDown}
+                            className="px-1.5"
+                            disabled={isLast}
+                            title="Bajar"
+                            onClick={() => moveBlockBy(block.key, 1)}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            icon={Trash2}
+                            className="px-1.5"
+                            title="Quitar"
+                            onClick={() =>
+                              setFormData((current) => ({
+                                ...current,
+                                blocks: current.blocks.filter((item) => item.key !== block.key),
+                              }))
+                            }
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-sm text-slate-400">Agregue racks para armar la distribución.</p>
+              <p className="text-sm text-slate-400">Agregue racks, secciones o piso para armar la distribución.</p>
             )}
           </section>
 
@@ -1176,12 +1344,12 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
               planLayout={formData.plan_layout}
               readOnly={readOnly}
               occupancyRevision={occupancyRevision}
-              onShowAislePositionsChange={(checked) =>
+              onShowFloorPositionsChange={(checked) =>
                 setFormData((current) => ({
                   ...current,
                   plan_layout: {
                     ...normalizePlanLayout(current.plan_layout),
-                    show_aisle_positions: checked,
+                    show_floor_positions: checked,
                   },
                 }))
               }
@@ -1219,9 +1387,8 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
           <Modal.Title>Regenerar posiciones</Modal.Title>
         </Modal.Header>
         <Modal.Body className="space-y-2 text-sm text-slate-600">
-          <p>Se crearán las ubicaciones nuevas del plano.</p>
-          <p>Las posiciones eliminadas se volverán a crear.</p>
-          <p>Las que ya existen (incluidas desactivadas o editadas) no se modifican.</p>
+          <p>Se borrarán todas las posiciones de esta cava.</p>
+          <p>Luego se crearán de nuevo según el plano y la nomenclatura actual.</p>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" icon={X} onClick={() => setConfirmGenerate(false)}>

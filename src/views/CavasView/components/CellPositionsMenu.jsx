@@ -43,7 +43,18 @@ function menuPosition(anchorEl) {
     : { left, top: rect.bottom + gap, bottom: "auto" };
 }
 
-export default function CellPositionsMenu({ cavaId, hall, rack, place, title, readOnly, anchorEl, onClose, onChanged }) {
+export default function CellPositionsMenu({
+  cavaId,
+  hall,
+  rack,
+  place,
+  places = null,
+  title,
+  readOnly,
+  anchorEl,
+  onClose,
+  onChanged,
+}) {
   const [positions, setPositions] = useState([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -55,6 +66,7 @@ export default function CellPositionsMenu({ cavaId, hall, rack, place, title, re
   const [deleting, setDeleting] = useState(false);
   const [coords, setCoords] = useState(null);
   const menuRef = useRef(null);
+  const placesKey = Array.isArray(places) ? places.join(",") : "";
 
   useLayoutEffect(() => {
     if (!anchorEl) return undefined;
@@ -93,7 +105,13 @@ export default function CellPositionsMenu({ cavaId, hall, rack, place, title, re
     setPositions([]);
     setCount(0);
     setPage(1);
-    getCellPositions({ cavaId, hall, rack, place })
+    getCellPositions({
+      cavaId,
+      hall,
+      rack,
+      place: placesKey ? undefined : place,
+      places: placesKey ? places : undefined,
+    })
       .then((data) => {
         if (cancelled) return;
         setPositions(data.results || []);
@@ -108,14 +126,21 @@ export default function CellPositionsMenu({ cavaId, hall, rack, place, title, re
     return () => {
       cancelled = true;
     };
-  }, [cavaId, hall, rack, place]);
+  }, [cavaId, hall, rack, place, placesKey]);
 
   async function loadMore() {
     const next = page + 1;
     setLoadingMore(true);
     setError("");
     try {
-      const data = await getCellPositions({ cavaId, hall, rack, place, page: next });
+      const data = await getCellPositions({
+        cavaId,
+        hall,
+        rack,
+        place: placesKey ? undefined : place,
+        places: placesKey ? places : undefined,
+        page: next,
+      });
       setPositions((rows) => [...rows, ...(data.results || [])]);
       setCount(data.count || 0);
       setPage(next);

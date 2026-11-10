@@ -1,14 +1,29 @@
 import {
+  accumulateOccupancyKpi,
   aisleDisplayName,
-  aislePositionPlaces,
   blockOccupancyKpis,
   cavaOccupancyKpis,
   cavaTitleOf,
   countSlots,
   depthCodesOf,
+  emptyOccupancyKpis,
+  anyFloorShowsPositions,
+  floorAcrossOf,
+  floorHallToken,
+  floorOverlaps,
+  floorOverlapSection,
+  floorOverlapSections,
+  floorPositionPlaces,
+  floorShowsPositions,
+  floorSpansTwoSections,
+  floorsOverlappingSection,
+  isFloorBlock,
+  isSectionBlock,
+  normalizeSectionType,
   planSections,
   rackTokensOf,
   relatedRacksForAisle,
+  sectionNeighbors,
   slotKey,
   suggestedAisleCode,
 } from "./cavaPlan";
@@ -35,13 +50,11 @@ import {
   SVG_PIECE_GAP,
 } from "./cavaPlanSpacing";
 import {
-  AISLE_BAND_PAD_SVG,
-  AISLE_DOT_SVG,
   AISLE_POS_GAP_SVG,
-  aisleBandThickness,
   aisleGroupBoxSize,
   aisleGroupSpan,
   chunkAislePlaces,
+  sectionBandBaseSize,
 } from "./cavaAisleVisual";
 
 const PLACEHOLDER = "#f59e0b";
@@ -62,9 +75,6 @@ const AISLE = SVG_AISLE_SIZE;
 /** V↔H al lado y arriba/abajo: mismo valor que el modal (escalado). */
 const CROSS_ORIENTATION_GAP = SVG_CROSS_GAP;
 const ROW_GAP = PIECE_GAP;
-const DIVIDER = 1;
-const DIVIDER_GAP = PIECE_GAP;
-const DIVIDER_FILL = "#000000";
 const PAD = 28;
 const HEADER = 68;
 const KPI_H = 22;
@@ -180,58 +190,202 @@ function measureRack(block, blocks, rackPrefix, planLayout) {
 
 /** Ver cavaAisleVisual.js — misma geometría que el modal. */
 const AISLE_POS_GAP = AISLE_POS_GAP_SVG;
-const AISLE_DOT = AISLE_DOT_SVG;
+
+function measureFloorAlong(block, planLayout, vertical) {
+  if (!floorShowsPositions(block, planLayout)) return 0;
+  const places = floorPositionPlaces(block);
+  if (!places.length) return 0;
+  const across = floorAcrossOf(block);
+  const groups = chunkAislePlaces(places, across);
+  return aisleGroupSpan(groups, { aisleVertical: vertical, svg: true, across });
+}
+
+function measureRestingFloorAlong(block, scope, planLayout, vertical) {
+  if (!isFloorBlock(block)) return 0;
+  if (floorOverlaps(block) && floorOverlapSections(scope, block).length) return 0;
+  return measureFloorAlong(block, planLayout, vertical);
+}
+
+/** Pisos vecinos o que solapan (largo = solo posiciones, sin KPI). */
+function measureFloorsAlongSection(scope, section, planLayout, vertical) {
+  const list = scope || [];
+  const overlapping = list.filter(
+    (block) =>
+      floorOverlaps(block) && floorOverlapSections(list, block).includes(section),
+  );
+  if (overlapping.length) {
+    return Math.max(
+      0,
+      ...overlapping.map((item) => measureFloorAlong(item, planLayout, vertical)),
+    );
+  }
+  const index = list.indexOf(section);
+  if (index < 0) return 0;
+  const neighbors = [];
+  if (index > 0 && isFloorBlock(list[index - 1])) neighbors.push(list[index - 1]);
+  if (index < list.length - 1 && isFloorBlock(list[index + 1])) neighbors.push(list[index + 1]);
+  return Math.max(
+    0,
+    ...neighbors.map((item) => measureFloorAlong(item, planLayout, vertical)),
+  );
+}
+
+function measureRelatedSpan(block, blocks, rackPrefix, planLayout, scopeBlocks, vertical) {
+  const scope = scopeBlocks || blocks;
+  const sectionType = normalizeSectionType(block.section_type);
+  const floorAlong = measureFloorsAlongSection(scope, block, planLayout, vertical);
+  // Túnel: alto/ancho = largo de posiciones (sin contador).
+  if (sectionType === "tunel" && floorAlong > 0) return floorAlong;
+
+  const related = relatedRacksForAisle(scope, block);
+  const relatedMeasures = related.map((rack) => measureRack(rack, blocks, rackPrefix, planLayout));
+  let rackAlong = 0;
+  if (vertical) {
+    rackAlong = relatedMeasures.length
+      ? Math.max(
+          0,
+          ...relatedMeasures.map(
+            (item) => item.h + (item.places?.length ? AXIS_TOP + AXIS_GAP : 0) + KPI_H + KPI_GAP,
+          ),
+        )
+      : 0;
+  } else {
+    rackAlong = relatedMeasures.length
+      ? Math.max(
+          0,
+          ...relatedMeasures.map((item) => {
+            const axisW = item.places?.length ? AXIS_W + AXIS_GAP : 0;
+            const kpiW = item.horizontal ? KPI_SIDE_W + KPI_INNER_GAP : 0;
+            return kpiW + axisW + item.w;
+          }),
+        )
+      : 0;
+  }
+  if (rackAlong > 0) return rackAlong;
+  if (floorAlong > 0) return floorAlong;
+  return Math.max(
+    0,
+    ...(scope || []).map((item) => measureRestingFloorAlong(item, scope, planLayout, vertical)),
+  );
+}
+
+/** Ancho/alto fit del label de sección (sin vecino relacionado). */
+function sectionFitAlong(label, vertical, base) {
+  const text = String(label || "").trim() || "—";
+  const char = vertical ? 11 : 9;
+  const pad = vertical ? 24 : 32;
+  return Math.max(base, text.length * char + pad);
+}
+
+function measureFloorCross(block, planLayout, vertical) {
+  if (!floorShowsPositions(block, planLayout)) return 0;
+  const places = floorPositionPlaces(block);
+  if (!places.length) return 0;
+  const across = floorAcrossOf(block);
+  const box = aisleGroupBoxSize({ svg: true, aisleVertical: vertical, across });
+  return vertical ? box.w : box.h;
+}
 
 function measureBlock(block, blocks, rackPrefix, aislePrefix, planLayout, scopeBlocks = null) {
-  if (block.kind === "aisle") {
+  if (isSectionBlock(block)) {
+    const sectionType = normalizeSectionType(block.section_type);
     const code = String(block.code || "").trim();
     const label = aisleDisplayName(block);
     const vertical = block.orientation === "vertical";
-    const places = planLayout?.show_aisle_positions ? aislePositionPlaces(block) : [];
     const align = vertical ? stackAlignOf(planLayout, block) : rowAlignOf(planLayout, block);
+    const base = sectionBandBaseSize(sectionType, { emptySize: AISLE });
     const scope = scopeBlocks || blocks;
-    const related = relatedRacksForAisle(scope, block);
-    const relatedMeasures = related.map((rack) => measureRack(rack, blocks, rackPrefix, planLayout));
-    const groupBox = aisleGroupBoxSize({ svg: true, aisleVertical: vertical });
-    const thin = places.length ? aisleBandThickness(groupBox, { svg: true, emptySize: AISLE }) : AISLE;
+    const relatedSpan = measureRelatedSpan(block, blocks, rackPrefix, planLayout, scope, vertical);
+    const fitSpan = sectionType === "division" ? Math.max(base, 48) : sectionFitAlong(label, vertical, base);
+    const along = relatedSpan > 0 ? Math.max(base, relatedSpan) : fitSpan;
+    // Solapar: el pasillo engrosa al tamaño del piso para centrarlo entre racks.
+    const overlayCross = Math.max(
+      0,
+      ...floorsOverlappingSection(scope, block).map((floor) =>
+        measureFloorCross(floor, planLayout, vertical),
+      ),
+    );
+    const cross = Math.max(base, overlayCross);
     if (vertical) {
-      const relatedH = Math.max(
-        128,
-        ...relatedMeasures.map(
-          (item) => item.h + (item.places?.length ? AXIS_TOP + AXIS_GAP : 0) + KPI_H + KPI_GAP,
-        ),
-        0,
-      );
       return {
-        kind: "aisle",
+        kind: "section",
+        sectionType,
         vertical: true,
-        w: thin,
-        h: relatedH,
+        w: cross,
+        h: along,
         label,
         block,
-        places,
+        places: [],
         hall: code,
         align,
       };
     }
-    const relatedW = Math.max(
-      192,
-      ...relatedMeasures.map((item) => {
-        const axisW = item.places?.length ? AXIS_W + AXIS_GAP : 0;
-        const kpiW = item.horizontal ? KPI_SIDE_W + KPI_INNER_GAP : 0;
-        return kpiW + axisW + item.w;
-      }),
-      0,
-    );
     return {
-      kind: "aisle",
+      kind: "section",
+      sectionType,
       vertical: false,
-      w: relatedW,
-      h: thin,
+      w: along,
+      h: cross,
       label,
       block,
-      places,
+      places: [],
       hall: code,
+      align,
+    };
+  }
+  if (isFloorBlock(block)) {
+    const vertical = block.orientation === "vertical";
+    const align = vertical ? stackAlignOf(planLayout, block) : rowAlignOf(planLayout, block);
+    // Oculto: no ocupa espacio ni dibuja etiqueta (evita T1/Piso encima del túnel).
+    if (!floorShowsPositions(block, planLayout)) {
+      return {
+        kind: "floor",
+        vertical,
+        across: floorAcrossOf(block),
+        overlap: true,
+        hidden: true,
+        w: 0,
+        h: 0,
+        label: "",
+        block,
+        places: [],
+        hall: "",
+        align,
+      };
+    }
+    const places = floorPositionPlaces(block);
+    const across = floorAcrossOf(block);
+    const hall = floorHallToken(sectionNeighbors(blocks, block));
+    const groups = chunkAislePlaces(places, across);
+    const groupBox = aisleGroupBoxSize({ svg: true, aisleVertical: vertical, across });
+    const groupSpan = aisleGroupSpan(groups, { aisleVertical: vertical, svg: true, across });
+    const overlap = floorOverlaps(block);
+    // Solo posiciones (sin KPI): el túnel alinea al largo de las celdas.
+    const naturalW = vertical
+      ? groups.length
+        ? groupBox.w
+        : Math.max(24, String(hall || "Piso").length * 7)
+      : groups.length
+        ? groupSpan
+        : Math.max(48, String(hall || "Piso").length * 8);
+    const naturalH = vertical
+      ? groups.length
+        ? groupSpan
+        : 48
+      : groups.length
+        ? groupBox.h
+        : 20;
+    return {
+      kind: "floor",
+      vertical,
+      across,
+      overlap,
+      w: naturalW,
+      h: naturalH,
+      label: hall || "Piso",
+      block,
+      places,
+      hall,
       align,
     };
   }
@@ -260,18 +414,14 @@ function measureSideColumn(blocks, blocksAll, rackPrefix, aislePrefix, planLayou
   );
   let w = 0;
   let h = 0;
-  items.forEach((item, index) => {
-    if (index > 0) {
-      const prev = items[index - 1];
-      const contiguous = prev.kind === "rack" && item.kind === "rack";
-      w += contiguous ? DIVIDER_GAP + DIVIDER + DIVIDER_GAP : RACK_GAP;
-    }
-    w += item.w;
-    h = Math.max(h, item.h + sideItemTop(item));
-  });
-  // Pasillos verticales = altura de la columna (tope a tope con la hilera más alta).
+  let laid = 0;
   items.forEach((item) => {
-    if (item.kind === "aisle" && item.vertical) item.h = h;
+    // Solapar: no suma ancho ni alto a la columna (solo overlay).
+    if (item.kind === "floor" && item.overlap) return;
+    h = Math.max(h, item.h + sideItemTop(item));
+    if (laid > 0) w += RACK_GAP;
+    w += item.w;
+    laid += 1;
   });
   return { items, w, h };
 }
@@ -304,31 +454,27 @@ function finalizeHorizontalRows(middleRows) {
     ...middleRows.filter((row) => row.block.kind === "rack").map((row) => row.contentW),
   );
   middleRows.forEach((row) => {
-    if (row.item.kind === "aisle" && !row.item.vertical && rackTrack > 0) {
-      row.item.w = Math.max(row.item.w, rackTrack);
-      row.contentW = row.axisW + row.item.w;
+    if (row.item.vertical || rackTrack < 1) return;
+    if (row.item.kind === "floor") {
+      // Piso: fit-content; no estirar a la pista. Solapado no suma fila propia.
+      row.contentW = row.item.overlap ? 0 : row.axisW + row.item.w;
+      return;
     }
+    if (row.item.kind !== "section") return;
+    row.contentW = row.axisW + row.item.w;
   });
   const trackW = Math.max(rackTrack, ...middleRows.map((row) => row.contentW), 0);
   middleRows.forEach((row) => {
     row.w = trackW;
     row.dividerW = 0;
   });
-  for (let index = 1; index < middleRows.length; index += 1) {
-    const prev = middleRows[index - 1];
-    const row = middleRows[index];
-    if (prev.block.kind === "rack" && row.block.kind === "rack") {
-      row.dividerW = Math.max(prev.contentW, row.contentW, rackTrack);
-    }
-  }
   let middleH = 0;
-  middleRows.forEach((row, index) => {
-    if (index > 0) {
-      const prev = middleRows[index - 1];
-      const contiguous = prev.block.kind === "rack" && row.block.kind === "rack";
-      middleH += contiguous ? DIVIDER_GAP + DIVIDER + DIVIDER_GAP : ROW_GAP;
-    }
+  let laid = 0;
+  middleRows.forEach((row) => {
+    if (row.item.kind === "floor" && row.item.overlap) return;
+    if (laid > 0) middleH += ROW_GAP;
     middleH += row.h;
+    laid += 1;
   });
   return { middleRows, trackW, middleH, w: trackW, h: middleH };
 }
@@ -341,20 +487,11 @@ function measureHorizontalBand(bandBlocks, blocks, rackPrefix, aislePrefix, plan
   return finalizeHorizontalRows(middleRows);
 }
 
-function stretchVerticalAisles(column) {
-  (column.items || []).forEach((item) => {
-    if (item.kind === "aisle" && item.vertical) {
-      item.h = column.h;
-    }
-  });
-}
-
 function measureSection(section, blocks, rackPrefix, aislePrefix, planLayout) {
   const axis = section.axis === "vertical" ? "vertical" : "horizontal";
   if (axis === "vertical") {
     const before = measureHorizontalBand(section.before, blocks, rackPrefix, aislePrefix, planLayout);
     const main = measureSideColumn(section.main, blocks, rackPrefix, aislePrefix, planLayout);
-    stretchVerticalAisles(main);
     const after = measureHorizontalBand(section.after, blocks, rackPrefix, aislePrefix, planLayout);
     // Mismo hueco que vertical individual ↔ horizontales al lado.
     const bandGaps =
@@ -366,14 +503,11 @@ function measureSection(section, blocks, rackPrefix, aislePrefix, planLayout) {
   }
 
   const before = measureSideColumn(section.before, blocks, rackPrefix, aislePrefix, planLayout);
-  stretchVerticalAisles(before);
   const after = measureSideColumn(section.after, blocks, rackPrefix, aislePrefix, planLayout);
-  stretchVerticalAisles(after);
   const main = measureHorizontalBand(section.main, blocks, rackPrefix, aislePrefix, planLayout);
   const h = Math.max(before.h, after.h, main.h, 0);
   [before, after].forEach((column) => {
     column.h = Math.max(column.h, h);
-    stretchVerticalAisles(column);
   });
   const sideGaps =
     (before.w && main.w ? CROSS_ORIENTATION_GAP : 0) +
@@ -406,9 +540,6 @@ function expandSectionsToModalWidth(sections, masterAxis) {
       if (needH > section.h && section.main) {
         section.main.drawH = (section.main.h || 0) + (needH - section.h);
         section.h = needH;
-        (section.main.items || []).forEach((item) => {
-          if (item.kind === "aisle" && item.vertical) item.h = section.main.drawH;
-        });
       } else if (section.main) {
         section.main.drawH = section.main.h;
       }
@@ -527,112 +658,125 @@ function drawItem(parts, item, x, y, occupancy) {
     parts.push(text(x + item.w / 2, y + item.h / 2, item.text));
     return;
   }
-  if (item.kind === "aisle") {
-    parts.push(`<rect x="${x}" y="${y}" width="${item.w}" height="${item.h}" fill="${AISLE_FILL}"/>`);
-    const places = item.places || [];
-    const groups = chunkAislePlaces(places);
-    const align = item.align || "start";
-    const pad = AISLE_BAND_PAD_SVG;
-    const showKpi = groups.length > 0;
-    const kpiTotal = showKpi ? blockOccupancyKpis(item.block, null, occupancy).total : 0;
-    const kpiGap = showKpi ? AISLE_POS_GAP : 0;
-    const cellStroke = `stroke="${PLACEHOLDER}" stroke-width="1.5" stroke-dasharray="4 3"`;
-    const aisleVertical = Boolean(item.vertical);
-    const boxSize = aisleGroupBoxSize({ svg: true, aisleVertical });
-    // Mismo margen en V y H (no centrar en un piso AISLE más ancho/alto).
-    const crossX = x + pad;
-    const crossY = y + pad;
-    const drawGroupCell = (chunk, cellX, cellY) => {
-      parts.push(`<rect x="${cellX}" y="${cellY}" width="${boxSize.w}" height="${boxSize.h}" fill="#ffffff" ${cellStroke}/>`);
-      const innerX = cellX + boxSize.pad;
-      const innerY = cellY + boxSize.pad;
-      chunk.forEach((place, index) => {
-        const marks = occupancy[slotKey(item.hall || "", "", place)] || [];
-        const mark = marks[0];
-        const step = index * (boxSize.dot + boxSize.gap);
-        const dotX = aisleVertical ? innerX + step : innerX + (boxSize.contentW - boxSize.dot) / 2;
-        const dotY = aisleVertical ? innerY + (boxSize.contentH - boxSize.dot) / 2 : innerY + step;
-        if (mark) {
-          parts.push(
-            `<rect x="${dotX}" y="${dotY}" width="${boxSize.dot}" height="${boxSize.dot}" fill="${markFill(mark)}"/>`,
-          );
-        } else {
-          parts.push(
-            `<rect x="${dotX}" y="${dotY}" width="${boxSize.dot}" height="${boxSize.dot}" fill="none" stroke="${PLACEHOLDER}" stroke-width="1.25"/>`,
-          );
-        }
-      });
-      return boxSize;
-    };
+  if (item.kind === "section") {
+    const sectionType = item.sectionType || "pasillo";
+    if (sectionType === "division") {
+      if (item.vertical) {
+        parts.push(`<rect x="${x}" y="${y}" width="1" height="${item.h}" fill="${LINE}"/>`);
+      } else {
+        parts.push(`<rect x="${x}" y="${y}" width="${item.w}" height="1" fill="${LINE}"/>`);
+      }
+      return;
+    }
+    const fill = sectionType === "tunel" ? "#e2e8f0" : AISLE_FILL;
+    const dash = sectionType === "tunel" ? "4 4" : "8 6";
+    const strokeW = sectionType === "tunel" ? 1 : 2;
+    parts.push(`<rect x="${x}" y="${y}" width="${item.w}" height="${item.h}" fill="${fill}"/>`);
     if (item.vertical) {
-      parts.push(`<line x1="${x + 1}" y1="${y}" x2="${x + 1}" y2="${y + item.h}" stroke="${LINE}" stroke-width="2" stroke-dasharray="8 6"/>`);
-      parts.push(`<line x1="${x + item.w - 1}" y1="${y}" x2="${x + item.w - 1}" y2="${y + item.h}" stroke="${LINE}" stroke-width="2" stroke-dasharray="8 6"/>`);
+      parts.push(`<line x1="${x + 1}" y1="${y}" x2="${x + 1}" y2="${y + item.h}" stroke="${LINE}" stroke-width="${strokeW}" stroke-dasharray="${dash}"/>`);
+      parts.push(`<line x1="${x + item.w - 1}" y1="${y}" x2="${x + item.w - 1}" y2="${y + item.h}" stroke="${LINE}" stroke-width="${strokeW}" stroke-dasharray="${dash}"/>`);
       const cx = x + item.w / 2;
       const cy = y + item.h / 2;
       parts.push(
         `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600" fill="${LABEL}" transform="rotate(90 ${cx} ${cy})">${escapeXml(item.label)}</text>`,
       );
-      const groupSpan = aisleGroupSpan(groups, { aisleVertical: true, svg: true });
-      const kpiBlock = showKpi ? KPI_H + kpiGap : 0;
-      let originY;
-      if (align === "end") {
-        originY = y + item.h - pad - groupSpan;
-      } else if (align === "center") {
-        originY = y + (item.h - groupSpan - kpiBlock) / 2;
-      } else {
-        originY = y + pad;
-      }
-      if (align === "end") {
-        let cursorY = y + item.h - pad;
-        groups.forEach((chunk, groupIndex) => {
-          cursorY -= boxSize.h;
-          drawGroupCell(chunk, crossX, cursorY);
-          if (groupIndex < groups.length - 1) cursorY -= AISLE_POS_GAP;
-        });
-        if (showKpi) {
-          drawHileraKpiTop(parts, kpiTotal, crossX, cursorY - kpiGap - KPI_H, boxSize.w);
+      return;
+    }
+    parts.push(`<line x1="${x}" y1="${y + 1}" x2="${x + item.w}" y2="${y + 1}" stroke="${LINE}" stroke-width="${strokeW}" stroke-dasharray="${dash}"/>`);
+    parts.push(`<line x1="${x}" y1="${y + item.h - 1}" x2="${x + item.w}" y2="${y + item.h - 1}" stroke="${LINE}" stroke-width="${strokeW}" stroke-dasharray="${dash}"/>`);
+    parts.push(text(x + item.w / 2, y + item.h / 2, item.label, { size: 15 }));
+    return;
+  }
+  if (item.kind === "floor") {
+    if (item.hidden || !(item.places || []).length) return;
+    const places = item.places || [];
+    const across = item.across || floorAcrossOf(item.block) || 3;
+    const groups = chunkAislePlaces(places, across);
+    const showKpi = groups.length > 0;
+    // item.hall ya viene del measure (vecinos); no pasar blocks=null.
+    const kpiTotal = showKpi
+      ? (() => {
+          const kpis = emptyOccupancyKpis();
+          const hall = item.hall || "";
+          places.forEach((place) => {
+            (occupancy?.[slotKey(hall, "", place)] || []).forEach((row) =>
+              accumulateOccupancyKpi(kpis, row),
+            );
+          });
+          return kpis.total;
+        })()
+      : 0;
+    const kpiGap = showKpi ? AISLE_POS_GAP : 0;
+    const cellStroke = `stroke="${PLACEHOLDER}" stroke-width="1.5" stroke-dasharray="4 3"`;
+    const aisleVertical = Boolean(item.vertical);
+    const translucent = Boolean(item.overlap);
+    const drawGroupCell = (chunk, cellX, cellY) => {
+      const boxSize = aisleGroupBoxSize({
+        svg: true,
+        aisleVertical,
+        across,
+        count: chunk.length,
+      });
+      if (translucent) parts.push(`<g opacity="0.55">`);
+      parts.push(`<rect x="${cellX}" y="${cellY}" width="${boxSize.w}" height="${boxSize.h}" fill="#ffffff" ${cellStroke}/>`);
+      const markW = boxSize.markW || boxSize.dot;
+      const markH = boxSize.markH || boxSize.dot;
+      const originX = cellX + boxSize.pad;
+      const originY = cellY + boxSize.pad;
+      chunk.forEach((place, index) => {
+        const marks = occupancy[slotKey(item.hall || "", "", place)] || [];
+        const mark = marks[0];
+        const step = index * ((aisleVertical ? markW : markH) + boxSize.gap);
+        const dotX = aisleVertical ? originX + step : originX;
+        const dotY = aisleVertical ? originY : originY + step;
+        if (mark) {
+          parts.push(
+            `<rect x="${dotX}" y="${dotY}" width="${markW}" height="${markH}" fill="${markFill(mark)}"/>`,
+          );
+        } else {
+          parts.push(
+            `<rect x="${dotX}" y="${dotY}" width="${markW}" height="${markH}" fill="none" stroke="${PLACEHOLDER}" stroke-width="1.25"/>`,
+          );
         }
+      });
+      if (translucent) parts.push(`</g>`);
+      return boxSize;
+    };
+    if (!groups.length) {
+      if (item.vertical) {
+        const cx = x + item.w / 2;
+        const cy = y + item.h / 2;
+        parts.push(
+          `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" font-weight="600" fill="${LABEL}" transform="rotate(90 ${cx} ${cy})">${escapeXml(item.label)}</text>`,
+        );
       } else {
-        let cursorY = originY;
-        groups.forEach((chunk, groupIndex) => {
-          drawGroupCell(chunk, crossX, cursorY);
-          cursorY += boxSize.h + (groupIndex < groups.length - 1 ? AISLE_POS_GAP : 0);
-        });
-        if (showKpi) {
-          drawHileraKpiTop(parts, kpiTotal, crossX, cursorY + kpiGap, boxSize.w);
-        }
+        parts.push(text(x + item.w / 2, y + item.h / 2, item.label, { size: 12 }));
       }
       return;
     }
-    parts.push(`<line x1="${x}" y1="${y + 1}" x2="${x + item.w}" y2="${y + 1}" stroke="${LINE}" stroke-width="2" stroke-dasharray="8 6"/>`);
-    parts.push(`<line x1="${x}" y1="${y + item.h - 1}" x2="${x + item.w}" y2="${y + item.h - 1}" stroke="${LINE}" stroke-width="2" stroke-dasharray="8 6"/>`);
-    parts.push(text(x + item.w / 2, y + item.h / 2, item.label, { size: 15 }));
-    const groupSpan = aisleGroupSpan(groups, { aisleVertical: false, svg: true });
-    const kpiBlock = showKpi ? KPI_SIDE_W + kpiGap : 0;
-    const gridY = crossY;
-    if (align === "end") {
-      let cursorX = x + item.w - pad;
+    if (item.vertical) {
+      // Contador arriba, fuera de flujo (no mueve las celdas).
+      let cursorY = y;
+      let firstBox = null;
       groups.forEach((chunk, groupIndex) => {
-        cursorX -= boxSize.w;
-        drawGroupCell(chunk, cursorX, gridY);
-        if (groupIndex < groups.length - 1) cursorX -= AISLE_POS_GAP;
+        const box = drawGroupCell(chunk, x, cursorY);
+        if (!firstBox) firstBox = box;
+        cursorY += box.h + (groupIndex < groups.length - 1 ? AISLE_POS_GAP : 0);
       });
-      if (showKpi) {
-        drawHileraKpiSide(parts, kpiTotal, cursorX - kpiGap - KPI_SIDE_W, gridY, boxSize.h);
+      if (showKpi && firstBox) {
+        drawHileraKpiTop(parts, kpiTotal, x, y - KPI_H - kpiGap, firstBox.w);
       }
-    } else {
-      const originX =
-        align === "center"
-          ? x + (item.w - groupSpan - kpiBlock) / 2
-          : x + pad;
-      let cursorX = originX;
-      groups.forEach((chunk, groupIndex) => {
-        drawGroupCell(chunk, cursorX, gridY);
-        cursorX += boxSize.w + (groupIndex < groups.length - 1 ? AISLE_POS_GAP : 0);
-      });
-      if (showKpi) {
-        drawHileraKpiSide(parts, kpiTotal, cursorX + kpiGap, gridY, boxSize.h);
-      }
+      return;
+    }
+    // Horizontal: contador a la izquierda, fuera de flujo.
+    let cursorX = x;
+    let lastBox = null;
+    groups.forEach((chunk, groupIndex) => {
+      lastBox = drawGroupCell(chunk, cursorX, y);
+      cursorX += lastBox.w + (groupIndex < groups.length - 1 ? AISLE_POS_GAP : 0);
+    });
+    if (showKpi && lastBox) {
+      drawHileraKpiSide(parts, kpiTotal, x - KPI_SIDE_W - kpiGap, y, lastBox.h);
     }
     return;
   }
@@ -759,14 +903,19 @@ function drawHileraKpiSide(parts, value, x, gridY, gridH) {
   parts.push("</g>");
 }
 
+function sideItemDrawnH(item) {
+  if ((item.kind === "section" || item.kind === "floor") && item.vertical) return item.h;
+  return sideItemTop(item) + item.h;
+}
+
 function drawSideColumn(parts, column, x, y, sectionH, occupancy, layout, blocks) {
   const items = column.items || [];
   const areaW = Math.max(column.w, column.drawW || column.w);
   const slack = Math.max(0, areaW - column.w);
-  const aligns = items.map((item) => rowAlignOf(layout, item.block));
-  const allCenter = items.length > 0 && aligns.every((align) => align === "center");
-  const allEnd = items.length > 0 && aligns.every((align) => align === "end");
-  const firstEnd = aligns.findIndex((align) => align === "end");
+  const rowAligns = items.map((item) => rowAlignOf(layout, item.block));
+  const allCenter = items.length > 0 && rowAligns.every((align) => align === "center");
+  const allEnd = items.length > 0 && rowAligns.every((align) => align === "end");
+  const firstEnd = rowAligns.findIndex((align) => align === "end");
   let packDx = 0;
   let slackAt = -1;
   if (allEnd) packDx = slack;
@@ -774,34 +923,93 @@ function drawSideColumn(parts, column, x, y, sectionH, occupancy, layout, blocks
   else if (firstEnd > 0) slackAt = firstEnd;
   else if (firstEnd === 0) packDx = slack;
 
+  // Alto de pista = max(contenido, alto del tramo); solapar no cuenta.
+  const contentH = Math.max(
+    0,
+    ...items
+      .filter((item) => !(item.kind === "floor" && item.overlap))
+      .map((item) => sideItemDrawnH(item)),
+  );
+  const trackH = Math.max(contentH, sectionH);
+
+  const stripBlocks = items.map((entry) => entry.block);
   let cursorX = x + packDx;
-  items.forEach((item, index) => {
-    if (index === slackAt) cursorX += slack;
-    if (index > 0) {
-      const prev = items[index - 1];
-      const contiguous = prev.kind === "rack" && item.kind === "rack";
-      if (contiguous) {
-        cursorX += DIVIDER_GAP;
-        const dividerH = Math.max(prev.h + sideItemTop(prev), item.h + sideItemTop(item));
-        parts.push(
-          `<rect x="${cursorX}" y="${y}" width="${DIVIDER}" height="${dividerH}" fill="${DIVIDER_FILL}"/>`,
-        );
-        cursorX += DIVIDER + DIVIDER_GAP;
-      } else {
-        cursorX += RACK_GAP;
-      }
+  let laid = 0;
+  let index = 0;
+  while (index < items.length) {
+    const item = items[index];
+    if (item.kind === "floor" && item.overlap) {
+      index += 1;
+      continue;
     }
-    if (item.kind === "aisle" && item.vertical) {
-      drawItem(parts, { ...item, h: sectionH }, cursorX, y, occupancy);
+    const mid = items[index + 1];
+    const right = items[index + 2];
+    if (
+      item.kind === "section" &&
+      item.vertical &&
+      mid?.kind === "floor" &&
+      mid.overlap &&
+      right?.kind === "section" &&
+      right.vertical &&
+      floorSpansTwoSections(stripBlocks, mid.block)
+    ) {
+      if (index === slackAt) cursorX += slack;
+      if (laid > 0) cursorX += RACK_GAP;
+      const groupH = Math.max(sideItemDrawnH(item), sideItemDrawnH(right));
+      const floorAlign = stackAlignOf(layout, mid.block);
+      const groupDy = rowAlignOffset(floorAlign, trackH - groupH);
+      const startX = cursorX;
+      drawItem(parts, item, cursorX, y + groupDy, occupancy);
+      cursorX += item.w + RACK_GAP;
+      drawItem(parts, right, cursorX, y + groupDy, occupancy);
+      cursorX += right.w;
+      const spanW = cursorX - startX;
+      // Cabe en el alto del tramo (no desborda el marco).
+      drawFloorOverlayInBox(
+        parts,
+        mid,
+        startX,
+        y + groupDy,
+        groupH,
+        spanW,
+        occupancy,
+        { vertical: true, align: floorAlign },
+      );
+      laid += 1;
+      index += 3;
+      continue;
+    }
+    if (index === slackAt) cursorX += slack;
+    if (laid > 0) cursorX += RACK_GAP;
+    laid += 1;
+    const itemH = sideItemDrawnH(item);
+    const itemDy = rowAlignOffset(stackAlignOf(layout, item.block), trackH - itemH);
+    if ((item.kind === "section" || item.kind === "floor") && item.vertical) {
+      drawItem(parts, item, cursorX, y + itemDy, occupancy);
+      if (item.kind === "section") {
+        floorsOverlappingSection(stripBlocks, item.block).forEach((floorBlock) => {
+          const floorItem = items.find((entry) => entry.block === floorBlock);
+          if (!floorItem) return;
+          const floorAlign = stackAlignOf(layout, floorBlock);
+          drawFloorOverlayInBox(
+            parts,
+            floorItem,
+            cursorX,
+            y + itemDy,
+            item.h,
+            item.w,
+            occupancy,
+            { vertical: true, align: floorAlign },
+          );
+        });
+      }
       cursorX += item.w;
-      return;
+      index += 1;
+      continue;
     }
     const kpiTop = sideItemKpiTop(item);
     const topAxis = sideItemTopAxis(item);
-    const itemH = kpiTop + topAxis + item.h;
-    const stackAlign = stackAlignOf(layout, item.block);
-    const dy = rowAlignOffset(stackAlign, sectionH - itemH);
-    let bodyY = y + dy;
+    let bodyY = y + itemDy;
     if (kpiTop && item.kind === "rack") {
       const kpis = blockOccupancyKpis(item.block, blocks, occupancy);
       const labelLeft = item.labelSide === "above";
@@ -816,31 +1024,102 @@ function drawSideColumn(parts, column, x, y, sectionH, occupancy, layout, blocks
     }
     drawItem(parts, item, cursorX, bodyY, occupancy);
     cursorX += item.w;
-  });
+    index += 1;
+  }
+}
+
+/**
+ * Piso solapado en SVG: cabe en la caja del pasillo/pista (no se sale del marco).
+ * scale uniforme si el largo natural supera boxAlong.
+ */
+function drawFloorOverlayInBox(
+  parts,
+  floorItem,
+  boxX,
+  boxY,
+  boxAlong,
+  boxCross,
+  occupancy,
+  { vertical = false, align = "start" } = {},
+) {
+  if (!floorItem || floorItem.hidden) return;
+  const naturalAlong = vertical ? floorItem.h : floorItem.w;
+  const scale =
+    naturalAlong > boxAlong && boxAlong > 0 ? boxAlong / naturalAlong : 1;
+  const drawnW = floorItem.w * scale;
+  const drawnH = floorItem.h * scale;
+  let ox;
+  let oy;
+  if (vertical) {
+    ox = boxX + Math.round((boxCross - drawnW) / 2);
+    oy = boxY + rowAlignOffset(align, boxAlong - drawnH);
+  } else {
+    ox = boxX + rowAlignOffset(align, boxAlong - drawnW);
+    oy = boxY + Math.round((boxCross - drawnH) / 2);
+  }
+  if (scale === 1) {
+    drawItem(parts, floorItem, ox, oy, occupancy);
+    return;
+  }
+  parts.push(`<g transform="translate(${ox} ${oy}) scale(${scale})">`);
+  drawItem(parts, floorItem, 0, 0, occupancy);
+  parts.push(`</g>`);
 }
 
 function drawHorizontalRows(parts, rows, x, y, trackW, occupancy, layout, blocks) {
+  const list = rows || [];
+  const stripBlocks = list.map((row) => row.block);
   let midY = y;
-  (rows || []).forEach((row, rowIndex) => {
-    if (rowIndex > 0) {
-      const prev = rows[rowIndex - 1];
-      const contiguous = prev.block.kind === "rack" && row.block.kind === "rack";
-      if (contiguous) {
-        midY += DIVIDER_GAP;
-        const dividerW = row.dividerW || Math.max(prev.contentW, row.contentW);
-        const groupAlign =
-          prev.contentW >= row.contentW
-            ? rowAlignOf(layout, prev.block)
-            : rowAlignOf(layout, row.block);
-        const groupDx = rowAlignOffset(groupAlign, trackW - dividerW);
-        parts.push(
-          `<rect x="${x + groupDx}" y="${midY}" width="${dividerW}" height="${DIVIDER}" fill="${DIVIDER_FILL}"/>`,
-        );
-        midY += DIVIDER + DIVIDER_GAP;
-      } else {
-        midY += ROW_GAP;
-      }
+  let laid = 0;
+  let index = 0;
+  while (index < list.length) {
+    const row = list[index];
+    if (row.item.kind === "floor" && row.item.overlap) {
+      index += 1;
+      continue;
     }
+    const mid = list[index + 1];
+    const bottom = list[index + 2];
+    if (
+      row.item.kind === "section" &&
+      !row.item.vertical &&
+      mid?.item.kind === "floor" &&
+      mid.item.overlap &&
+      bottom?.item.kind === "section" &&
+      !bottom.item.vertical &&
+      floorSpansTwoSections(stripBlocks, mid.block)
+    ) {
+      if (laid > 0) midY += ROW_GAP;
+      const floorAlign = rowAlignOf(layout, mid.block);
+      const startY = midY;
+      const drawSectionRow = (entry) => {
+        const contentW = entry.contentW || entry.item.w;
+        const dx = rowAlignOffset(floorAlign, trackW - contentW);
+        const rowX = x + dx;
+        drawItem(parts, entry.item, rowX, midY, occupancy);
+        midY += entry.h;
+      };
+      drawSectionRow(row);
+      midY += ROW_GAP;
+      drawSectionRow(bottom);
+      const spanH = midY - startY;
+      // Cabe en el ancho de la pista (no desborda el marco).
+      drawFloorOverlayInBox(
+        parts,
+        mid.item,
+        x,
+        startY,
+        trackW,
+        spanH,
+        occupancy,
+        { vertical: false, align: floorAlign },
+      );
+      laid += 1;
+      index += 3;
+      continue;
+    }
+    if (laid > 0) midY += ROW_GAP;
+    laid += 1;
     const align = rowAlignOf(layout, row.block);
     const contentW = row.contentW || (row.kpiSideW || 0) + row.axisW + row.item.w;
     const dx = rowAlignOffset(align, trackW - contentW);
@@ -865,8 +1144,26 @@ function drawHorizontalRows(parts, rows, x, y, trackW, occupancy, layout, blocks
       bodyY = midY + row.axisTopH;
     }
     drawItem(parts, row.item, rowX, bodyY, occupancy);
+    if (row.item.kind === "section") {
+      floorsOverlappingSection(stripBlocks, row.block).forEach((floorBlock) => {
+        const floorRow = list.find((entry) => entry.block === floorBlock);
+        if (!floorRow) return;
+        const floorAlign = rowAlignOf(layout, floorBlock);
+        drawFloorOverlayInBox(
+          parts,
+          floorRow.item,
+          rowX,
+          bodyY,
+          row.item.w,
+          row.item.h,
+          occupancy,
+          { vertical: false, align: floorAlign },
+        );
+      });
+    }
     midY += row.h;
-  });
+    index += 1;
+  }
   return midY;
 }
 
@@ -885,9 +1182,9 @@ export function buildCavaPlanSvg({ name, code, blocks, nomenclature, occupancy =
   const frameInnerLeft = contentOriginX;
   const frameInnerRight = contentOriginX + contentWidth;
   const title = cavaTitleOf(name, code);
-  const showAislePositions = Boolean(layout.show_aisle_positions);
-  const total = countSlots(blocks, { includeAislePositions: showAislePositions });
-  const cavaKpis = cavaOccupancyKpis(occupancy, { includeAislePositions: showAislePositions });
+  const floorVisible = anyFloorShowsPositions(blocks, layout);
+  const total = countSlots(blocks, { planLayout: layout });
+  const cavaKpis = cavaOccupancyKpis(occupancy, { includeFloorPositions: floorVisible });
   const shownTotal = cavaKpis.total || total;
   const parts = [];
   let y = PAD + HEADER + FRAME;

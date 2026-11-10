@@ -12,8 +12,8 @@ export function cavaTitleOf(name, code) {
 }
 
 /**
- * Token de pasillo desde el nombre: máx. 2 iniciales + último número suelto.
- * «Pasillo 1» → P1 · «Tunel Tunel» → TT · «pedro pelon peludo» → PP.
+ * Token de sección desde el nombre: máx. 2 iniciales + último número suelto.
+ * «Pasillo 1» → P1 · «Tunel Tunel» → TT · «Linea 1» → L1.
  */
 export function aisleTokenFromName(name) {
   const raw = String(name || "").trim();
@@ -42,26 +42,54 @@ export function uniqueAisleToken(name, used = []) {
   return `${stem}${next}`;
 }
 
-/** Nombre visible del pasillo (campo name; fallback legacy). */
+export const SECTION_TYPES = [
+  { value: "pasillo", label: "Pasillo" },
+  { value: "tunel", label: "Túnel" },
+  { value: "division", label: "División" },
+];
+
+export function normalizeSectionType(value) {
+  if (value === "tunel" || value === "division") return value;
+  return "pasillo";
+}
+
+export function isSectionBlock(block) {
+  return block?.kind === "section" || block?.kind === "aisle";
+}
+
+export function isFloorBlock(block) {
+  return block?.kind === "floor";
+}
+
+export function isNamedSection(block) {
+  return isSectionBlock(block) && Boolean(String(block?.code || "").trim());
+}
+
+/** Nombre visible de la sección. */
 export function aisleDisplayName(blockOrName) {
   if (blockOrName && typeof blockOrName === "object") {
     const name = String(blockOrName.name || "").trim();
     if (name) return name;
     const code = String(blockOrName.code || "").trim();
-    if (!code) return "Pasillo";
-    return /^\d+$/.test(code) ? `Pasillo ${code}` : code;
+    const type = normalizeSectionType(blockOrName.section_type);
+    const fallback =
+      type === "tunel" ? "Túnel" : type === "division" ? "Línea" : "Pasillo";
+    if (!code) return fallback;
+    return /^\d+$/.test(code) ? `${fallback} ${code}` : code;
   }
   const token = String(blockOrName || "").trim();
   if (!token) return "Pasillo";
   return /^\d+$/.test(token) ? `Pasillo ${token}` : token;
 }
 
+export const sectionDisplayName = aisleDisplayName;
+
 /** Resuelve el nombre visible desde el token (code) buscando el bloque. */
 export function aisleLabelForCode(blocks, code) {
   const token = String(code || "").trim();
   if (!token) return "Pasillo";
   const block = (blocks || []).find(
-    (item) => item.kind === "aisle" && String(item.code || "").trim() === token,
+    (item) => isNamedSection(item) && String(item.code || "").trim() === token,
   );
   return aisleDisplayName(block || token);
 }
@@ -85,23 +113,107 @@ export function rackTokensOf(block) {
   return [];
 }
 
-/** Places 01..N de sobre-almacenamiento en un pasillo. */
-export function aislePositionPlaces(block) {
-  if (block?.kind !== "aisle") return [];
+/** Secciones inmediatas prev/next con token. */
+export function sectionNeighbors(blocks, indexOrBlock) {
+  const list = blocks || [];
+  const index =
+    typeof indexOrBlock === "number" ? indexOrBlock : list.indexOf(indexOrBlock);
+  if (index < 0) return [];
+  const found = [];
+  if (index > 0 && isNamedSection(list[index - 1])) found.push(list[index - 1]);
+  if (index < list.length - 1 && isNamedSection(list[index + 1])) found.push(list[index + 1]);
+  return found;
+}
+
+export function floorHallToken(neighbors) {
+  return (neighbors || [])
+    .map((block) => String(block?.code || "").trim())
+    .filter(Boolean)
+    .join("-");
+}
+
+export function floorIsActive(blocks, floorBlock) {
+  return sectionNeighbors(blocks, floorBlock).length >= 1;
+}
+
+/** Piso dibujado encima de la sección vecina (no ocupa columna propia). */
+export function floorOverlaps(block) {
+  return isFloorBlock(block) && block?.overlap === true;
+}
+
+/** Secciones vecinas sobre las que solapa un piso (1 o 2). */
+export function floorOverlapSections(blocks, floorBlock) {
+  if (!floorOverlaps(floorBlock)) return [];
+  return sectionNeighbors(blocks, floorBlock);
+}
+
+/** Sección única de solapar (si hay dos, null — se abarcan ambas). */
+export function floorOverlapSection(blocks, floorBlock) {
+  const neighbors = floorOverlapSections(blocks, floorBlock);
+  return neighbors.length === 1 ? neighbors[0] : null;
+}
+
+/** Piso entre dos secciones contiguas (solapa ambos pasillos). */
+export function floorSpansTwoSections(blocks, floorBlock) {
+  return floorOverlapSections(blocks, floorBlock).length >= 2;
+}
+
+/** Pisos del scope que solapan solo esta sección (un vecino). */
+export function floorsOverlappingSection(blocks, sectionBlock) {
+  const list = blocks || [];
+  if (!isNamedSection(sectionBlock) && !isSectionBlock(sectionBlock)) return [];
+  return list.filter((block) => floorOverlapSection(list, block) === sectionBlock);
+}
+
+/** Places 01..N de posiciones de piso. */
+export function floorPositionPlaces(block) {
+  if (!isFloorBlock(block)) return [];
   const count = Math.max(0, Number(block.rack_count) || 0);
   if (count < 1) return [];
   return Array.from({ length: count }, (_, index) => String(index + 1).padStart(2, "0"));
+}
+
+/** Piso visible: check general del plano, o «siempre visible» del bloque. */
+export function floorShowsPositions(block, planLayout = null) {
+  if (!isFloorBlock(block)) return false;
+  if (block?.always_visible === true) return true;
+  return Boolean(planLayout?.show_floor_positions);
+}
+
+/** Algún piso del plano se muestra (KPI / conteo). */
+export function anyFloorShowsPositions(blocks, planLayout = null) {
+  if (Boolean(planLayout?.show_floor_positions)) return true;
+  return (blocks || []).some((block) => isFloorBlock(block) && block?.always_visible === true);
+}
+
+/** Cuántas posiciones caben por grupo en la hilera (dimensión). Default 3. */
+export function floorAcrossOf(block) {
+  const raw = Number(block?.depth);
+  if (!Number.isFinite(raw) || raw < 1) return 3;
+  return Math.floor(raw);
+}
+
+/** @deprecated usar floorPositionPlaces */
+export function aislePositionPlaces(block) {
+  if (isFloorBlock(block)) return floorPositionPlaces(block);
+  return [];
 }
 
 export function isAisleOverflowPosition(row) {
   return Boolean(row) && !String(row.rack || "").trim();
 }
 
-export function countSlots(blocks, { includeAislePositions = false } = {}) {
+export function countSlots(
+  blocks,
+  { includeFloorPositions = false, includeAislePositions, planLayout = null } = {},
+) {
+  const includeAllFloor = includeFloorPositions || includeAislePositions;
   return (blocks || []).reduce((total, block) => {
-    if (block.kind === "aisle") {
-      return includeAislePositions ? total + aislePositionPlaces(block).length : total;
+    if (isFloorBlock(block)) {
+      const show = includeAllFloor || floorShowsPositions(block, planLayout);
+      return show ? total + floorPositionPlaces(block).length : total;
     }
+    if (isSectionBlock(block)) return total;
     if (block.kind !== "rack") return total;
     const levels = Number(block.levels) || 0;
     const racks = rackTokensOf(block).length;
@@ -128,12 +240,12 @@ export function accumulateOccupancyKpi(kpis, row) {
   else kpis.libre += 1;
 }
 
-/** KPIs de una hilera (block rack) según occupancy del plano. */
+/** KPIs de una hilera (block rack/floor) según occupancy del plano. */
 export function blockOccupancyKpis(block, blocks, occupancy) {
   const kpis = emptyOccupancyKpis();
-  if (block?.kind === "aisle") {
-    const hall = String(block.code || "").trim();
-    aislePositionPlaces(block).forEach((place) => {
+  if (isFloorBlock(block)) {
+    const hall = floorHallToken(sectionNeighbors(blocks, block));
+    floorPositionPlaces(block).forEach((place) => {
       const marks = occupancy?.[slotKey(hall, "", place)] || [];
       marks.forEach((row) => accumulateOccupancyKpi(kpis, row));
     });
@@ -152,12 +264,13 @@ export function blockOccupancyKpis(block, blocks, occupancy) {
   return kpis;
 }
 
-/** KPIs totales de la cava. includeAislePositions=false omite sobre-almacenamiento. */
-export function cavaOccupancyKpis(occupancy, { includeAislePositions = true } = {}) {
+/** KPIs totales de la cava. */
+export function cavaOccupancyKpis(occupancy, { includeFloorPositions = true, includeAislePositions } = {}) {
+  const includeFloor = includeAislePositions ?? includeFloorPositions;
   const kpis = emptyOccupancyKpis();
   Object.values(occupancy || {}).forEach((marks) => {
     (marks || []).forEach((row) => {
-      if (!includeAislePositions && isAisleOverflowPosition(row)) return;
+      if (!includeFloor && isAisleOverflowPosition(row)) return;
       accumulateOccupancyKpi(kpis, row);
     });
   });
@@ -218,27 +331,29 @@ export function planSections(blocks, { axis = "horizontal" } = {}) {
   return sections;
 }
 
-/** Sentinel: Sin pasillo explícito (no heredar vecino). */
+/** Sentinel: Sin sección explícita (no heredar vecino). */
 export const AISLE_NONE = "-";
 
 export function isAisleNone(value) {
   return String(value || "").trim() === AISLE_NONE;
 }
 
-/** Pasillo contiguo en la lista (abajo primero, luego arriba; para al llegar a otro rack). */
+/** Sección contigua en la lista (abajo primero, luego arriba). */
 export function neighborAisleCode(blocks, block) {
   const list = blocks || [];
   const index = list.indexOf(block);
   if (index < 0 || block?.kind !== "rack") return "";
   for (let cursor = index + 1; cursor < list.length; cursor += 1) {
     if (list[cursor].kind === "rack") break;
-    if (list[cursor].kind !== "aisle") continue;
+    if (list[cursor].kind === "floor") continue;
+    if (!isNamedSection(list[cursor])) continue;
     const code = String(list[cursor].code || "").trim();
     if (code) return code;
   }
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
     if (list[cursor].kind === "rack") break;
-    if (list[cursor].kind !== "aisle") continue;
+    if (list[cursor].kind === "floor") continue;
+    if (!isNamedSection(list[cursor])) continue;
     const code = String(list[cursor].code || "").trim();
     if (code) return code;
   }
@@ -246,8 +361,8 @@ export function neighborAisleCode(blocks, block) {
 }
 
 /**
- * Pasillo efectivo del rack: explícito, o cercanía si aisle_code vacío.
- * AISLE_NONE / "-" → sin pasillo (nomenclatura sin P).
+ * Sección efectiva del rack: explícito, o cercanía si aisle_code vacío.
+ * AISLE_NONE / "-" → sin sección.
  */
 export function suggestedAisleCode(blocks, block) {
   if (block?.kind !== "rack") return "";
@@ -257,7 +372,7 @@ export function suggestedAisleCode(blocks, block) {
   return neighborAisleCode(blocks, block);
 }
 
-/** Valor del select: Sin pasillo, código guardado, o preselección por cercanía. */
+/** Valor del select: Sin sección, código guardado, o preselección por cercanía. */
 export function aisleSelectValue(blocks, block) {
   if (block?.kind !== "rack") return "";
   const chosen = String(block.aisle_code || "").trim();
@@ -273,10 +388,10 @@ export function aisleCodeFromSelect(blocks, block, selected) {
   return neighborAisleCode(blocks, block) ? AISLE_NONE : "";
 }
 
-/** Racks ligados a un pasillo por aisle_code / herencia (o vecino si nadie lo asignó). */
+/** Racks ligados a una sección por aisle_code / herencia. */
 export function relatedRacksForAisle(blocks, aisle) {
   const list = blocks || [];
-  if (!aisle || aisle.kind !== "aisle") return [];
+  if (!isNamedSection(aisle)) return [];
   const code = String(aisle.code || "").trim();
   if (code) {
     const linked = list.filter((block) => {
@@ -296,7 +411,7 @@ export function relatedRacksForAisle(blocks, aisle) {
   return [];
 }
 
-/** Agrupa racks contiguos (espalda-espalda) y pasillos sueltos. */
+/** Agrupa racks contiguos (espalda-espalda) y bloques sueltos. */
 export function contiguousBlockGroups(blocks) {
   const groups = [];
   for (const block of blocks || []) {
@@ -312,13 +427,25 @@ export function contiguousBlockGroups(blocks) {
 
 export function blocksPayload(blocks) {
   return (blocks || []).map((block) => {
-    if (block.kind === "aisle") {
+    if (isSectionBlock(block)) {
       const name = String(block.name || "").trim();
+      const section_type = normalizeSectionType(block.section_type);
       return {
-        kind: "aisle",
+        kind: "section",
+        section_type,
         name,
         code: String(block.code || "").trim(),
+        rack_count: 0,
+        orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
+      };
+    }
+    if (isFloorBlock(block)) {
+      return {
+        kind: "floor",
         rack_count: Math.max(0, Number(block.rack_count) || 0),
+        depth: floorAcrossOf(block),
+        overlap: block.overlap === true,
+        always_visible: block.always_visible === true,
         orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
       };
     }

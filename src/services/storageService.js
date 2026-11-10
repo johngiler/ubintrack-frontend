@@ -117,15 +117,26 @@ export async function getPositions(page = 1, filters = {}, search = "") {
   return response.data;
 }
 
-export async function getCellPositions({ cavaId, hall = "", rack, place, page = 1 }) {
+export async function getCellPositions({
+  cavaId,
+  hall = "",
+  rack,
+  place,
+  places,
+  page = 1,
+}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: "100",
     cava: String(cavaId),
     hall: hall ?? "",
     rack: String(rack ?? ""),
-    place: String(place ?? ""),
   });
+  if (Array.isArray(places) && places.length) {
+    params.set("place_in", places.map(String).join(","));
+  } else if (place != null && place !== "") {
+    params.set("place", String(place));
+  }
   const response = await httpClient.get(`/api/positions/?${params.toString()}`);
   return response.data;
 }
