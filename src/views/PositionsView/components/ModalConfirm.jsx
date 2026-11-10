@@ -4,20 +4,45 @@ import { useState } from "react";
 import { Trash2, X } from "lucide-react";
 
 import { Modal, Button } from "@/components/ui/bootstrap";
-import { deletePosition } from "@/services/storageService";
+import { bulkDeletePositions, deletePosition } from "@/services/storageService";
 
-export default function ModalConfirm({ show, onHide, position, onDelete, showAlert }) {
+export default function ModalConfirm({
+  show,
+  onHide,
+  position,
+  positionIds,
+  onDelete,
+  showAlert,
+}) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const fromSelection = Array.isArray(positionIds) && positionIds.length > 0;
+  const ids = fromSelection
+    ? positionIds
+    : position?.id
+      ? [position.id]
+      : [];
+  const isBulk = fromSelection;
 
   async function handleDelete() {
+    if (!ids.length) return;
     setIsDeleting(true);
     try {
-      await deletePosition(position.id);
-      await onDelete();
-      onHide();
-      showAlert("success", "Posición eliminada correctamente");
+      if (isBulk) {
+        const result = await bulkDeletePositions(ids);
+        await onDelete();
+        onHide();
+        showAlert("success", result?.message || "Posiciones eliminadas");
+      } else {
+        await deletePosition(ids[0]);
+        await onDelete();
+        onHide();
+        showAlert("success", "Posición eliminada correctamente");
+      }
     } catch {
-      showAlert("danger", "Error al eliminar la posición");
+      showAlert(
+        "danger",
+        isBulk ? "Error al eliminar las posiciones" : "Error al eliminar la posición",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -26,10 +51,22 @@ export default function ModalConfirm({ show, onHide, position, onDelete, showAle
   return (
     <Modal show={show} onHide={onHide} size="md">
       <Modal.Header closeButton>
-        <Modal.Title>Confirmar eliminación</Modal.Title>
+        <Modal.Title>
+          {isBulk ? "Confirmar eliminación masiva" : "Confirmar eliminación"}
+        </Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        ¿Está seguro que desea eliminar la posición <strong>{position?.code}</strong>?
+        {isBulk ? (
+          <>
+            ¿Eliminar <strong>{ids.length}</strong> posiciones seleccionadas? Solo se
+            borran las que estén libres.
+          </>
+        ) : (
+          <>
+            ¿Está seguro que desea eliminar la posición{" "}
+            <strong>{position?.code}</strong>?
+          </>
+        )}
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={onHide} disabled={isDeleting}>

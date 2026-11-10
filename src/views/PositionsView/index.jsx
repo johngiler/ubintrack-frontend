@@ -7,11 +7,13 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
+  Filter,
   FilterX,
   Grid3x3,
   Pencil,
   Plus,
   Printer,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +26,7 @@ import {
   Row,
   Button,
   Alert,
+  Form,
   Pagination,
   Table,
 } from "@/components/ui/bootstrap";
@@ -37,15 +40,18 @@ import PositionsViewSkeleton from "./PositionsViewSkeleton";
 import {
   getPositions,
   getPositionHalls,
+  getPositionIds,
   getCavas,
   getCava,
   printPosition,
+  bulkPrintPositions,
 } from "@/services/storageService";
 import { canCRUD } from "@/services/httpClient";
 import { aisleDisplayName, isSectionBlock } from "../CavasView/cavaPlan";
 import { cavaTitleOf, statusBadgeVariant, statusLabels } from "./positionLabels";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
+import ModalBulkFlags from "./components/ModalBulkFlags";
 import PositionExpandedBins from "./components/PositionExpandedBins";
 
 const PAGE_SIZE = 50;
@@ -55,7 +61,14 @@ const EMPTY_FILTERS = {
   hall: "",
   cava_id: "",
   is_active: "",
+  is_picking: "",
+  is_push: "",
 };
+
+function boolFilter(value) {
+  if (value === "" || value == null) return undefined;
+  return value === "true" || value === true;
+}
 
 export default function PositionsView() {
   const user = useAuth().user;
@@ -71,6 +84,12 @@ export default function PositionsView() {
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get("search") || "");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [expandedPositions, setExpandedPositions] = useState({});
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState(null);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const [isBulkPrinting, setIsBulkPrinting] = useState(false);
+  const [showBulkFlagsModal, setShowBulkFlagsModal] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     const initialSearch = searchParams.get("search") || "";
@@ -122,7 +141,16 @@ export default function PositionsView() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, filters.status, filters.hall, filters.cava_id, filters.is_active]);
+    setSelectedIds([]);
+  }, [
+    debouncedSearchTerm,
+    filters.status,
+    filters.hall,
+    filters.cava_id,
+    filters.is_active,
+    filters.is_picking,
+    filters.is_push,
+  ]);
 
   const showAlertMessage = useCallback((variant, message) => {
     setAlert({ show: true, variant, message });
@@ -132,10 +160,9 @@ export default function PositionsView() {
   const apiFilters = {
     ...filters,
     page_size: PAGE_SIZE,
-    is_active:
-      filters.is_active === ""
-        ? undefined
-        : filters.is_active === "true" || filters.is_active === true,
+    is_active: boolFilter(filters.is_active),
+    is_picking: boolFilter(filters.is_picking),
+    is_push: boolFilter(filters.is_push),
   };
 
   const {
@@ -155,10 +182,34 @@ export default function PositionsView() {
     if (error) showAlertMessage("danger", "Error al cargar las posiciones");
   }, [error, showAlertMessage]);
 
+  const visibleIds = useMemo(() => positions.map((row) => row.id), [positions]);
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const selectedCount = selectedIds.length;
+  const showBulkActions = selectedCount > 0;
+
+  const activeFilterCount = [
+    filters.status,
+    filters.hall,
+    filters.cava_id,
+    filters.is_active,
+    filters.is_picking,
+    filters.is_push,
+  ].filter(Boolean).length;
+
+  const hasFilters = Boolean(debouncedSearchTerm) || activeFilterCount > 0;
+
+  const showSelectAllFiltered =
+    allVisibleSelected &&
+    Boolean(totalItems) &&
+    totalItems > visibleIds.length &&
+    selectedCount < totalItems;
+
   const clearFilters = () => {
     setSearchTerm("");
     setFilters(EMPTY_FILTERS);
     setSearchParams({});
+    setSelectedIds([]);
   };
 
   const handleFilterChange = (field, value) => {
@@ -180,6 +231,35 @@ export default function PositionsView() {
       next[positionId] = !prev[positionId];
       return next;
     });
+  };
+
+  const toggleSelectOne = (positionId) => {
+    setSelectedIds((prev) =>
+      prev.includes(positionId)
+        ? prev.filter((id) => id !== positionId)
+        : [...prev, positionId],
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (!visibleIds.length) return;
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+    setSelectedIds((prev) => [...new Set([...prev, ...visibleIds])]);
+  };
+
+  const handleSelectAllFiltered = async () => {
+    setIsSelectingAll(true);
+    try {
+      const data = await getPositionIds(apiFilters, debouncedSearchTerm);
+      setSelectedIds(Array.isArray(data?.ids) ? data.ids : []);
+    } catch {
+      showAlertMessage("danger", "No se pudieron seleccionar todas");
+    } finally {
+      setIsSelectingAll(false);
+    }
   };
 
   const handleShowModal = (position, mode) => {
@@ -208,12 +288,30 @@ export default function PositionsView() {
     }
   };
 
-  const hasFilters =
-    Boolean(debouncedSearchTerm) ||
-    Boolean(filters.status) ||
-    Boolean(filters.hall) ||
-    Boolean(filters.cava_id) ||
-    Boolean(filters.is_active);
+  const handleBulkPrint = async () => {
+    if (!selectedIds.length) return;
+    setIsBulkPrinting(true);
+    try {
+      const result = await bulkPrintPositions(selectedIds);
+      showAlertMessage("success", result?.message || "Etiquetas enviadas a impresión");
+    } catch {
+      showAlertMessage("danger", "Error al imprimir las etiquetas");
+    } finally {
+      setIsBulkPrinting(false);
+    }
+  };
+
+  const openBulkDelete = () => {
+    setSelectedPosition(null);
+    setBulkDeleteIds(selectedIds);
+    setShowConfirmModal(true);
+  };
+
+  const handleAfterDelete = async () => {
+    setSelectedIds([]);
+    setBulkDeleteIds(null);
+    await loadPositions();
+  };
 
   return (
     <Fragment>
@@ -237,89 +335,218 @@ export default function PositionsView() {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto p-0.5">
-                <WmsSearchBar
-                  id="search-position"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setSearchParams({});
-                  }}
-                  onClear={() => {
-                    setSearchTerm("");
-                    setSearchParams({});
-                  }}
-                  placeholder="Buscar por posición, bin o cliente…"
-                  className="!w-[280px] !min-w-[280px] !max-w-[280px] shrink-0"
-                />
-                <Select
-                  size="sm"
-                  isClearable
-                  aria-label="Filtrar por cava"
-                  placeholder="Cava"
-                  className="!w-[200px] shrink-0"
-                  options={cavaOptions}
-                  value={filters.cava_id}
-                  onChange={(e) => handleFilterChange("cava_id", e.target.value || "")}
-                />
-                <Select
-                  size="sm"
-                  isClearable
-                  aria-label="Filtrar por pasillo o túnel"
-                  placeholder="Pasillo / túnel"
-                  className="!w-[140px] shrink-0"
-                  options={hallOptions}
-                  value={filters.hall}
-                  onChange={(e) => handleFilterChange("hall", e.target.value || "")}
-                  noOptionsMessage={() =>
-                    filters.cava_id ? "Sin secciones" : "Sin tokens"
-                  }
-                />
-                <Select
-                  size="sm"
-                  isClearable
-                  aria-label="Filtrar por estado"
-                  placeholder="Estado"
-                  className="!w-[130px] shrink-0"
-                  options={statusOptions}
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange("status", e.target.value || "")}
-                />
-                <Select
-                  size="sm"
-                  isClearable
-                  aria-label="Filtrar por activo"
-                  placeholder="Activo"
-                  className="!w-[110px] shrink-0"
-                  options={activeOptions}
-                  value={filters.is_active}
-                  onChange={(e) => handleFilterChange("is_active", e.target.value || "")}
-                />
-                {hasFilters && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={FilterX}
-                    onClick={clearFilters}
-                    title="Limpiar filtros"
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                    Limpiar filtros
-                  </Button>
-                )}
-                <div className="ml-auto shrink-0 pl-2">
-                  {perms.add && (
+              <div className="flex w-full flex-col gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2">
+                  <WmsSearchBar
+                    id="search-position"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setSearchParams({});
+                    }}
+                    onClear={() => {
+                      setSearchTerm("");
+                      setSearchParams({});
+                    }}
+                    placeholder="Buscar por posición, bin o cliente…"
+                    className="!w-[280px] !min-w-[220px] !max-w-full shrink-0"
+                  />
+                  <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={FilterX}
+                        onClick={clearFilters}
+                        title="Limpiar filtros"
+                        className="whitespace-nowrap"
+                      >
+                        Limpiar
+                      </Button>
+                    )}
                     <Button
-                      variant="primary"
+                      variant={filtersOpen || activeFilterCount > 0 ? "secondary" : "outline"}
                       size="sm"
-                      icon={Plus}
+                      icon={Filter}
+                      onClick={() => setFiltersOpen((open) => !open)}
+                      title={filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
                       className="whitespace-nowrap"
-                      onClick={handleNewPosition}
+                      aria-expanded={filtersOpen}
                     >
-                      Nueva posición
+                      Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                     </Button>
-                  )}
+                    {perms.add && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={Plus}
+                        className="whitespace-nowrap"
+                        onClick={handleNewPosition}
+                      >
+                        Nueva posición
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {filtersOpen ? (
+                    <motion.div
+                      key="positions-filters"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Cava</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por cava"
+                            placeholder="Todas"
+                            options={cavaOptions}
+                            value={filters.cava_id}
+                            onChange={(e) =>
+                              handleFilterChange("cava_id", e.target.value || "")
+                            }
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Pasillo / túnel</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por pasillo o túnel"
+                            placeholder="Todos"
+                            options={hallOptions}
+                            value={filters.hall}
+                            onChange={(e) =>
+                              handleFilterChange("hall", e.target.value || "")
+                            }
+                            noOptionsMessage={() =>
+                              filters.cava_id ? "Sin secciones" : "Sin tokens"
+                            }
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Estado</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por estado"
+                            placeholder="Todos"
+                            options={statusOptions}
+                            value={filters.status}
+                            onChange={(e) =>
+                              handleFilterChange("status", e.target.value || "")
+                            }
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Activo</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por activo"
+                            placeholder="Todos"
+                            options={activeOptions}
+                            value={filters.is_active}
+                            onChange={(e) =>
+                              handleFilterChange("is_active", e.target.value || "")
+                            }
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Picking</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por picking"
+                            placeholder="Todos"
+                            options={activeOptions}
+                            value={filters.is_picking}
+                            onChange={(e) =>
+                              handleFilterChange("is_picking", e.target.value || "")
+                            }
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Push</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por push"
+                            placeholder="Todos"
+                            options={activeOptions}
+                            value={filters.is_push}
+                            onChange={(e) =>
+                              handleFilterChange("is_push", e.target.value || "")
+                            }
+                          />
+                        </Form.Group>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+
+                {showBulkActions ? (
+                  <div className="flex w-full flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-2">
+                    <span className="text-xs text-slate-600">
+                      {selectedCount} seleccionadas
+                    </span>
+                    {perms.change && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={SlidersHorizontal}
+                        onClick={() => setShowBulkFlagsModal(true)}
+                        title="Cambiar activo, picking o push"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        Cambiar flags
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={Printer}
+                      onClick={handleBulkPrint}
+                      disabled={isBulkPrinting}
+                      loading={isBulkPrinting}
+                      title="Imprimir etiquetas seleccionadas"
+                      className="shrink-0 whitespace-nowrap"
+                    >
+                      {isBulkPrinting ? "Imprimiendo…" : "Imprimir"}
+                    </Button>
+                    {perms.delete && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        icon={Trash2}
+                        onClick={openBulkDelete}
+                        title="Eliminar posiciones seleccionadas"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        Eliminar
+                      </Button>
+                    )}
+                    {showSelectAllFiltered ? (
+                      <button
+                        type="button"
+                        className="cursor-pointer text-xs font-medium text-sky-700 hover:underline disabled:opacity-50"
+                        onClick={handleSelectAllFiltered}
+                        disabled={isSelectingAll}
+                      >
+                        {isSelectingAll
+                          ? "Seleccionando…"
+                          : `Seleccionar todas (${totalItems})`}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </Card.Header>
 
@@ -327,9 +554,17 @@ export default function PositionsView() {
               {isLoading ? (
                 <PositionsViewSkeleton />
               ) : positions.length > 0 ? (
-                <Table hover responsive className="mb-0 min-w-[960px]">
+                <Table hover responsive className="mb-0 min-w-[1000px]">
                   <Table.Head>
                     <tr>
+                      <Table.HeaderCell className="w-10 normal-case tracking-normal">
+                        <Form.Check
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          onChange={toggleSelectAllVisible}
+                          aria-label="Seleccionar página"
+                        />
+                      </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[160px] normal-case tracking-normal">
                         Código
                       </Table.HeaderCell>
@@ -356,6 +591,7 @@ export default function PositionsView() {
                   <Table.Body>
                     {positions.map((position) => {
                       const isExpanded = Boolean(expandedPositions[position.id]);
+                      const isSelected = selectedIds.includes(position.id);
                       const currentBin =
                         position.bins?.find((bin) => bin.status === "almacenado") ||
                         position.bins?.find((bin) => bin.status !== "despachado");
@@ -364,6 +600,14 @@ export default function PositionsView() {
                       return (
                         <Fragment key={position.id}>
                           <Table.Row>
+                            <Table.Cell>
+                              <Form.Check
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectOne(position.id)}
+                                aria-label={`Seleccionar ${position.code}`}
+                              />
+                            </Table.Cell>
                             <Table.Cell>
                               <button
                                 type="button"
@@ -458,6 +702,7 @@ export default function PositionsView() {
                                     size="sm"
                                     className="text-red-600 hover:bg-red-50"
                                     onClick={() => {
+                                      setBulkDeleteIds(null);
                                       setSelectedPosition(position);
                                       setShowConfirmModal(true);
                                     }}
@@ -478,7 +723,7 @@ export default function PositionsView() {
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.15 }}
                               >
-                                <td colSpan={7} className="p-0">
+                                <td colSpan={8} className="p-0">
                                   <PositionExpandedBins bins={position.bins} />
                                 </td>
                               </motion.tr>
@@ -564,9 +809,24 @@ export default function PositionsView() {
 
       <ModalConfirm
         show={showConfirmModal}
-        onHide={() => setShowConfirmModal(false)}
+        onHide={() => {
+          setShowConfirmModal(false);
+          setBulkDeleteIds(null);
+        }}
         position={selectedPosition}
-        onDelete={loadPositions}
+        positionIds={bulkDeleteIds || undefined}
+        onDelete={handleAfterDelete}
+        showAlert={showAlertMessage}
+      />
+
+      <ModalBulkFlags
+        show={showBulkFlagsModal}
+        onHide={() => setShowBulkFlagsModal(false)}
+        positionIds={selectedIds}
+        onSaved={async () => {
+          setSelectedIds([]);
+          await loadPositions();
+        }}
         showAlert={showAlertMessage}
       />
     </Fragment>

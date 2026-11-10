@@ -127,6 +127,12 @@ export async function getPositions(page = 1, filters = {}, search = "") {
     if (typeof filters.is_active === "boolean") {
       url += `&is_active=${filters.is_active}`;
     }
+    if (typeof filters.is_picking === "boolean") {
+      url += `&is_picking=${filters.is_picking}`;
+    }
+    if (typeof filters.is_push === "boolean") {
+      url += `&is_push=${filters.is_push}`;
+    }
     if (filters.page_size) {
       url += `&page_size=${filters.page_size}`;
     }
@@ -181,6 +187,64 @@ export async function patchPosition(id, data) {
 
 export async function deletePosition(id) {
   const response = await httpClient.delete(`/api/positions/${id}/`);
+  return response.data;
+}
+
+function positionsListQuery(filters = {}, search = "") {
+  const params = new URLSearchParams();
+  if (search && search.trim() !== "") {
+    params.set("search", search.trim());
+  }
+  if (filters.status) params.set("status", filters.status);
+  if (filters.hall) params.set("hall", filters.hall);
+  if (filters.cava_id) params.set("cava", String(filters.cava_id));
+  if (typeof filters.is_active === "boolean") {
+    params.set("is_active", String(filters.is_active));
+  }
+  if (typeof filters.is_picking === "boolean") {
+    params.set("is_picking", String(filters.is_picking));
+  }
+  if (typeof filters.is_push === "boolean") {
+    params.set("is_push", String(filters.is_push));
+  }
+  return params;
+}
+
+/** IDs del listado con los mismos filtros/búsqueda (sin paginar). */
+export async function getPositionIds(filters = {}, search = "") {
+  const params = positionsListQuery(filters, search);
+  const qs = params.toString();
+  const response = await httpClient.get(
+    qs ? `/api/positions/ids/?${qs}` : "/api/positions/ids/",
+  );
+  return response.data;
+}
+
+export async function bulkDeletePositions(ids) {
+  const response = await httpClient.delete("/api/positions/bulk-delete/", {
+    data: { ids },
+  });
+  return response.data;
+}
+
+export async function bulkPrintPositions(ids) {
+  const response = await httpClient.post(
+    "/api/positions/bulk-print/",
+    { ids },
+    { timeout: 60000 },
+  );
+  return response.data;
+}
+
+/** Cambia flags en masa. Solo enviar claves a aplicar: is_active, is_picking, is_push. */
+export async function bulkUpdatePositionFlags(ids, flags = {}) {
+  const payload = { ids };
+  if (typeof flags.is_active === "boolean") payload.is_active = flags.is_active;
+  if (typeof flags.is_picking === "boolean") payload.is_picking = flags.is_picking;
+  if (typeof flags.is_push === "boolean") payload.is_push = flags.is_push;
+  const response = await httpClient.post("/api/positions/bulk-update-flags/", payload, {
+    timeout: 60000,
+  });
   return response.data;
 }
 

@@ -11,8 +11,26 @@ export function useWmsSearchParams() {
 
   const setSearchParams = useCallback(
     (next) => {
-      const params = typeof next === "function" ? next(new URLSearchParams(searchParams.toString())) : next;
-      const qs = params?.toString?.() ?? String(params || "");
+      const resolved =
+        typeof next === "function"
+          ? next(new URLSearchParams(searchParams.toString()))
+          : next;
+
+      let qs = "";
+      if (resolved instanceof URLSearchParams) {
+        qs = resolved.toString();
+      } else if (resolved && typeof resolved === "object") {
+        // Plain object (p. ej. {}): no usar Object#toString → "[object Object]".
+        const params = new URLSearchParams();
+        Object.entries(resolved).forEach(([key, value]) => {
+          if (value == null || value === "") return;
+          params.set(key, String(value));
+        });
+        qs = params.toString();
+      } else if (resolved != null) {
+        qs = String(resolved);
+      }
+
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
     [pathname, router, searchParams],
