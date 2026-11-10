@@ -14,6 +14,7 @@ import {
   floorOverlapSections,
   floorPositionPlaces,
   floorShowsPositions,
+  floorSizeOnAxis,
   floorSpansTwoSections,
   floorsOverlappingSection,
   isFloorBlock,
@@ -190,23 +191,18 @@ function measureRack(block, blocks, rackPrefix, planLayout) {
 /** Ver cavaAisleVisual.js — misma geometría que el modal. */
 const AISLE_POS_GAP = AISLE_POS_GAP_SVG;
 
-function measureFloorAlong(block, planLayout, vertical) {
-  if (!floorShowsPositions(block, planLayout)) return 0;
-  const places = floorPositionPlaces(block);
-  if (!places.length) return 0;
-  const across = floorAcrossOf(block);
-  const groups = chunkAislePlaces(places, across);
-  return aisleGroupSpan(groups, { aisleVertical: vertical, svg: true, across });
+function measureFloorAlong(block, planLayout, alongVertical) {
+  return floorSizeOnAxis(block, { alongVertical, planLayout, svg: true });
 }
 
-function measureRestingFloorAlong(block, scope, planLayout, vertical) {
+function measureRestingFloorAlong(block, scope, planLayout, alongVertical) {
   if (!isFloorBlock(block)) return 0;
   if (floorOverlaps(block) && floorOverlapSections(scope, block).length) return 0;
-  return measureFloorAlong(block, planLayout, vertical);
+  return measureFloorAlong(block, planLayout, alongVertical);
 }
 
-/** Pisos vecinos o que solapan (largo = solo posiciones, sin KPI). */
-function measureFloorsAlongSection(scope, section, planLayout, vertical) {
+/** Pisos vecinos o que solapan (largo = eje libre de la sección). */
+function measureFloorsAlongSection(scope, section, planLayout, alongVertical) {
   const list = scope || [];
   const overlapping = list.filter(
     (block) =>
@@ -215,7 +211,7 @@ function measureFloorsAlongSection(scope, section, planLayout, vertical) {
   if (overlapping.length) {
     return Math.max(
       0,
-      ...overlapping.map((item) => measureFloorAlong(item, planLayout, vertical)),
+      ...overlapping.map((item) => measureFloorAlong(item, planLayout, alongVertical)),
     );
   }
   const index = list.indexOf(section);
@@ -225,12 +221,14 @@ function measureFloorsAlongSection(scope, section, planLayout, vertical) {
   if (index < list.length - 1 && isFloorBlock(list[index + 1])) neighbors.push(list[index + 1]);
   return Math.max(
     0,
-    ...neighbors.map((item) => measureFloorAlong(item, planLayout, vertical)),
+    ...neighbors.map((item) => measureFloorAlong(item, planLayout, alongVertical)),
   );
 }
 
 function measureRelatedSpan(block, blocks, rackPrefix, planLayout, scopeBlocks, vertical) {
-  const scope = scopeBlocks || blocks;
+  // scope = plano completo (vecinos piso). strip = tramo local (fallback racks en reposo).
+  const scope = blocks;
+  const strip = scopeBlocks || blocks;
   const sectionType = normalizeSectionType(block.section_type);
   const floorAlong = measureFloorsAlongSection(scope, block, planLayout, vertical);
   // Túnel: alto/ancho = largo de posiciones (sin contador).
@@ -267,7 +265,7 @@ function measureRelatedSpan(block, blocks, rackPrefix, planLayout, scopeBlocks, 
   if (floorAlong > 0) return floorAlong;
   return Math.max(
     0,
-    ...(scope || []).map((item) => measureRestingFloorAlong(item, scope, planLayout, vertical)),
+    ...(strip || []).map((item) => measureRestingFloorAlong(item, strip, planLayout, vertical)),
   );
 }
 
@@ -279,13 +277,13 @@ function sectionFitAlong(label, vertical, base) {
   return Math.max(base, text.length * char + pad);
 }
 
-function measureFloorCross(block, planLayout, vertical) {
-  if (!floorShowsPositions(block, planLayout)) return 0;
-  const places = floorPositionPlaces(block);
-  if (!places.length) return 0;
-  const across = floorAcrossOf(block);
-  const box = aisleGroupBoxSize({ svg: true, aisleVertical: vertical, across });
-  return vertical ? box.w : box.h;
+function measureFloorCross(block, planLayout, sectionVertical) {
+  // Eje fino de la sección = el otro lado del along del piso.
+  return floorSizeOnAxis(block, {
+    alongVertical: !sectionVertical,
+    planLayout,
+    svg: true,
+  });
 }
 
 function measureBlock(block, blocks, rackPrefix, aislePrefix, planLayout, scopeBlocks = null) {
@@ -537,10 +535,11 @@ function finalizeHorizontalRows(middleRows, scopeBlocks = null) {
 
 function measureHorizontalBand(bandBlocks, blocks, rackPrefix, aislePrefix, planLayout) {
   const list = bandBlocks || [];
+  // Scope completo: la sección toma el piso/rack vecino aunque esté en otra franja.
   const middleRows = list.map((block) =>
-    measureMiddleRow(block, blocks, rackPrefix, aislePrefix, planLayout, list),
+    measureMiddleRow(block, blocks, rackPrefix, aislePrefix, planLayout, blocks),
   );
-  return finalizeHorizontalRows(middleRows, list);
+  return finalizeHorizontalRows(middleRows, blocks);
 }
 
 function measureSection(section, blocks, rackPrefix, aislePrefix, planLayout) {

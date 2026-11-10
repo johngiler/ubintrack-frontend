@@ -1,3 +1,9 @@
+import {
+  aisleGroupBoxSize,
+  aisleGroupSpan,
+  chunkAislePlaces,
+} from "./cavaAisleVisual";
+
 export function slotKey(hall, rack, place) {
   return `${hall || ""}\t${rack}\t${place}`;
 }
@@ -201,6 +207,31 @@ export function floorAcrossOf(block) {
   const raw = Number(block?.depth);
   if (!Number.isFinite(raw) || raw < 1) return 3;
   return Math.floor(raw);
+}
+
+/**
+ * Caja w×h del piso en su orientación real (marcas + gaps).
+ * La sección toma alto o ancho con floorSizeOnAxis.
+ */
+export function floorPlacesExtent(block, { planLayout = null, svg = false } = {}) {
+  if (!floorShowsPositions(block, planLayout)) return { w: 0, h: 0 };
+  const places = floorPositionPlaces(block);
+  if (!places.length) return { w: 0, h: 0 };
+  const across = floorAcrossOf(block);
+  const floorVertical = block.orientation === "vertical";
+  const groups = chunkAislePlaces(places, across);
+  const box = aisleGroupBoxSize({ svg, aisleVertical: floorVertical, across });
+  const span = aisleGroupSpan(groups, { aisleVertical: floorVertical, svg, across });
+  return floorVertical ? { w: box.w, h: span } : { w: span, h: box.h };
+}
+
+/** Dimensión del piso en el eje libre de la sección (alto si alongVertical). */
+export function floorSizeOnAxis(
+  block,
+  { alongVertical = false, planLayout = null, svg = false } = {},
+) {
+  const { w, h } = floorPlacesExtent(block, { planLayout, svg });
+  return alongVertical ? h : w;
 }
 
 /** @deprecated usar floorPositionPlaces */

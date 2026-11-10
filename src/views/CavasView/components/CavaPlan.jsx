@@ -22,6 +22,7 @@ import {
   floorOverlapSections,
   floorPositionPlaces,
   floorShowsPositions,
+  floorSizeOnAxis,
   floorSpansTwoSections,
   floorsOverlappingSection,
   hileraLabel,
@@ -60,7 +61,6 @@ import {
   AISLE_DOT_UI,
   AISLE_POS_GAP_UI,
   aisleGroupBoxSize,
-  aisleGroupSpan,
   chunkAislePlaces,
   sectionAlongSpan,
   sectionBandBaseSize,
@@ -166,24 +166,14 @@ function verticalSectionSpan(block) {
 
 const VERTICAL_KPI_PAD = HILERA_KPI_TOP_H + PIECE_GAP;
 
-/** Alto/ancho del piso a lo largo (solo posiciones, sin KPI). */
+/** Alto/ancho del piso en el eje libre de la sección (respeta orientación del piso). */
 function floorAlongSpan(block, { vertical = false, planLayout = null } = {}) {
-  if (!floorShowsPositions(block, planLayout)) return 0;
-  const places = floorPositionPlaces(block);
-  if (!places.length) return 0;
-  const across = floorAcrossOf(block);
-  const groups = chunkAislePlaces(places, across);
-  return aisleGroupSpan(groups, { aisleVertical: vertical, svg: false, across });
+  return floorSizeOnAxis(block, { alongVertical: vertical, planLayout, svg: false });
 }
 
-/** Grosor del piso (eje fino): V → ancho del grupo; H → alto del grupo. */
+/** Grosor del piso en el eje fino de la sección (el otro lado de floorAlongSpan). */
 function floorCrossSpan(block, { vertical = false, planLayout = null } = {}) {
-  if (!floorShowsPositions(block, planLayout)) return 0;
-  const places = floorPositionPlaces(block);
-  if (!places.length) return 0;
-  const across = floorAcrossOf(block);
-  const box = aisleGroupBoxSize({ svg: false, aisleVertical: vertical, across });
-  return vertical ? box.w : box.h;
+  return floorSizeOnAxis(block, { alongVertical: !vertical, planLayout, svg: false });
 }
 
 function overlayFloorCross(overlayFloors, { vertical = false, planLayout = null } = {}) {
@@ -270,11 +260,18 @@ function maxSpan(blocks, spanOf) {
   return Math.max(0, ...blocks.map(spanOf));
 }
 
-/** Ancho/alto del pasillo = hilera relacionada (o la más ancha del tramo). */
-function aisleSpanFor(aisle, scope, spanOf, { throughSections = false } = {}) {
+/** Ancho/alto del pasillo = hileras ligadas; si no hay, racks del tramo local. */
+function aisleSpanFor(aisle, scope, spanOf, { throughSections = false, stripScope = null } = {}) {
   const related = relatedRacksForAisle(scope, aisle, { throughSections });
-  const racks = related.length ? related : (scope || []).filter((block) => block.kind === "rack");
-  return Math.max(0, maxSpan(racks, spanOf));
+  if (related.length) return Math.max(0, maxSpan(related, spanOf));
+  const local = stripScope || scope;
+  return Math.max(
+    0,
+    maxSpan(
+      (local || []).filter((block) => block.kind === "rack"),
+      spanOf,
+    ),
+  );
 }
 
 /** Piso que aún ocupa fila/columna (solapar no cuenta para la pista de racks). */
@@ -312,25 +309,29 @@ function floorSpanForSection(section, scope, { vertical = false, planLayout = nu
 
 /**
  * Relacionado de una sección.
+ * scope = plano completo (vecinos piso/racks). stripScope = tramo local (fallback racks).
  * Túnel: alto/ancho = largo de posiciones de piso (sin contador).
- * Resto: racks ligados, o piso en reposo.
+ * Resto: racks ligados, o piso vecino, o piso en reposo del tramo.
  */
 function relatedSpanForSection(
   section,
   scope,
   spanOf,
-  { vertical = false, planLayout = null, throughSections = false } = {},
+  { vertical = false, planLayout = null, throughSections = false, stripScope = null } = {},
 ) {
   const floorSpan = floorSpanForSection(section, scope, { vertical, planLayout });
   if (normalizeSectionType(section?.section_type) === "tunel" && floorSpan > 0) {
     return floorSpan;
   }
-  const rackSpan = aisleSpanFor(section, scope, spanOf, { throughSections });
+  const rackSpan = aisleSpanFor(section, scope, spanOf, { throughSections, stripScope });
   if (rackSpan > 0) return rackSpan;
   if (floorSpan > 0) return floorSpan;
+  const restingScope = stripScope || scope;
   const restingFloorSpan = Math.max(
     0,
-    ...(scope || []).map((block) => restingFloorAlongSpan(block, scope, { vertical, planLayout })),
+    ...(restingScope || []).map((block) =>
+      restingFloorAlongSpan(block, restingScope, { vertical, planLayout }),
+    ),
   );
   return restingFloorSpan;
 }
@@ -1546,12 +1547,13 @@ export default function CavaPlan({
               floorAlongSpan(floor, { vertical: false, planLayout: layout }),
               ...sections.map((section) =>
                 Math.max(
-                  relatedSpanForSection(section, middle, horizontalSectionSpan, {
+                  relatedSpanForSection(section, blocks, horizontalSectionSpan, {
                     vertical: false,
                     planLayout: layout,
                     throughSections: true,
+                    stripScope: middle,
                   }),
-                  measuredRelatedRackAlong(section, middle, { throughSections: true }),
+                  measuredRelatedRackAlong(section, blocks, { throughSections: true }),
                 ),
               ),
             );
@@ -1654,12 +1656,13 @@ export default function CavaPlan({
           // Solo absolute/solapar mira racks al otro lado; sin eso = solo relacionados.
           const throughSections = floorsOverlappingSection(middle, block).length > 0;
           const relatedSpan = Math.max(
-            relatedSpanForSection(block, middle, horizontalSectionSpan, {
+            relatedSpanForSection(block, blocks, horizontalSectionSpan, {
               vertical: false,
               planLayout: layout,
               throughSections,
+              stripScope: middle,
             }),
-            measuredRelatedRackAlong(block, middle, { throughSections }),
+            measuredRelatedRackAlong(block, blocks, { throughSections }),
           );
           const overlayCross = overlayFloorCross(overlayFloors, {
             vertical: false,
@@ -1780,12 +1783,13 @@ export default function CavaPlan({
                 floorAlongSpan(floor, { vertical: true, planLayout: layout }),
                 ...sections.map((section) =>
                   Math.max(
-                    relatedSpanForSection(section, items, verticalSectionSpan, {
+                    relatedSpanForSection(section, blocks, verticalSectionSpan, {
                       vertical: true,
                       planLayout: layout,
                       throughSections: true,
+                      stripScope: items,
                     }),
-                    measuredRelatedRackAlong(section, items, {
+                    measuredRelatedRackAlong(section, blocks, {
                       throughSections: true,
                       vertical: true,
                     }),
@@ -1862,12 +1866,13 @@ export default function CavaPlan({
             // Relacionado = cuerpo sin contador (fórmula + DOM). Arriba/Medio/Abajo igual.
             const relatedSpan = isSectionBlock(block)
               ? Math.max(
-                  relatedSpanForSection(block, items, verticalSectionSpan, {
+                  relatedSpanForSection(block, blocks, verticalSectionSpan, {
                     vertical: true,
                     planLayout: layout,
                     throughSections,
+                    stripScope: items,
                   }),
-                  measuredRelatedRackAlong(block, items, {
+                  measuredRelatedRackAlong(block, blocks, {
                     throughSections,
                     vertical: true,
                   }),
@@ -1977,7 +1982,6 @@ export default function CavaPlan({
   function renderSection(section, sectionIndex) {
     const axis = section.axis || masterAxis;
     if (axis === "vertical") {
-      const onlyMain = !section.before.length && !section.after.length;
       const hasCross = section.before.length || section.after.length;
       return (
         <div
@@ -1985,7 +1989,6 @@ export default function CavaPlan({
           className="flex w-full min-w-0 flex-col items-stretch justify-start"
           style={{
             gap: hasCross ? CROSS_ORIENTATION_GAP : undefined,
-            ...(onlyMain ? { minHeight: planFrameMinStyle(masterAxis).minHeight } : null),
           }}
         >
           {section.before.length ? (
@@ -1994,9 +1997,7 @@ export default function CavaPlan({
             </div>
           ) : null}
           {section.main.length ? (
-            <div
-              className={`flex w-full shrink-0 items-stretch ${onlyMain ? "min-h-0 flex-1" : ""}`}
-            >
+            <div className="flex w-full shrink-0 items-stretch">
               {renderVerticalStrip(section.main, { fill: false })}
             </div>
           ) : null}
