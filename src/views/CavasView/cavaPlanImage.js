@@ -1405,7 +1405,7 @@ export function buildCavaPlanSvg({ name, code, blocks, nomenclature, occupancy =
     ["#0ea5e9", "Picking", cavaKpis.picking],
     ["#f59e0b", "Push", cavaKpis.push],
   ];
-  const legendStep = Math.max(96, Math.floor((Math.max(width, 720) - PAD * 2) / legendRows.length));
+  const legendStep = Math.max(96, Math.floor((Math.max(width, PLAN_VIEW_FRAME_MIN) - PAD * 2) / legendRows.length));
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <rect width="100%" height="100%" fill="#ffffff"/>
