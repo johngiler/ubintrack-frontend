@@ -34,6 +34,12 @@ function formatTemperature(value) {
   return `${value}°C`;
 }
 
+function formatCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  return n.toLocaleString("es-CO");
+}
+
 export default function CavasView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "storage", "cava");
@@ -160,7 +166,7 @@ export default function CavasView() {
               {isLoading ? (
                 <CavasViewSkeleton />
               ) : cavas.length > 0 ? (
-                <Table hover responsive className="mb-0 min-w-[900px]">
+                <Table hover responsive className="mb-0 min-w-[980px]">
                   <Table.Head>
                     <tr>
                       <Table.HeaderCell className="min-w-[180px] normal-case tracking-normal">
@@ -172,11 +178,11 @@ export default function CavasView() {
                       <Table.HeaderCell className="min-w-[120px] normal-case tracking-normal">
                         Condición
                       </Table.HeaderCell>
-                      <Table.HeaderCell className="min-w-[110px] normal-case tracking-normal">
-                        Temperatura
+                      <Table.HeaderCell className="min-w-[120px] normal-case tracking-normal">
+                        Temp. min / max
                       </Table.HeaderCell>
-                      <Table.HeaderCell className="min-w-[90px] normal-case tracking-normal">
-                        Ubicaciones
+                      <Table.HeaderCell className="min-w-[120px] normal-case tracking-normal">
+                        Activas / total
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[100px] normal-case tracking-normal">
                         Estado
@@ -198,11 +204,21 @@ export default function CavasView() {
                         <Table.Cell>
                           <ConditionBadge condition={cava.condition} />
                         </Table.Cell>
-                        <Table.Cell className="text-slate-600">
-                          {formatTemperature(cava.current_temp)}
+                        <Table.Cell className="text-sm text-slate-600">
+                          <span className="tabular-nums">
+                            {formatTemperature(cava.temp_min)}
+                            <span className="mx-1 text-slate-300">/</span>
+                            {formatTemperature(cava.temp_max)}
+                          </span>
                         </Table.Cell>
-                        <Table.Cell className="text-slate-600">
-                          {cava.slot_count ?? 0}
+                        <Table.Cell className="text-sm text-slate-600">
+                          <span className="tabular-nums font-medium text-slate-800">
+                            {formatCount(cava.active_slot_count)}
+                          </span>
+                          <span className="mx-1 text-slate-300">/</span>
+                          <span className="tabular-nums text-slate-500">
+                            {formatCount(cava.slot_count)}
+                          </span>
                         </Table.Cell>
                         <Table.Cell>
                           <Badge variant={cava.is_active ? "success" : "danger"} dot={false}>

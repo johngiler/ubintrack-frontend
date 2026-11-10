@@ -5,14 +5,16 @@ import { createPortal } from "react-dom";
 import { ChevronDown, Trash2, X } from "lucide-react";
 import { motion } from "motion/react";
 
-import { Button, Form, Modal } from "@/components/ui/bootstrap";
+import { Button, Modal } from "@/components/ui/bootstrap";
 import { IconButton } from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
+import { useWmsNavigate } from "@/hooks/useWmsRouter";
 import { getApiErrorMessage } from "@/services/httpClient";
 import { deletePosition, getCellPositions, patchPosition } from "@/services/storageService";
 import { revalidateBins, revalidatePositions } from "@/lib/swr";
 
-const MENU_WIDTH = 520;
+const MENU_WIDTH_EDIT = 400;
+const MENU_WIDTH_VIEW = 340;
 
 const STATUS_LABEL = {
   libre: "Libre",
@@ -27,13 +29,50 @@ function statusMark(position) {
   return { label: "Libre", dot: "bg-emerald-500", text: "text-emerald-600" };
 }
 
-function menuPosition(anchorEl) {
+function FlagCell({ on, onClass, label }) {
+  return (
+    <span
+      className={`inline-flex w-full justify-center text-[10px] font-semibold tabular-nums ${
+        on ? onClass : "text-slate-300"
+      }`}
+      title={label}
+    >
+      {on ? "Sí" : "—"}
+    </span>
+  );
+}
+
+/** Switch compacto solo para esta lista (no el Form.Check global). */
+function MiniSwitch({ id, checked, disabled, onChange, "aria-label": ariaLabel }) {
+  return (
+    <label
+      htmlFor={id}
+      className={`inline-flex cursor-pointer items-center ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    >
+      <span className="relative inline-flex h-3.5 w-7 shrink-0 items-center">
+        <input
+          type="checkbox"
+          id={id}
+          checked={Boolean(checked)}
+          disabled={disabled}
+          onChange={onChange}
+          aria-label={ariaLabel}
+          className="peer sr-only"
+        />
+        <span className="absolute inset-0 rounded-full bg-slate-200 transition-colors peer-checked:bg-[var(--brand-primary)] peer-focus-visible:ring-2 peer-focus-visible:ring-[color-mix(in_srgb,var(--brand-primary)_40%,transparent)]" />
+        <span className="absolute left-0.5 h-2.5 w-2.5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-3.5" />
+      </span>
+    </label>
+  );
+}
+
+function menuPosition(anchorEl, menuWidth) {
   const rect = anchorEl.getBoundingClientRect();
   const margin = 8;
   const gap = 6;
   let left = rect.left;
-  if (left + MENU_WIDTH > window.innerWidth - margin) {
-    left = window.innerWidth - margin - MENU_WIDTH;
+  if (left + menuWidth > window.innerWidth - margin) {
+    left = window.innerWidth - margin - menuWidth;
   }
   left = Math.max(margin, left);
   const spaceBelow = window.innerHeight - rect.bottom;
@@ -66,7 +105,19 @@ export default function CellPositionsMenu({
   const [deleting, setDeleting] = useState(false);
   const [coords, setCoords] = useState(null);
   const menuRef = useRef(null);
+  const navigate = useWmsNavigate();
   const placesKey = Array.isArray(places) ? places.join(",") : "";
+  const menuWidth = readOnly ? MENU_WIDTH_VIEW : MENU_WIDTH_EDIT;
+  const gridClass = readOnly
+    ? "grid grid-cols-[minmax(0,1fr)_4.25rem_1.75rem_1.75rem] items-center gap-x-2"
+    : "grid grid-cols-[minmax(0,1fr)_4.25rem_1.75rem_2.25rem_2.25rem_1.5rem] items-center gap-x-3";
+
+  function openInCatalog(position) {
+    const code = String(position?.code || "").trim();
+    if (!code) return;
+    onClose?.();
+    navigate(`/storage/positions?search=${encodeURIComponent(code)}`);
+  }
 
   useLayoutEffect(() => {
     if (!anchorEl) return undefined;
@@ -75,7 +126,7 @@ export default function CellPositionsMenu({
         onClose();
         return;
       }
-      setCoords(menuPosition(anchorEl));
+      setCoords(menuPosition(anchorEl, menuWidth));
     };
     placeMenu();
     window.addEventListener("resize", placeMenu);
@@ -84,7 +135,7 @@ export default function CellPositionsMenu({
       window.removeEventListener("resize", placeMenu);
       window.removeEventListener("scroll", placeMenu, true);
     };
-  }, [anchorEl, onClose]);
+  }, [anchorEl, onClose, menuWidth]);
 
   useEffect(() => {
     function onPointerDown(event) {
@@ -224,7 +275,7 @@ export default function CellPositionsMenu({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.16 }}
-        style={{ position: "fixed", width: MENU_WIDTH, zIndex: 70, ...coords }}
+        style={{ position: "fixed", width: menuWidth, zIndex: 70, ...coords }}
         className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
       >
         <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
@@ -243,64 +294,89 @@ export default function CellPositionsMenu({
             <Skeleton className="h-8 w-full" />
           </div>
         ) : positions.length ? (
-          <ul className="max-h-64 overflow-y-auto py-1">
-            {positions.map((position) => {
-              const mark = statusMark(position);
-              return (
-              <li key={position.id} className="flex items-center gap-2 px-3 py-1">
-                <span className={`min-w-0 flex-1 truncate text-xs ${position.is_active ? "text-slate-700" : "text-slate-400"}`}>
-                  {position.code}
-                </span>
-                <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] ${mark.text}`}>
-                  <span className={`h-1.5 w-1.5 ${mark.dot}`} />
-                  {mark.label}
-                </span>
-                {readOnly ? (
-                  position.is_picking ? (
-                    <span className="shrink-0 text-[11px] font-medium text-sky-700">Picking</span>
-                  ) : null
-                ) : (
-                  <>
-                    <Form.Check
-                      type="switch"
-                      id={`cell-position-picking-${position.id}`}
-                      className="!min-h-0 shrink-0 gap-1.5"
-                      label="Picking"
-                      checked={Boolean(position.is_picking)}
-                      disabled={busyId === position.id}
-                      onChange={() => togglePicking(position)}
-                    />
-                    <Form.Check
-                      type="switch"
-                      id={`cell-position-active-${position.id}`}
-                      className="!min-h-0 shrink-0 gap-1.5"
-                      label={position.is_active ? "Activo" : "Inactivo"}
-                      checked={Boolean(position.is_active)}
-                      disabled={busyId === position.id}
-                      onChange={() => toggleActive(position)}
-                    />
-                    <IconButton
-                      size="sm"
-                      variant="ghost"
-                      aria-label="Eliminar"
-                      disabled={busyId === position.id}
-                      onClick={() => setPendingDelete(position)}
+          <div className="max-h-64 overflow-y-auto">
+            <div
+              className={`${gridClass} border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500`}
+            >
+              <span>Posición</span>
+              <span>Estado</span>
+              <span className="text-center">Push</span>
+              <span className="text-center">Pick</span>
+              {readOnly ? null : <span className="text-center">Activo</span>}
+              {readOnly ? null : <span />}
+            </div>
+            <ul className="py-0.5">
+              {positions.map((position) => {
+                const mark = statusMark(position);
+                const busy = busyId === position.id;
+                return (
+                  <li key={position.id} className={`${gridClass} px-3 py-1.5 hover:bg-slate-50`}>
+                    <button
+                      type="button"
+                      title="Ver en catálogo"
+                      onClick={() => openInCatalog(position)}
+                      className={`min-w-0 cursor-pointer truncate text-left text-xs font-medium underline-offset-2 hover:underline ${
+                        position.is_active ? "text-sky-700" : "text-slate-400"
+                      }`}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </IconButton>
-                  </>
-                )}
-              </li>
-              );
-            })}
-            {positions.length < count ? (
-              <li className="px-3 py-2">
-                <Button variant="outline" size="sm" icon={ChevronDown} loading={loadingMore} onClick={loadMore}>
-                  Cargar más
-                </Button>
-              </li>
-            ) : null}
-          </ul>
+                      {position.code}
+                    </button>
+                    <span className={`inline-flex min-w-0 items-center gap-1 truncate text-[11px] ${mark.text}`}>
+                      <span className={`h-1.5 w-1.5 shrink-0 ${mark.dot}`} />
+                      {mark.label}
+                    </span>
+                    <FlagCell on={Boolean(position.is_push)} onClass="text-amber-700" label="Push" />
+                    {readOnly ? (
+                      <FlagCell
+                        on={Boolean(position.is_picking)}
+                        onClass="text-sky-700"
+                        label="Picking"
+                      />
+                    ) : (
+                      <>
+                        <div className="flex justify-center">
+                          <MiniSwitch
+                            id={`cell-position-picking-${position.id}`}
+                            aria-label="Picking"
+                            checked={Boolean(position.is_picking)}
+                            disabled={busy}
+                            onChange={() => togglePicking(position)}
+                          />
+                        </div>
+                        <div className="flex justify-center">
+                          <MiniSwitch
+                            id={`cell-position-active-${position.id}`}
+                            aria-label={position.is_active ? "Activo" : "Inactivo"}
+                            checked={Boolean(position.is_active)}
+                            disabled={busy}
+                            onChange={() => toggleActive(position)}
+                          />
+                        </div>
+                        <div className="flex justify-end">
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            aria-label="Eliminar"
+                            disabled={busy}
+                            onClick={() => setPendingDelete(position)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </IconButton>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+              {positions.length < count ? (
+                <li className="px-3 py-2">
+                  <Button variant="outline" size="sm" icon={ChevronDown} loading={loadingMore} onClick={loadMore}>
+                    Cargar más
+                  </Button>
+                </li>
+              ) : null}
+            </ul>
+          </div>
         ) : (
           <p className="px-3 py-3 text-xs text-slate-500">Esta celda no tiene posiciones.</p>
         )}
