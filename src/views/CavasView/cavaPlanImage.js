@@ -7,7 +7,6 @@ import {
   countSlots,
   depthCodesOf,
   emptyOccupancyKpis,
-  anyFloorShowsPositions,
   floorAcrossOf,
   floorHallToken,
   floorOverlaps,
@@ -569,6 +568,20 @@ function text(x, y, value, { size = 13, weight = "600", anchor = "middle", basel
   return `<text x="${x}" y="${y}" text-anchor="${anchor}" dominant-baseline="${baseline}" font-family="ui-sans-serif, system-ui, sans-serif" fill="${LABEL}" font-size="${size}" font-weight="${weight}">${escapeXml(value)}</text>`;
 }
 
+function drawPickingCheck(parts, mx, my, dot) {
+  const pad = Math.max(1.2, dot * 0.22);
+  const x1 = mx + pad;
+  const y1 = my + dot * 0.52;
+  const x2 = mx + dot * 0.42;
+  const y2 = my + dot - pad;
+  const x3 = mx + dot - pad;
+  const y3 = my + pad * 1.1;
+  const stroke = Math.max(1.25, dot * 0.18);
+  parts.push(
+    `<polyline points="${x1},${y1} ${x2},${y2} ${x3},${y3}" fill="none" stroke="#ffffff" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"/>`,
+  );
+}
+
 function drawMarks(parts, x, y, width, height, marks, levels = 0) {
   const real = marks?.length ? [...marks].sort((a, b) => a.level - b.level) : null;
   const count = real ? real.length : levels >= 1 ? levels : 0;
@@ -589,9 +602,11 @@ function drawMarks(parts, x, y, width, height, marks, levels = 0) {
     const my = originY + row * (dot + gap);
     if (real) {
       const mark = real[index];
+      const tip = mark.is_picking ? " · Picking" : "";
       parts.push(
-        `<rect x="${mx}" y="${my}" width="${dot}" height="${dot}" fill="${markFill(mark)}"><title>Nivel ${mark.level} · ${escapeXml(markName(mark))}</title></rect>`,
+        `<rect x="${mx}" y="${my}" width="${dot}" height="${dot}" fill="${markFill(mark)}"><title>Nivel ${mark.level} · ${escapeXml(markName(mark))}${tip}</title></rect>`,
       );
+      if (mark.is_picking) drawPickingCheck(parts, mx, my, dot);
     } else {
       parts.push(
         `<rect x="${mx}" y="${my}" width="${dot}" height="${dot}" fill="none" stroke="${PLACEHOLDER}" stroke-width="1.5"><title>Nivel ${index + 1}</title></rect>`,
@@ -603,7 +618,7 @@ function drawMarks(parts, x, y, width, height, marks, levels = 0) {
 function drawRackUnit(parts, x, y, item, token, occupancy) {
   const tunnel = isTunnelToken(occupancy, item.hall, token, item.rawPlaces || item.places);
   const stroke = tunnel ? TUNNEL : INK;
-  const strokeW = 1.5;
+  const strokeW = tunnel ? 2.5 : 1.5;
   let gridX = x;
   let gridY = y;
   let labelX = x + item.gridW / 2;
@@ -733,6 +748,9 @@ function drawItem(parts, item, x, y, occupancy) {
           parts.push(
             `<rect x="${dotX}" y="${dotY}" width="${markW}" height="${markH}" fill="${markFill(mark)}"/>`,
           );
+          if (mark.is_picking) {
+            drawPickingCheck(parts, dotX, dotY, Math.min(markW, markH));
+          }
         } else {
           parts.push(
             `<rect x="${dotX}" y="${dotY}" width="${markW}" height="${markH}" fill="none" stroke="${PLACEHOLDER}" stroke-width="1.25"/>`,
@@ -1182,9 +1200,8 @@ export function buildCavaPlanSvg({ name, code, blocks, nomenclature, occupancy =
   const frameInnerLeft = contentOriginX;
   const frameInnerRight = contentOriginX + contentWidth;
   const title = cavaTitleOf(name, code);
-  const floorVisible = anyFloorShowsPositions(blocks, layout);
   const total = countSlots(blocks, { planLayout: layout });
-  const cavaKpis = cavaOccupancyKpis(occupancy, { includeFloorPositions: floorVisible });
+  const cavaKpis = cavaOccupancyKpis(occupancy, { blocks, planLayout: layout });
   const shownTotal = cavaKpis.total || total;
   const parts = [];
   let y = PAD + HEADER + FRAME;
@@ -1286,7 +1303,10 @@ export function buildCavaPlanSvg({ name, code, blocks, nomenclature, occupancy =
     ["#f97316", "Asignado", cavaKpis.asignado],
     ["#ef4444", "Ocupado", cavaKpis.ocupado],
     ["#94a3b8", "Inactivo", cavaKpis.inactivo],
+    ["#0ea5e9", "Picking", cavaKpis.picking],
+    ["#f59e0b", "Push", cavaKpis.push],
   ];
+  const legendStep = Math.max(96, Math.floor((Math.max(width, 720) - PAD * 2) / legendRows.length));
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <rect width="100%" height="100%" fill="#ffffff"/>
@@ -1294,7 +1314,7 @@ export function buildCavaPlanSvg({ name, code, blocks, nomenclature, occupancy =
   <text x="${PAD}" y="${PAD + 28}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600" fill="${TITLE}">${shownTotal} ubicaciones</text>
   ${legendRows
     .map(([color, label, count], index) => {
-      const legendX = PAD + index * 118;
+      const legendX = PAD + index * legendStep;
       return `<rect x="${legendX}" y="${PAD + 38}" width="8" height="8" fill="${color}"/><text x="${legendX + 14}" y="${PAD + 46}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="${LABEL}">${label} ${count}</text>`;
     })
     .join("")}

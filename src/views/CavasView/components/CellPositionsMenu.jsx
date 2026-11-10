@@ -12,7 +12,7 @@ import { getApiErrorMessage } from "@/services/httpClient";
 import { deletePosition, getCellPositions, patchPosition } from "@/services/storageService";
 import { revalidateBins, revalidatePositions } from "@/lib/swr";
 
-const MENU_WIDTH = 420;
+const MENU_WIDTH = 520;
 
 const STATUS_LABEL = {
   libre: "Libre",
@@ -168,6 +168,25 @@ export default function CellPositionsMenu({
     }
   }
 
+  async function togglePicking(position) {
+    setBusyId(position.id);
+    setError("");
+    try {
+      const updated = await patchPosition(position.id, { is_picking: !position.is_picking });
+      setPositions((rows) =>
+        rows.map((row) =>
+          row.id === position.id ? { ...row, is_picking: updated.is_picking } : row,
+        ),
+      );
+      await revalidatePositions();
+      onChanged?.();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "No se pudo actualizar la posición."));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) return;
     setDeleting(true);
@@ -236,8 +255,21 @@ export default function CellPositionsMenu({
                   <span className={`h-1.5 w-1.5 ${mark.dot}`} />
                   {mark.label}
                 </span>
-                {readOnly ? null : (
+                {readOnly ? (
+                  position.is_picking ? (
+                    <span className="shrink-0 text-[11px] font-medium text-sky-700">Picking</span>
+                  ) : null
+                ) : (
                   <>
+                    <Form.Check
+                      type="switch"
+                      id={`cell-position-picking-${position.id}`}
+                      className="!min-h-0 shrink-0 gap-1.5"
+                      label="Picking"
+                      checked={Boolean(position.is_picking)}
+                      disabled={busyId === position.id}
+                      onChange={() => togglePicking(position)}
+                    />
                     <Form.Check
                       type="switch"
                       id={`cell-position-active-${position.id}`}

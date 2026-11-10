@@ -186,6 +186,16 @@ export function anyFloorShowsPositions(blocks, planLayout = null) {
   return (blocks || []).some((block) => isFloorBlock(block) && block?.always_visible === true);
 }
 
+/** Halls de piso visibles según check general y «siempre visible». */
+export function visibleFloorHalls(blocks, planLayout = null) {
+  const halls = new Set();
+  (blocks || []).forEach((block) => {
+    if (!floorShowsPositions(block, planLayout)) return;
+    halls.add(floorHallToken(sectionNeighbors(blocks, block)));
+  });
+  return halls;
+}
+
 /** Cuántas posiciones caben por grupo en la hilera (dimensión). Default 3. */
 export function floorAcrossOf(block) {
   const raw = Number(block?.depth);
@@ -224,12 +234,23 @@ export function countSlots(
 }
 
 export function emptyOccupancyKpis() {
-  return { total: 0, libre: 0, asignado: 0, ocupado: 0, inactivo: 0, activa: 0 };
+  return {
+    total: 0,
+    libre: 0,
+    asignado: 0,
+    ocupado: 0,
+    inactivo: 0,
+    activa: 0,
+    picking: 0,
+    push: 0,
+  };
 }
 
 export function accumulateOccupancyKpi(kpis, row) {
   if (!row || !kpis) return;
   kpis.total += 1;
+  if (row.is_picking) kpis.picking += 1;
+  if (row.is_push) kpis.push += 1;
   if (!row.is_active) {
     kpis.inactivo += 1;
     return;
@@ -264,13 +285,47 @@ export function blockOccupancyKpis(block, blocks, occupancy) {
   return kpis;
 }
 
+/** True si todas las posiciones de la hilera rack tienen is_push. */
+export function blockIsPush(block, blocks, occupancy) {
+  if (block?.kind !== "rack") return false;
+  const hall = suggestedAisleCode(blocks, block);
+  const tokens = rackTokensOf(block);
+  const places = depthCodesOf(block);
+  let total = 0;
+  let push = 0;
+  tokens.forEach((token) => {
+    places.forEach((place) => {
+      (occupancy?.[slotKey(hall, token, place)] || []).forEach((row) => {
+        total += 1;
+        if (row.is_push) push += 1;
+      });
+    });
+  });
+  return total > 0 && push === total;
+}
+
 /** KPIs totales de la cava. */
-export function cavaOccupancyKpis(occupancy, { includeFloorPositions = true, includeAislePositions } = {}) {
+export function cavaOccupancyKpis(
+  occupancy,
+  {
+    includeFloorPositions = true,
+    includeAislePositions,
+    blocks = null,
+    planLayout = null,
+  } = {},
+) {
   const includeFloor = includeAislePositions ?? includeFloorPositions;
+  const floorHalls = blocks != null ? visibleFloorHalls(blocks, planLayout) : null;
   const kpis = emptyOccupancyKpis();
   Object.values(occupancy || {}).forEach((marks) => {
     (marks || []).forEach((row) => {
-      if (!includeFloor && isAisleOverflowPosition(row)) return;
+      if (isAisleOverflowPosition(row)) {
+        if (floorHalls) {
+          if (!floorHalls.has(String(row.hall || "").trim())) return;
+        } else if (!includeFloor) {
+          return;
+        }
+      }
       accumulateOccupancyKpi(kpis, row);
     });
   });

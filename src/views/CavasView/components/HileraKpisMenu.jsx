@@ -5,7 +5,11 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { motion } from "motion/react";
 
+import { Form } from "@/components/ui/bootstrap";
 import { IconButton } from "@/components/ui/Button";
+import { getApiErrorMessage } from "@/services/httpClient";
+import { setHileraPush } from "@/services/storageService";
+import { revalidatePositions } from "@/lib/swr";
 import { emptyOccupancyKpis } from "../cavaPlan";
 
 const MENU_WIDTH = 220;
@@ -17,6 +21,8 @@ const ROWS = [
   { key: "asignado", label: "Asignado", dot: "bg-orange-500", text: "text-orange-700" },
   { key: "ocupado", label: "Ocupado", dot: "bg-red-500", text: "text-red-700" },
   { key: "inactivo", label: "Inactivo", dot: "bg-slate-400", text: "text-slate-500" },
+  { key: "picking", label: "Picking", dot: "bg-sky-500", text: "text-sky-700" },
+  { key: "push", label: "Push", dot: "bg-amber-500", text: "text-amber-700" },
 ];
 
 function menuPosition(anchorEl) {
@@ -35,10 +41,27 @@ function menuPosition(anchorEl) {
     : { left, top: rect.bottom + gap, bottom: "auto" };
 }
 
-export default function HileraKpisMenu({ title, kpis, anchorEl, onClose }) {
+export default function HileraKpisMenu({
+  title,
+  kpis,
+  anchorEl,
+  onClose,
+  cavaId = null,
+  hall = "",
+  racks = null,
+  showPush = false,
+  isPush = false,
+  readOnly = false,
+  onChanged,
+}) {
   const data = kpis || emptyOccupancyKpis();
   const [coords, setCoords] = useState(null);
+  const [pushOn, setPushOn] = useState(Boolean(isPush));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const menuRef = useRef(null);
+  const canTogglePush =
+    showPush && !readOnly && Boolean(cavaId) && Array.isArray(racks) && racks.length > 0;
 
   useLayoutEffect(() => {
     if (!anchorEl) return undefined;
@@ -59,6 +82,11 @@ export default function HileraKpisMenu({ title, kpis, anchorEl, onClose }) {
   }, [anchorEl, onClose]);
 
   useEffect(() => {
+    setPushOn(Boolean(isPush));
+    setError("");
+  }, [isPush, title]);
+
+  useEffect(() => {
     function onPointerDown(event) {
       if (menuRef.current?.contains(event.target)) return;
       if (anchorEl?.contains(event.target)) return;
@@ -74,6 +102,23 @@ export default function HileraKpisMenu({ title, kpis, anchorEl, onClose }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [anchorEl, onClose]);
+
+  async function togglePush() {
+    if (!canTogglePush || busy) return;
+    const next = !pushOn;
+    setBusy(true);
+    setError("");
+    try {
+      await setHileraPush(cavaId, { hall, racks, is_push: next });
+      setPushOn(next);
+      await revalidatePositions();
+      onChanged?.();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "No se pudo actualizar push."));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (typeof document === "undefined" || !coords) return null;
 
@@ -93,6 +138,28 @@ export default function HileraKpisMenu({ title, kpis, anchorEl, onClose }) {
           <X className="h-4 w-4" />
         </IconButton>
       </div>
+      {error ? <p className="px-3 pt-2 text-xs text-red-600">{error}</p> : null}
+      {showPush ? (
+        <div className="border-b border-slate-100 px-3 py-2">
+          {readOnly ? (
+            pushOn ? (
+              <span className="text-xs font-medium text-sky-700">Push</span>
+            ) : (
+              <span className="text-xs text-slate-400">Sin push</span>
+            )
+          ) : (
+            <Form.Check
+              type="switch"
+              id={`hilera-push-${title}`}
+              className="!min-h-0 gap-1.5"
+              label="Push"
+              checked={pushOn}
+              disabled={!canTogglePush || busy}
+              onChange={togglePush}
+            />
+          )}
+        </div>
+      ) : null}
       <ul className="py-1">
         {ROWS.map((row) => (
           <li key={row.key} className="flex items-center justify-between gap-3 px-3 py-1.5">

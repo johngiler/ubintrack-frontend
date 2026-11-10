@@ -1387,8 +1387,9 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
           <Modal.Title>Regenerar posiciones</Modal.Title>
         </Modal.Header>
         <Modal.Body className="space-y-2 text-sm text-slate-600">
-          <p>Se borrarán todas las posiciones de esta cava.</p>
-          <p>Luego se crearán de nuevo según el plano y la nomenclatura actual.</p>
+          <p>Se crearán las ubicaciones nuevas del plano.</p>
+          <p>Las posiciones eliminadas se volverán a crear.</p>
+          <p>Las que ya existen (incluidas desactivadas o editadas) no se modifican.</p>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" icon={X} onClick={() => setConfirmGenerate(false)}>

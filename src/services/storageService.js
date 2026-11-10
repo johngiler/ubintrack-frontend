@@ -80,6 +80,15 @@ export async function getCavaOccupancy(id) {
   return response.data;
 }
 
+export async function setHileraPush(id, { hall = "", racks = [], is_push }) {
+  const response = await httpClient.post(`/api/cavas/${id}/set_hilera_push/`, {
+    hall,
+    racks,
+    is_push: Boolean(is_push),
+  });
+  return response.data;
+}
+
 export async function getCavaGeneration(id) {
   const response = await httpClient.get(`/api/cavas/${id}/generation/`);
   return response.data;

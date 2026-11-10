@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Download, Expand } from "lucide-react";
+import { Check, Download, Expand } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 
 import { Button, Form } from "@/components/ui/bootstrap";
@@ -9,12 +9,12 @@ import { getCavaOccupancy } from "@/services/storageService";
 import {
   aisleDisplayName,
   aisleLabelForCode,
+  blockIsPush,
   blockOccupancyKpis,
   cavaOccupancyKpis,
   cavaTitleOf,
   countSlots,
   depthCodesOf,
-  anyFloorShowsPositions,
   floorAcrossOf,
   floorHallToken,
   floorOverlaps,
@@ -363,10 +363,14 @@ function LevelMarks({ marks, levels = 0 }) {
         ) : (
           <span
             key={item.level}
-            title={`Nivel ${item.level} · ${markLabel(item)}`}
-            className={`shrink-0 ${markClass(item)}`}
+            title={`Nivel ${item.level} · ${markLabel(item)}${item.is_picking ? " · Picking" : ""}`}
+            className={`relative flex shrink-0 items-center justify-center ${markClass(item)}`}
             style={{ width: MARK, height: MARK }}
-          />
+          >
+            {item.is_picking ? (
+              <Check className="h-[70%] w-[70%] text-white" strokeWidth={3} aria-hidden />
+            ) : null}
+          </span>
         ),
       )}
     </span>
@@ -500,11 +504,13 @@ function RackDrawing({
   const labelLeft = vertical && labelSide === "above";
   const labelAbove = !vertical && labelSide === "above";
   const cellBorder = tunnel ? "border-amber-500" : "border-slate-900";
+  const edgeBorder = tunnel ? "border-l-2 border-t-2" : "border-l border-t";
+  const cellEdge = tunnel ? "border-b-2 border-r-2" : "border-b border-r";
 
   // Borde externo en el grid + solo right/bottom en celdas → sin doble trazo interno.
   const grid = (
     <div
-      className={`grid shrink-0 border-l border-t bg-white ${cellBorder}`}
+      className={`grid shrink-0 bg-white ${edgeBorder} ${cellBorder}`}
       style={{
         gridTemplateColumns: `repeat(${columns}, ${CELL}px)`,
         gridTemplateRows: `repeat(${rows}, ${CELL}px)`,
@@ -519,7 +525,7 @@ function RackDrawing({
             type="button"
             aria-pressed={selected}
             aria-label={`${label} ${place}`}
-            className={`flex h-full w-full cursor-pointer items-center justify-center border-b border-r bg-white ${cellBorder} ${selected ? "ring-2 ring-inset ring-sky-500" : "hover:bg-slate-50"}`}
+            className={`flex h-full w-full cursor-pointer items-center justify-center bg-white ${cellEdge} ${cellBorder} ${selected ? "ring-2 ring-inset ring-sky-500" : "hover:bg-slate-50"}`}
             onClick={(event) => onSelect(place, event)}
           >
             <LevelMarks marks={marks} levels={levels} />
@@ -736,12 +742,18 @@ function AislePalletMark({
   return (
     <span
       aria-hidden
-      title={item ? `${place} · ${markLabel(item)}` : place}
+      title={item ? `${place} · ${markLabel(item)}${item.is_picking ? " · Picking" : ""}` : place}
       className="pointer-events-none flex shrink-0 items-center justify-center"
       style={{ width, height }}
     >
       {item ? (
-        <span className={`block h-full w-full ${markClass(item)}`} />
+        <span
+          className={`relative flex h-full w-full items-center justify-center ${markClass(item)}`}
+        >
+          {item.is_picking ? (
+            <Check className="h-[65%] w-[65%] text-white" strokeWidth={3} aria-hidden />
+          ) : null}
+        </span>
       ) : (
         <span className="block h-full w-full border border-amber-400 bg-transparent" />
       )}
@@ -1128,9 +1140,13 @@ export default function CavaPlan({
 }) {
   const cavaTitle = cavaTitleOf(name, code);
   const rackPrefix = nomenclature?.rack_prefix || "";
-  const layout = useMemo(() => normalizePlanLayout(planLayout, blocks), [planLayout, blocks]);
+  const baseLayout = useMemo(() => normalizePlanLayout(planLayout, blocks), [planLayout, blocks]);
+  const [floorPreview, setFloorPreview] = useState(null);
+  const layout = useMemo(() => {
+    if (floorPreview === null) return baseLayout;
+    return { ...baseLayout, show_floor_positions: floorPreview };
+  }, [baseLayout, floorPreview]);
   const showFloorPositions = Boolean(layout.show_floor_positions);
-  const floorVisible = anyFloorShowsPositions(blocks, layout);
   const total = countSlots(blocks, { planLayout: layout });
   const masterAxis = defaultOrientationOf(layout, blocks);
   const sections = useMemo(
@@ -1146,13 +1162,17 @@ export default function CavaPlan({
   const [measuredTrackW, setMeasuredTrackW] = useState(0);
   const rackSpanRefs = useRef(new Map());
   const cavaKpis = useMemo(
-    () => cavaOccupancyKpis(occupancy, { includeFloorPositions: floorVisible }),
-    [occupancy, floorVisible],
+    () => cavaOccupancyKpis(occupancy, { blocks, planLayout: layout }),
+    [occupancy, blocks, layout],
   );
   const planImage = useMemo(
     () => buildCavaPlanSvg({ name, code, blocks, nomenclature, occupancy, planLayout: layout }),
     [name, code, blocks, nomenclature, occupancy, layout],
   );
+
+  useEffect(() => {
+    setFloorPreview(null);
+  }, [cavaId, planLayout]);
 
   const refreshTrackWidth = () => {
     let max = 0;
@@ -1268,6 +1288,11 @@ export default function CavaPlan({
       : kpiBlock
         ? blockOccupancyKpis(kpiBlock, blocks, occupancy)
         : null;
+  const kpiPushDepth = kpiBlock?.kind === "rack" ? depthCodesOf(kpiBlock).length : 0;
+  const kpiShowPush = kpiSelected?.scope === "hilera" && kpiPushDepth > 2;
+  const kpiPushHall = kpiShowPush ? suggestedAisleCode(blocks, kpiBlock) : "";
+  const kpiPushRacks = kpiShowPush ? rackTokensOf(kpiBlock) : null;
+  const kpiIsPush = kpiShowPush ? blockIsPush(kpiBlock, blocks, occupancy) : false;
 
   function selectCell(block, token, place, event) {
     const anchorEl = event.currentTarget;
@@ -1836,21 +1861,36 @@ export default function CavaPlan({
                   <span className="h-1.5 w-1.5 bg-slate-400" /> Inactivo{" "}
                   <span className="font-semibold tabular-nums text-slate-700">{cavaKpis.inactivo}</span>
                 </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 bg-sky-500" /> Picking{" "}
+                  <span className="font-semibold tabular-nums text-slate-700">{cavaKpis.picking}</span>
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 bg-amber-500" /> Push{" "}
+                  <span className="font-semibold tabular-nums text-slate-700">{cavaKpis.push}</span>
+                </span>
               </span>
             ) : null}
           </button>
         </div>
         {sections.length ? (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            {typeof onShowFloorPositionsChange === "function" ? (
+            {typeof onShowFloorPositionsChange === "function" || readOnly ? (
               <Form.Check
                 type="checkbox"
                 id="cava-show-floor-positions"
                 className="!mb-0 text-xs"
                 label="Ver posiciones de piso"
                 checked={showFloorPositions}
-                disabled={readOnly}
-                onChange={(event) => onShowFloorPositionsChange(event.target.checked)}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  if (readOnly || typeof onShowFloorPositionsChange !== "function") {
+                    setFloorPreview(checked);
+                    return;
+                  }
+                  setFloorPreview(null);
+                  onShowFloorPositionsChange(checked);
+                }}
               />
             ) : null}
             <Button variant="outline" size="sm" icon={Expand} onClick={onOpen}>
@@ -1886,6 +1926,13 @@ export default function CavaPlan({
             kpis={kpiMenuData}
             anchorEl={kpiSelected.anchorEl}
             onClose={() => setKpiSelected(null)}
+            cavaId={cavaId}
+            hall={kpiPushHall}
+            racks={kpiPushRacks}
+            showPush={kpiShowPush}
+            isPush={kpiIsPush}
+            readOnly={readOnly}
+            onChanged={() => setOccupancyTick((value) => value + 1)}
           />
         ) : null}
       </AnimatePresence>
