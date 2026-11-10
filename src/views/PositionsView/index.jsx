@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -25,18 +25,25 @@ import {
   Button,
   Alert,
   Pagination,
-  Form,
   Table,
 } from "@/components/ui/bootstrap";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import PositionsViewSkeleton from "./PositionsViewSkeleton";
-import { getPositions, getCavas, printPosition } from "@/services/storageService";
+import {
+  getPositions,
+  getPositionHalls,
+  getCavas,
+  getCava,
+  printPosition,
+} from "@/services/storageService";
 import { canCRUD } from "@/services/httpClient";
-import { cavaTitleOf, formatLocation, statusBadgeVariant, statusLabels } from "./positionLabels";
+import { aisleDisplayName, isSectionBlock } from "../CavasView/cavaPlan";
+import { cavaTitleOf, statusBadgeVariant, statusLabels } from "./positionLabels";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
 import PositionExpandedBins from "./components/PositionExpandedBins";
@@ -76,6 +83,42 @@ export default function PositionsView() {
 
   const { data: cavasData } = useSWR(["cavas", "options"], () => getCavas(1, "", 200));
   const cavas = cavasData?.results || [];
+  const cavaOptions = cavas.map((cava) => ({
+    value: String(cava.id),
+    label: `${cavaTitleOf(cava.name, cava.code)}${
+      cava.condition ? ` · ${cava.condition}` : ""
+    }`,
+  }));
+
+  const { data: hallsData } = useSWR(
+    ["positions", "halls", filters.cava_id || "all"],
+    () => getPositionHalls({ cavaId: filters.cava_id || undefined }),
+  );
+  const { data: cavaDetail } = useSWR(
+    filters.cava_id ? ["cava", filters.cava_id, "hall-labels"] : null,
+    () => getCava(filters.cava_id),
+  );
+  const hallOptions = useMemo(() => {
+    const labels = new Map();
+    (cavaDetail?.blocks || []).forEach((block) => {
+      const code = String(block?.code || "").trim();
+      if (!code || !isSectionBlock(block)) return;
+      labels.set(code, aisleDisplayName(block));
+    });
+    return (Array.isArray(hallsData) ? hallsData : []).map((row) => {
+      const value = String(row.value ?? row).trim();
+      return { value, label: labels.get(value) || value };
+    });
+  }, [hallsData, cavaDetail]);
+
+  const statusOptions = Object.entries(statusLabels).map(([value, label]) => ({
+    value,
+    label,
+  }));
+  const activeOptions = [
+    { value: "true", label: "Sí" },
+    { value: "false", label: "No" },
+  ];
 
   useEffect(() => {
     setCurrentPage(1);
@@ -119,7 +162,12 @@ export default function PositionsView() {
   };
 
   const handleFilterChange = (field, value) => {
-    setFilters((prev) => ({ ...prev, [field]: value }));
+    setFilters((prev) => {
+      const next = { ...prev, [field]: value };
+      // Al cambiar cava, el token de pasillo puede no aplicar.
+      if (field === "cava_id") next.hall = "";
+      return next;
+    });
     setSearchParams({});
   };
 
@@ -204,56 +252,49 @@ export default function PositionsView() {
                   placeholder="Buscar por posición, bin o cliente…"
                   className="!w-[280px] !min-w-[280px] !max-w-[280px] shrink-0"
                 />
-                <Form.Select
+                <Select
                   size="sm"
-                  value={filters.cava_id}
-                  onChange={(e) => handleFilterChange("cava_id", e.target.value)}
+                  isClearable
                   aria-label="Filtrar por cava"
-                  className="!w-[150px] shrink-0"
-                  style={{ minWidth: "150px" }}
-                >
-                  <option value="">Cavas</option>
-                  {cavas.map((cava) => (
-                    <option key={cava.id} value={cava.id}>
-                      {cava.name} ({cava.condition})
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Control
-                  size="sm"
-                  value={filters.hall}
-                  onChange={(e) => handleFilterChange("hall", e.target.value)}
-                  aria-label="Filtrar por pasillo"
-                  placeholder="Pasillo"
-                  className="!h-8 !w-[120px] shrink-0"
+                  placeholder="Cava"
+                  className="!w-[200px] shrink-0"
+                  options={cavaOptions}
+                  value={filters.cava_id}
+                  onChange={(e) => handleFilterChange("cava_id", e.target.value || "")}
                 />
-                <Form.Select
+                <Select
                   size="sm"
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange("status", e.target.value)}
+                  isClearable
+                  aria-label="Filtrar por pasillo o túnel"
+                  placeholder="Pasillo / túnel"
+                  className="!w-[140px] shrink-0"
+                  options={hallOptions}
+                  value={filters.hall}
+                  onChange={(e) => handleFilterChange("hall", e.target.value || "")}
+                  noOptionsMessage={() =>
+                    filters.cava_id ? "Sin secciones" : "Sin tokens"
+                  }
+                />
+                <Select
+                  size="sm"
+                  isClearable
                   aria-label="Filtrar por estado"
+                  placeholder="Estado"
                   className="!w-[130px] shrink-0"
-                  style={{ minWidth: "130px" }}
-                >
-                  <option value="">Estado</option>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Select
+                  options={statusOptions}
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange("status", e.target.value || "")}
+                />
+                <Select
                   size="sm"
-                  value={filters.is_active}
-                  onChange={(e) => handleFilterChange("is_active", e.target.value)}
+                  isClearable
                   aria-label="Filtrar por activo"
-                  className="!w-[120px] shrink-0"
-                  style={{ minWidth: "120px" }}
-                >
-                  <option value="">Activo</option>
-                  <option value="true">Sí</option>
-                  <option value="false">No</option>
-                </Form.Select>
+                  placeholder="Activo"
+                  className="!w-[110px] shrink-0"
+                  options={activeOptions}
+                  value={filters.is_active}
+                  onChange={(e) => handleFilterChange("is_active", e.target.value || "")}
+                />
                 {hasFilters && (
                   <Button
                     variant="outline"
@@ -286,17 +327,14 @@ export default function PositionsView() {
               {isLoading ? (
                 <PositionsViewSkeleton />
               ) : positions.length > 0 ? (
-                <Table hover responsive className="mb-0 min-w-[1100px]">
+                <Table hover responsive className="mb-0 min-w-[960px]">
                   <Table.Head>
                     <tr>
-                      <Table.HeaderCell className="min-w-[140px] normal-case tracking-normal">
+                      <Table.HeaderCell className="min-w-[160px] normal-case tracking-normal">
                         Código
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[180px] normal-case tracking-normal">
                         Cava / Almacén
-                      </Table.HeaderCell>
-                      <Table.HeaderCell className="min-w-[280px] normal-case tracking-normal">
-                        Ubicación
                       </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[120px] normal-case tracking-normal">
                         Estado
@@ -321,6 +359,7 @@ export default function PositionsView() {
                       const currentBin =
                         position.bins?.find((bin) => bin.status === "almacenado") ||
                         position.bins?.find((bin) => bin.status !== "despachado");
+                      const hallToken = String(position.hall || "").trim();
 
                       return (
                         <Fragment key={position.id}>
@@ -338,20 +377,25 @@ export default function PositionsView() {
                                   <ChevronDown className="h-4 w-4 text-slate-400" />
                                 )}
                               </button>
+                              {hallToken ? (
+                                <div className="mt-0.5 text-[11px] text-slate-400">
+                                  {hallToken}
+                                  {position.rack ? ` · R${position.rack}` : " · Piso"}
+                                </div>
+                              ) : null}
                             </Table.Cell>
                             <Table.Cell>
                               <div className="flex flex-col">
                                 <span className="font-medium text-slate-800">
-                                  {cavaTitleOf(position.cava?.name, position.cava?.code)} ({position.cava?.condition})
+                                  {cavaTitleOf(position.cava?.name, position.cava?.code)}
+                                  {position.cava?.condition
+                                    ? ` · ${position.cava.condition}`
+                                    : ""}
                                 </span>
                                 <span className="text-xs text-slate-500">
                                   {position.cava?.storage?.name || "—"}
                                 </span>
                               </div>
-                            </Table.Cell>
-                            <Table.Cell>
-                              <div className="text-sm text-slate-700">{formatLocation(position)}</div>
-                              <div className="text-xs text-slate-500">{position.code}</div>
                             </Table.Cell>
                             <Table.Cell>
                               <div className="flex flex-col items-start gap-1">

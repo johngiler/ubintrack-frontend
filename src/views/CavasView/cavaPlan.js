@@ -285,23 +285,25 @@ export function blockOccupancyKpis(block, blocks, occupancy) {
   return kpis;
 }
 
-/** True si todas las posiciones de la hilera rack tienen is_push. */
+/** True si todas las posiciones activas de la hilera rack tienen is_push. */
 export function blockIsPush(block, blocks, occupancy) {
   if (block?.kind !== "rack") return false;
   const hall = suggestedAisleCode(blocks, block);
   const tokens = rackTokensOf(block);
   const places = depthCodesOf(block);
-  let total = 0;
+  let active = 0;
   let push = 0;
   tokens.forEach((token) => {
     places.forEach((place) => {
       (occupancy?.[slotKey(hall, token, place)] || []).forEach((row) => {
-        total += 1;
+        // Inactivas no llevan push; no cuentan para el estado de la hilera.
+        if (!row.is_active) return;
+        active += 1;
         if (row.is_push) push += 1;
       });
     });
   });
-  return total > 0 && push === total;
+  return active > 0 && push === active;
 }
 
 /** KPIs totales de la cava. */

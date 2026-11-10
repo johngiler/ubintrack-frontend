@@ -7,6 +7,14 @@ import { Modal, Button, Form, Row, Col, Alert } from "@/components/ui/bootstrap"
 import Select from "@/components/ui/Select";
 import { createPosition, updatePosition, getCavas } from "@/services/storageService";
 import { getApiErrorMessage } from "@/services/httpClient";
+import {
+  canEnablePicking,
+  canEnablePush,
+  positionFlagsError,
+  withActiveChange,
+  withPickingChange,
+  withPushChange,
+} from "@/lib/positionFlags";
 import { cavaTitleOf, statusLabels } from "../positionLabels";
 
 const EMPTY_POSITION = {
@@ -91,6 +99,13 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
       return;
     }
 
+    const flagsError = positionFlagsError(formData);
+    if (flagsError) {
+      setShowValidation(true);
+      setFormError(flagsError);
+      return;
+    }
+
     setShowValidation(false);
     setFormError(null);
     setIsSaving(true);
@@ -117,11 +132,12 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
       onHide();
       showAlert("success", "Posición guardada correctamente");
     } catch (err) {
-      const fieldPush = err?.response?.data?.is_push;
-      const apiMsg = Array.isArray(fieldPush)
-        ? fieldPush[0]
-        : typeof fieldPush === "string"
-          ? fieldPush
+      const data = err?.response?.data || {};
+      const fieldMsg = data.is_push || data.is_picking || data.is_active;
+      const apiMsg = Array.isArray(fieldMsg)
+        ? fieldMsg[0]
+        : typeof fieldMsg === "string"
+          ? fieldMsg
           : getApiErrorMessage(err, "Error al guardar la posición");
       setFormError(apiMsg);
     } finally {
@@ -320,7 +336,10 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
                   label={formData.is_active ? "Activo" : "Inactivo"}
                   checked={Boolean(formData.is_active)}
                   disabled={readOnly}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  onChange={(e) => {
+                    setFormError(null);
+                    setFormData(withActiveChange(formData, e.target.checked));
+                  }}
                 />
               </Form.Group>
             </Col>
@@ -333,8 +352,11 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
                   id="position-is-picking"
                   label={formData.is_picking ? "Sí" : "No"}
                   checked={Boolean(formData.is_picking)}
-                  disabled={readOnly}
-                  onChange={(e) => setFormData({ ...formData, is_picking: e.target.checked })}
+                  disabled={readOnly || !canEnablePicking(formData)}
+                  onChange={(e) => {
+                    setFormError(null);
+                    setFormData(withPickingChange(formData, e.target.checked));
+                  }}
                 />
               </Form.Group>
             </Col>
@@ -347,10 +369,10 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
                   id="position-is-push"
                   label={formData.is_push ? "Sí" : "No"}
                   checked={Boolean(formData.is_push)}
-                  disabled={readOnly}
+                  disabled={readOnly || !canEnablePush(formData)}
                   onChange={(e) => {
                     setFormError(null);
-                    setFormData({ ...formData, is_push: e.target.checked });
+                    setFormData(withPushChange(formData, e.target.checked));
                   }}
                 />
                 <Form.Text className="text-muted">

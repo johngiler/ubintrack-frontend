@@ -94,6 +94,15 @@ export async function getCavaGeneration(id) {
   return response.data;
 }
 
+/** Tokens de pasillo/túnel (P1, T1, …) usados en posiciones. */
+export async function getPositionHalls({ cavaId } = {}) {
+  const params = new URLSearchParams();
+  if (cavaId) params.set("cava", String(cavaId));
+  const qs = params.toString();
+  const response = await httpClient.get(qs ? `/api/positions/halls/?${qs}` : "/api/positions/halls/");
+  return response.data;
+}
+
 // Positions
 export async function getPositions(page = 1, filters = {}, search = "") {
   // Construir la URL base

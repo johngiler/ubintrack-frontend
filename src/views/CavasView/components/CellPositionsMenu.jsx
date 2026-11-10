@@ -9,6 +9,7 @@ import { Button, Modal } from "@/components/ui/bootstrap";
 import { IconButton } from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import { useWmsNavigate } from "@/hooks/useWmsRouter";
+import { canEnablePicking } from "@/lib/positionFlags";
 import { getApiErrorMessage } from "@/services/httpClient";
 import { deletePosition, getCellPositions, patchPosition } from "@/services/storageService";
 import { revalidateBins, revalidatePositions } from "@/lib/swr";
@@ -208,7 +209,16 @@ export default function CellPositionsMenu({
     try {
       const updated = await patchPosition(position.id, { is_active: !position.is_active });
       setPositions((rows) =>
-        rows.map((row) => (row.id === position.id ? { ...row, is_active: updated.is_active } : row)),
+        rows.map((row) =>
+          row.id === position.id
+            ? {
+                ...row,
+                is_active: updated.is_active,
+                is_picking: updated.is_picking,
+                is_push: updated.is_push,
+              }
+            : row,
+        ),
       );
       await revalidatePositions();
       onChanged?.();
@@ -220,13 +230,29 @@ export default function CellPositionsMenu({
   }
 
   async function togglePicking(position) {
+    const next = !position.is_picking;
+    if (next && !canEnablePicking(position)) {
+      setError(
+        position.is_push
+          ? "Push y picking no pueden estar activos a la vez."
+          : "No se puede activar picking en una posición inactiva.",
+      );
+      return;
+    }
     setBusyId(position.id);
     setError("");
     try {
-      const updated = await patchPosition(position.id, { is_picking: !position.is_picking });
+      const updated = await patchPosition(position.id, { is_picking: next });
       setPositions((rows) =>
         rows.map((row) =>
-          row.id === position.id ? { ...row, is_picking: updated.is_picking } : row,
+          row.id === position.id
+            ? {
+                ...row,
+                is_picking: updated.is_picking,
+                is_push: updated.is_push,
+                is_active: updated.is_active,
+              }
+            : row,
         ),
       );
       await revalidatePositions();
@@ -339,7 +365,7 @@ export default function CellPositionsMenu({
                             id={`cell-position-picking-${position.id}`}
                             aria-label="Picking"
                             checked={Boolean(position.is_picking)}
-                            disabled={busy}
+                            disabled={busy || !canEnablePicking(position)}
                             onChange={() => togglePicking(position)}
                           />
                         </div>
