@@ -87,7 +87,7 @@ export default function CavasView() {
   }, [loadCavas, loadPositionTotals]);
 
   useEffect(() => {
-    if (error) showAlertMessage("danger", "Error al cargar las cavas");
+    if (error) showAlertMessage("danger", "Error al cargar las cámaras");
   }, [error, showAlertMessage]);
 
   const clearFilters = () => {
@@ -122,12 +122,12 @@ export default function CavasView() {
       )}
 
       <WmsPageHeader
-        title="Cavas"
-        description="Administra las cavas y sus condiciones de almacenamiento."
+        title="Cámaras"
+        description="Administra las cámaras y sus condiciones de almacenamiento."
         icon={Building}
         breadcrumbs={[
           { title: "Bodega", active: true },
-          { title: "Cavas", active: true },
+          { title: "Cámaras", active: true },
         ]}
       />
 
@@ -141,7 +141,7 @@ export default function CavasView() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onClear={() => setSearchTerm("")}
-                  placeholder="Buscar cava"
+                  placeholder="Buscar cámara"
                   className="!w-[220px] !min-w-[220px] !max-w-[220px] shrink-0"
                 />
                 {hasFilters && (
@@ -165,7 +165,7 @@ export default function CavasView() {
                       className="whitespace-nowrap"
                       onClick={handleNewCava}
                     >
-                      Nueva cava
+                      Nueva cámara
                     </Button>
                   )}
                 </div>
@@ -280,11 +280,11 @@ export default function CavasView() {
                   canCreate={perms.add}
                   onClearFilters={clearFilters}
                   onCreate={handleNewCava}
-                  emptyTitle="No hay cavas"
-                  emptyDescription="Comienza creando la primera cava del almacén."
-                  filtersTitle="No se encontraron cavas"
-                  filtersDescription="Intenta ajustar tu búsqueda para encontrar la cava que buscas."
-                  createLabel="Nueva cava"
+                  emptyTitle="No hay cámaras"
+                  emptyDescription="Comienza creando la primera cámara del almacén."
+                  filtersTitle="No se encontraron cámaras"
+                  filtersDescription="Intenta ajustar tu búsqueda para encontrar la cámara que buscas."
+                  createLabel="Nueva cámara"
                 />
               )}
             </Card.Body>

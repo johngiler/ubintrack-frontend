@@ -68,7 +68,7 @@ export const WMS_NAV_GROUPS = [
       },
       {
         href: "/storage/cavas",
-        label: "Cavas",
+        label: "Cámaras",
         icon: Building,
         staffOnly: true,
         viewPerm: "storage.view_cava",

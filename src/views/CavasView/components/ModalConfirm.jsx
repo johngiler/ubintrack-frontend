@@ -16,9 +16,9 @@ export default function ModalConfirm({ show, onHide, cava, onDelete, showAlert }
       await deleteCava(cava.id);
       await onDelete();
       onHide();
-      showAlert("success", "Cava eliminada correctamente");
+      showAlert("success", "Cámara eliminada correctamente");
     } catch {
-      showAlert("danger", "Error al eliminar la cava");
+      showAlert("danger", "Error al eliminar la cámara");
     } finally {
       setIsDeleting(false);
     }
@@ -30,7 +30,8 @@ export default function ModalConfirm({ show, onHide, cava, onDelete, showAlert }
         <Modal.Title>Confirmar eliminación</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        ¿Está seguro que desea eliminar la cava <strong>{cavaTitleOf(cava?.name, cava?.code)}</strong>?
+        ¿Está seguro que desea eliminar la cámara{" "}
+        <strong>{cavaTitleOf(cava?.name, cava?.code)}</strong>?
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={onHide} disabled={isDeleting}>

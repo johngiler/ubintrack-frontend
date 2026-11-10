@@ -505,11 +505,11 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
       onHide();
       const msg =
         positionsAlreadyGenerated && slotsToRemove > 0
-          ? `Cava guardada. Se sincronizaron las posiciones (−${slotsToRemove} previstas).`
-          : "Cava guardada correctamente";
+          ? `Cámara guardada. Se sincronizaron las posiciones (−${slotsToRemove} previstas).`
+          : "Cámara guardada correctamente";
       showAlert("success", msg);
     } catch (error) {
-      setFormError(messageFromError(error, "No se pudo guardar la cava."));
+      setFormError(messageFromError(error, "No se pudo guardar la cámara."));
     } finally {
       setIsSaving(false);
     }
@@ -615,7 +615,11 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
   };
 
   const cavaTitle = cavaTitleOf(formData.name, formData.code);
-  const title = readOnly ? `Ver ${cavaTitle}` : formData?.id ? `Editar ${cavaTitle}` : "Nueva cava";
+  const title = readOnly
+    ? `Ver ${cavaTitle}`
+    : formData?.id
+      ? `Editar ${cavaTitle}`
+      : "Nueva cámara";
   const nameMissing = showValidation && isBlank(formData.name);
   const storageMissing = showValidation && !formData.storage_id;
   const conditionMissing = showValidation && !formData.condition;
