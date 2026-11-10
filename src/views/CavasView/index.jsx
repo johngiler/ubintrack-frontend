@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
+import useSWR from "swr";
 import { Building, Eye, FilterX, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
@@ -20,7 +21,7 @@ import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import CavasViewSkeleton from "./CavasViewSkeleton";
-import { getCavas } from "@/services/storageService";
+import { getCavas, getCavaPositionTotals } from "@/services/storageService";
 import { canCRUD } from "@/services/httpClient";
 import { cavaTitleOf } from "./cavaPlan";
 import { ConditionBadge } from "./cavaLabels";
@@ -75,6 +76,15 @@ export default function CavasView() {
     fetcher: () => getCavas(currentPage, debouncedSearchTerm, PAGE_SIZE),
     pageSize: PAGE_SIZE,
   });
+
+  const { data: positionTotals, mutate: loadPositionTotals } = useSWR(
+    ["cavas", "position-totals", debouncedSearchTerm || ""],
+    () => getCavaPositionTotals(debouncedSearchTerm),
+  );
+
+  const refreshCavas = useCallback(async () => {
+    await Promise.all([loadCavas(), loadPositionTotals()]);
+  }, [loadCavas, loadPositionTotals]);
 
   useEffect(() => {
     if (error) showAlertMessage("danger", "Error al cargar las cavas");
@@ -287,6 +297,20 @@ export default function CavasView() {
                     <strong>{(currentPage - 1) * PAGE_SIZE + 1}</strong> al{" "}
                     <strong>{Math.min(currentPage * PAGE_SIZE, totalItems)}</strong> de{" "}
                     <strong>{totalItems}</strong> registros
+                    {positionTotals ? (
+                      <>
+                        <span className="mx-2 text-slate-300">·</span>
+                        Posiciones{" "}
+                        <strong className="tabular-nums">
+                          {formatCount(positionTotals.active)}
+                        </strong>
+                        <span className="mx-1 text-slate-300">/</span>
+                        <strong className="tabular-nums">
+                          {formatCount(positionTotals.total)}
+                        </strong>
+                        <span className="ml-1 text-slate-400">(activas / total)</span>
+                      </>
+                    ) : null}
                   </div>
                   {totalPages > 1 && (
                     <Pagination className="pagination mb-0 ms-md-auto">
@@ -333,7 +357,7 @@ export default function CavasView() {
         onHide={handleCloseModal}
         cava={selectedCava}
         mode={modalMode}
-        onSave={loadCavas}
+        onSave={refreshCavas}
         showAlert={showAlertMessage}
       />
 
@@ -341,7 +365,7 @@ export default function CavasView() {
         show={showConfirmModal}
         onHide={() => setShowConfirmModal(false)}
         cava={selectedCava}
-        onDelete={loadCavas}
+        onDelete={refreshCavas}
         showAlert={showAlertMessage}
       />
     </Fragment>

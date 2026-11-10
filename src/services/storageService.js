@@ -40,6 +40,16 @@ export async function getCavas(page = 1, search = "", pageSize = 20) {
   return response.data;
 }
 
+/** Totales de posiciones en todas las cavas (mismo scope/filtros de lista). */
+export async function getCavaPositionTotals(search = "") {
+  let url = "/api/cavas/totals/";
+  if (search) {
+    url += `?search=${encodeURIComponent(search)}`;
+  }
+  const response = await httpClient.get(url);
+  return response.data;
+}
+
 export async function getCava(id) {
   const response = await httpClient.get(`/api/cavas/${id}/`);
   return response.data;

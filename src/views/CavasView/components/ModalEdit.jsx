@@ -22,6 +22,7 @@ import {
   aisleSelectValue,
   blocksPayload,
   cavaTitleOf,
+  countSlots,
   floorAcrossOf,
   floorIsActive,
   isFloorBlock,
@@ -330,6 +331,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
   const [showValidation, setShowValidation] = useState(false);
   const [occupancyRevision, setOccupancyRevision] = useState(0);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
+  const [confirmReduce, setConfirmReduce] = useState(null);
   const [dragKey, setDragKey] = useState(null);
   /** Undo de un paso al cambiar orientación master (restaurar si no hubo ediciones). */
   const masterUndoRef = useRef(null);
@@ -394,6 +396,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
     if (!show) {
       setShowValidation(false);
       setConfirmGenerate(false);
+      setConfirmReduce(null);
       setDragKey(null);
     }
   }, [cava, show]);
@@ -480,19 +483,49 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
     return saved;
   };
 
-  const handleSave = async () => {
+  const positionsAlreadyGenerated = Boolean(
+    formData.positions_has_been_generated || cava?.positions_has_been_generated,
+  );
+
+  const nextSlotCount = useMemo(
+    () => countSlots(formData.blocks, { planLayout: formData.plan_layout }),
+    [formData.blocks, formData.plan_layout],
+  );
+
+  const currentSlotCount = Number(cava?.slot_count ?? 0);
+  const slotsToRemove = Math.max(0, currentSlotCount - nextSlotCount);
+
+  const persistAndClose = async () => {
     setFormError("");
     setIsSaving(true);
     try {
       const saved = await persist();
       if (!saved) return;
+      setConfirmReduce(null);
       onHide();
-      showAlert("success", "Cava guardada correctamente");
+      const msg =
+        positionsAlreadyGenerated && slotsToRemove > 0
+          ? `Cava guardada. Se sincronizaron las posiciones (−${slotsToRemove} previstas).`
+          : "Cava guardada correctamente";
+      showAlert("success", msg);
     } catch (error) {
       setFormError(messageFromError(error, "No se pudo guardar la cava."));
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (
+      formData.id &&
+      positionsAlreadyGenerated &&
+      slotsToRemove > 0 &&
+      !confirmReduce
+    ) {
+      setConfirmReduce({ removed: slotsToRemove, next: nextSlotCount, prev: currentSlotCount });
+      return;
+    }
+    await persistAndClose();
   };
 
   const applyGenerationResult = async (job) => {
@@ -1403,12 +1436,12 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
       </Modal.Footer>
       <Modal show={confirmGenerate} onHide={() => setConfirmGenerate(false)} size="sm" layerClassName="z-[80]">
         <Modal.Header closeButton>
-          <Modal.Title>Regenerar posiciones</Modal.Title>
+          <Modal.Title>Sincronizar posiciones</Modal.Title>
         </Modal.Header>
         <Modal.Body className="space-y-2 text-sm text-slate-600">
           <p>Se crearán las ubicaciones nuevas del plano.</p>
-          <p>Las posiciones eliminadas se volverán a crear.</p>
-          <p>Las que ya existen (incluidas desactivadas o editadas) no se modifican.</p>
+          <p>Las libres que ya no existan en el plano se eliminarán.</p>
+          <p>Asignadas u ocupadas no se borran.</p>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" icon={X} onClick={() => setConfirmGenerate(false)}>
@@ -1416,6 +1449,42 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
           </Button>
           <Button variant="primary" icon={LayoutGrid} onClick={() => void runGenerate()} disabled={busy}>
             Continuar
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={Boolean(confirmReduce)}
+        onHide={() => setConfirmReduce(null)}
+        size="sm"
+        layerClassName="z-[80]"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Se restarán posiciones</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="space-y-2 text-sm text-slate-600">
+          <p>
+            El plano pasa de{" "}
+            <strong className="tabular-nums">{confirmReduce?.prev ?? 0}</strong> a{" "}
+            <strong className="tabular-nums">{confirmReduce?.next ?? 0}</strong>{" "}
+            ubicaciones (−
+            <strong className="tabular-nums">{confirmReduce?.removed ?? 0}</strong>).
+          </p>
+          <p>Al guardar se eliminarán las posiciones libres que ya no correspondan.</p>
+          <p>Las asignadas u ocupadas no se borran.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" icon={X} onClick={() => setConfirmReduce(null)} disabled={isSaving}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            icon={Save}
+            onClick={() => void persistAndClose()}
+            disabled={isSaving}
+            loading={isSaving}
+          >
+            {isSaving ? "Guardando…" : "Guardar y sincronizar"}
           </Button>
         </Modal.Footer>
       </Modal>
