@@ -21,7 +21,13 @@ export function cavaTitleOf(name, code) {
 
 export function formatLocation(position) {
   if (!position) return "—";
-  const hall = position.hall ? `Pasillo ${position.hall}` : "—";
+  // hall ya es token (P1, TT); si llega numérico legacy → «Pasillo N».
+  const hallRaw = String(position.hall || "").trim();
+  const hall = hallRaw
+    ? /^\d+$/.test(hallRaw)
+      ? `Pasillo ${hallRaw}`
+      : hallRaw
+    : "—";
   const rack = position.rack ? `Rack ${position.rack}` : "—";
   const level = position.level != null ? `Nivel ${position.level}${position.place ?? ""}` : "—";
   const cava = position.cava ? cavaTitleOf(position.cava.name, position.cava.code) : "—";

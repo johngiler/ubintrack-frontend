@@ -185,7 +185,7 @@ const AISLE_DOT = AISLE_DOT_SVG;
 function measureBlock(block, blocks, rackPrefix, aislePrefix, planLayout, scopeBlocks = null) {
   if (block.kind === "aisle") {
     const code = String(block.code || "").trim();
-    const label = aisleDisplayName(code);
+    const label = aisleDisplayName(block);
     const vertical = block.orientation === "vertical";
     const places = planLayout?.show_aisle_positions ? aislePositionPlaces(block) : [];
     const align = vertical ? stackAlignOf(planLayout, block) : rowAlignOf(planLayout, block);

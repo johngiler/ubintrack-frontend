@@ -8,6 +8,7 @@ import { Button, Form } from "@/components/ui/bootstrap";
 import { getCavaOccupancy } from "@/services/storageService";
 import {
   aisleDisplayName,
+  aisleLabelForCode,
   aislePositionPlaces,
   blockOccupancyKpis,
   cavaOccupancyKpis,
@@ -680,7 +681,7 @@ function AisleBand({
   onKpiClick,
 }) {
   const code = String(block.code || "").trim();
-  const label = aisleDisplayName(code);
+  const label = aisleDisplayName(block);
   const places = showPositions ? aislePositionPlaces(block) : [];
   const cluster = aislePlacesCluster(places, align, "horizontal");
   const groupBox = aisleGroupBoxSize({ svg: false, aisleVertical: false });
@@ -732,7 +733,7 @@ function VerticalAisleBand({
   onKpiClick,
 }) {
   const code = String(block.code || "").trim();
-  const label = aisleDisplayName(code);
+  const label = aisleDisplayName(block);
   const places = showPositions ? aislePositionPlaces(block) : [];
   const cluster = aislePlacesCluster(places, align, "vertical");
   const groupBox = aisleGroupBoxSize({ svg: false, aisleVertical: true });
@@ -881,12 +882,12 @@ export default function CavaPlan({
       ? suggestedAisleCode(blocks, selectedBlock)
       : "";
   const selectedTitle = selectedIsAisle
-    ? [aisleDisplayName(selectedAisle), selected.place].filter(Boolean).join(" · ")
+    ? [aisleDisplayName(selectedBlock), selected.place].filter(Boolean).join(" · ")
     : selectedBlock
       ? [
           `${rackPrefix}${selected.token}`,
           selected.place,
-          selectedAisle ? aisleDisplayName(selectedAisle) : "",
+          selectedAisle ? aisleLabelForCode(blocks, selectedAisle) : "",
         ].filter(Boolean).join(" · ")
       : "";
   const kpiBlock =
@@ -899,7 +900,7 @@ export default function CavaPlan({
     kpiSelected?.scope === "cava"
       ? cavaTitle
       : kpiBlock?.kind === "aisle"
-        ? aisleDisplayName(kpiBlock.code)
+        ? aisleDisplayName(kpiBlock)
         : kpiBlock
           ? `Hilera ${hileraLabel(kpiBlock, rackPrefix)}`
           : "";

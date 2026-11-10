@@ -13,7 +13,6 @@ import {
   getPositionNomenclature,
   getStorages,
   updateCava,
-  updatePositionNomenclature,
 } from "@/services/storageService";
 import { conditionLabels } from "../cavaLabels";
 import {
@@ -23,6 +22,7 @@ import {
   blocksPayload,
   cavaTitleOf,
   rackTokensOf,
+  uniqueAisleToken,
 } from "../cavaPlan";
 import {
   DOOR_WALL_OPTIONS,
@@ -51,9 +51,9 @@ const ORIENTATION_OPTIONS = [
 ];
 const RACK_GRID =
   "w-full grid-cols-[1.5rem_5.5rem_3.25rem_3.25rem_4rem_4.75rem_7.75rem_6.75rem_5.5rem_7.5rem_auto] justify-items-start";
-/** Misma pista izquierda que rack: drag + título, luego campos pegados. */
+/** Misma pista izquierda que rack: drag + nombre (+ token), luego campos pegados. */
 const AISLE_GRID =
-  "w-full grid-cols-[1.5rem_5.5rem_7.75rem_6.75rem_max-content_3.25rem_auto] justify-items-start";
+  "w-full grid-cols-[1.5rem_minmax(9rem,12rem)_7.75rem_6.75rem_max-content_3.25rem_auto] justify-items-start";
 const FIELD_CLASS = "rounded-md";
 const COMPACT_HEIGHT = 32;
 const COMPACT_FIELD = "!h-8 rounded-md px-2 py-0 text-xs leading-none";
@@ -83,7 +83,7 @@ const COMPACT_SELECT_STYLES = {
 const EMPTY_NOMENCLATURE = {
   separator: "-",
   cava_prefix: "C",
-  aisle_prefix: "P",
+  aisle_prefix: "",
   rack_prefix: "R",
   level_prefix: "N",
 };
@@ -129,24 +129,27 @@ function emptyRack(orientation = "horizontal") {
   };
 }
 
-function nextAisleCode(blocks) {
+function nextAisleName(blocks) {
   const used = new Set();
   (blocks || []).forEach((block) => {
     if (block.kind !== "aisle") return;
-    const n = Number(String(block.code || "").trim());
-    if (Number.isFinite(n) && n >= 1) used.add(n);
+    const match = /^Pasillo\s+(\d+)$/i.exec(String(block.name || "").trim());
+    if (match) used.add(Number(match[1]));
   });
   let next = 1;
   while (used.has(next)) next += 1;
-  return String(next);
+  return `Pasillo ${next}`;
 }
 
 function emptyAisle(orientation = "horizontal", blocks = []) {
   const axis = orientation === "vertical" ? "vertical" : "horizontal";
+  const name = nextAisleName(blocks);
+  const used = (blocks || []).filter((block) => block.kind === "aisle").map((block) => block.code);
   return {
     key: newKey(),
     kind: "aisle",
-    code: nextAisleCode(blocks),
+    name,
+    code: uniqueAisleToken(name, used),
     create_aisle_positions: false,
     rack_count: 0,
     orientation: axis,
@@ -157,12 +160,18 @@ function blocksFromApi(blocks) {
   const mapped = (blocks || []).map((block, index) => {
     const aisleCount =
       block.kind === "aisle" ? Math.max(0, Number(block.rack_count) || 0) : 0;
+    const code = block.code || "";
+    const name =
+      block.kind === "aisle"
+        ? String(block.name || "").trim() || aisleDisplayName({ code })
+        : "";
     return {
       key: block.id ? `id-${block.id}` : newKey(),
       id: block.id,
       sort_order: block.sort_order ?? index,
       kind: block.kind,
-      code: block.code || "",
+      name,
+      code,
       create_aisle_positions: block.kind === "aisle" ? aisleCount > 0 : false,
       rack_count: block.kind === "aisle" ? aisleCount : block.rack_count || 1,
       levels: block.levels || "",
@@ -172,24 +181,47 @@ function blocksFromApi(blocks) {
       aisle_code: block.aisle_code || "",
     };
   });
+  const used = [];
   mapped.forEach((block) => {
-    if (block.kind === "aisle" && !String(block.code || "").trim()) {
-      block.code = nextAisleCode(mapped);
+    if (block.kind !== "aisle") return;
+    if (!String(block.name || "").trim()) block.name = nextAisleName(mapped);
+    if (!String(block.code || "").trim()) {
+      block.code = uniqueAisleToken(block.name, used);
     }
+    used.push(block.code);
   });
   return mapped;
 }
 
 function blockTitle(block, nomenclature) {
   if (block.kind === "aisle") {
-    return aisleDisplayName(block.code);
+    return aisleDisplayName(block);
   }
   const tokens = rackTokensOf(block);
-  const prefix = nomenclature?.rack_prefix || "";
+  const prefix = nomenclature?.rack_prefix || "R";
   if (!tokens.length) return "Grupo de racks";
   const first = `${prefix}${tokens[0]}`;
   const last = `${prefix}${tokens[tokens.length - 1]}`;
   return tokens.length === 1 ? first : `${first} a ${last}`;
+}
+
+/** Renombra pasillo, recalcula token y actualiza aisle_code de racks ligados. */
+function renameAisleBlocks(blocks, key, nextName) {
+  const list = blocks || [];
+  const target = list.find((block) => block.key === key);
+  if (!target || target.kind !== "aisle") return list;
+  const oldCode = String(target.code || "").trim();
+  const used = list
+    .filter((block) => block.kind === "aisle" && block.key !== key)
+    .map((block) => block.code);
+  const newCode = uniqueAisleToken(nextName, used);
+  return list.map((block) => {
+    if (block.key === key) return { ...block, name: nextName, code: newCode };
+    if (block.kind === "rack" && String(block.aisle_code || "").trim() === oldCode) {
+      return { ...block, aisle_code: newCode };
+    }
+    return block;
+  });
 }
 
 function sleep(ms) {
@@ -260,7 +292,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
       const code = String(block.code || "").trim();
       if (!code || seen.has(code)) continue;
       seen.add(code);
-      options.push({ value: code, label: aisleDisplayName(code) });
+      options.push({ value: code, label: aisleDisplayName(block) });
     }
     return options;
   }, [formData.blocks]);
@@ -383,13 +415,6 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
       blocks: blocksPayload(formData.blocks),
       plan_layout: planLayoutPayload(formData.plan_layout, formData.blocks),
     };
-    await updatePositionNomenclature({
-      separator: nomenclature.separator || "-",
-      cava_prefix: nomenclature.cava_prefix || "",
-      aisle_prefix: nomenclature.aisle_prefix || "",
-      rack_prefix: nomenclature.rack_prefix || "",
-      level_prefix: nomenclature.level_prefix || "",
-    });
     const saved = formData.id ? await updateCava(formData.id, payload) : await createCava(payload);
     const blocks = blocksFromApi(saved.blocks);
     setFormData((current) => ({
@@ -587,26 +612,6 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                 onChange={(event) => setFormData({ ...formData, temp_max: event.target.value })}
               />
             </Form.Group>
-          </div>
-
-          <div className="mt-4 grid grid-cols-5 items-end gap-3">
-            {[
-              ["separator", "Separador"],
-              ["cava_prefix", "Cava"],
-              ["aisle_prefix", "Pasillo"],
-              ["rack_prefix", "Rack"],
-              ["level_prefix", "Nivel"],
-            ].map(([field, label]) => (
-              <Form.Group key={field} className="mb-0">
-                <Form.Label className={LABEL_CLASS}>{label}</Form.Label>
-                <Form.Control
-                  className={FIELD_CLASS}
-                  value={nomenclature[field] ?? ""}
-                  readOnly={readOnly}
-                  onChange={(event) => setNomenclature({ ...nomenclature, [field]: event.target.value })}
-                />
-              </Form.Group>
-            ))}
           </div>
 
           <section className="mt-6 border-t border-slate-200 pt-5">
@@ -840,7 +845,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                       {showAisleHeader ? (
                         <div className={`grid ${AISLE_GRID} items-end gap-x-1 px-1.5 pb-0.5 text-left text-[11px] font-medium text-slate-400`}>
                           <span />
-                          <span>Pasillo</span>
+                          <span>Nombre</span>
                           <span>Orientación</span>
                           <span>Alineación</span>
                           <span>Posiciones</span>
@@ -885,9 +890,38 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                         ) : (
                           <span />
                         )}
-                        <span className="truncate text-left text-xs font-semibold text-slate-600">
-                          {blockTitle(block, nomenclature)}
-                        </span>
+                        {block.kind === "aisle" ? (
+                          <div className="flex w-full min-w-0 items-center gap-1">
+                            <Form.Control
+                              size="sm"
+                              className={`${COMPACT_FIELD} w-full min-w-0 text-left`}
+                              value={block.name || ""}
+                              readOnly={readOnly}
+                              placeholder="Pasillo 1"
+                              title="Nombre del pasillo"
+                              onChange={(event) =>
+                                setFormData((current) => ({
+                                  ...current,
+                                  blocks: renameAisleBlocks(
+                                    current.blocks,
+                                    block.key,
+                                    event.target.value,
+                                  ),
+                                }))
+                              }
+                            />
+                            <span
+                              className="shrink-0 text-[10px] font-semibold tabular-nums text-slate-400"
+                              title="Token en el código de posición"
+                            >
+                              {block.code || "—"}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="truncate text-left text-xs font-semibold text-slate-600">
+                            {blockTitle(block, nomenclature)}
+                          </span>
+                        )}
                         {block.kind === "rack" ? (
                           <>
                             <Form.Control

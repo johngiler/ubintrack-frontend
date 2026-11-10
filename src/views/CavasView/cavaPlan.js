@@ -11,10 +11,59 @@ export function cavaTitleOf(name, code) {
   return token ? `Cava ${token}` : "Cava";
 }
 
-/** Nombre visible del pasillo: «Pasillo 1» (sin prefijo P de nomenclatura). */
-export function aisleDisplayName(code) {
+/**
+ * Token de pasillo desde el nombre: máx. 2 iniciales + último número suelto.
+ * «Pasillo 1» → P1 · «Tunel Tunel» → TT · «pedro pelon peludo» → PP.
+ */
+export function aisleTokenFromName(name) {
+  const raw = String(name || "").trim();
+  if (!raw) return "";
+  const initials = [];
+  let number = "";
+  for (const part of raw.split(/\s+/)) {
+    if (/^\d+$/.test(part)) {
+      number = part;
+      continue;
+    }
+    const letter = part.match(/[A-Za-zÀ-ÿ]/)?.[0];
+    if (letter && initials.length < 2) initials.push(letter.toUpperCase());
+  }
+  return `${initials.join("")}${number}`;
+}
+
+/** Token único en un set ya usado (PP, PP2, …). */
+export function uniqueAisleToken(name, used = []) {
+  const taken = new Set((used || []).map((item) => String(item || "").trim()).filter(Boolean));
+  const base = aisleTokenFromName(name) || "P";
+  if (!taken.has(base)) return base;
+  const stem = base.replace(/\d+$/, "") || base;
+  let next = 2;
+  while (taken.has(`${stem}${next}`)) next += 1;
+  return `${stem}${next}`;
+}
+
+/** Nombre visible del pasillo (campo name; fallback legacy). */
+export function aisleDisplayName(blockOrName) {
+  if (blockOrName && typeof blockOrName === "object") {
+    const name = String(blockOrName.name || "").trim();
+    if (name) return name;
+    const code = String(blockOrName.code || "").trim();
+    if (!code) return "Pasillo";
+    return /^\d+$/.test(code) ? `Pasillo ${code}` : code;
+  }
+  const token = String(blockOrName || "").trim();
+  if (!token) return "Pasillo";
+  return /^\d+$/.test(token) ? `Pasillo ${token}` : token;
+}
+
+/** Resuelve el nombre visible desde el token (code) buscando el bloque. */
+export function aisleLabelForCode(blocks, code) {
   const token = String(code || "").trim();
-  return token ? `Pasillo ${token}` : "Pasillo";
+  if (!token) return "Pasillo";
+  const block = (blocks || []).find(
+    (item) => item.kind === "aisle" && String(item.code || "").trim() === token,
+  );
+  return aisleDisplayName(block || token);
 }
 
 export function depthCodesOf(block) {
@@ -264,8 +313,10 @@ export function contiguousBlockGroups(blocks) {
 export function blocksPayload(blocks) {
   return (blocks || []).map((block) => {
     if (block.kind === "aisle") {
+      const name = String(block.name || "").trim();
       return {
         kind: "aisle",
+        name,
         code: String(block.code || "").trim(),
         rack_count: Math.max(0, Number(block.rack_count) || 0),
         orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
