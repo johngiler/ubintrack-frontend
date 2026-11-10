@@ -581,27 +581,36 @@ function measureSection(section, blocks, rackPrefix, aislePrefix, planLayout) {
 }
 
 /**
- * Lienzo fit-content: H y V con piso FRAME_MIN; solo crece si el contenido supera el mín.
+ * Lienzo:
+ * - master V → alto mínimo FRAME_MIN, ancho = contenido (fit)
+ * - master H → ancho mínimo FRAME_MIN, alto = contenido (fit)
  */
 function expandSectionsToModalWidth(sections, masterAxis) {
   const frameMin = Math.max(1, PLAN_VIEW_FRAME_MIN - PAD * 2 - FRAME * 2);
-  const naturalH = Math.max(1, ...sections.map((section) => section.h));
-  const contentMinH = frameMin;
+  const naturalH = Math.max(1, ...sections.map((section) => section.h || 0));
+  const naturalW = Math.max(1, ...sections.map((section) => section.w || 0));
+  const masterVertical = masterAxis === "vertical";
+  const contentMinH = masterVertical ? frameMin : naturalH;
 
   sections.forEach((section) => {
     if (section.axis === "vertical") {
       if (section.main) section.main.drawW = section.main.w || 0;
       section.w = Math.max(section.main?.w || 0, section.before?.w || 0, section.after?.w || 0);
-      const needH = Math.max(contentMinH, section.h);
-      if (needH > section.h && section.main) {
-        section.main.drawH = (section.main.h || 0) + (needH - section.h);
-        section.h = needH;
+      // Solo master V estira alto al piso; H deja el alto natural.
+      if (masterVertical) {
+        const needH = Math.max(contentMinH, section.h);
+        if (needH > section.h && section.main) {
+          section.main.drawH = (section.main.h || 0) + (needH - section.h);
+          section.h = needH;
+        } else if (section.main) {
+          section.main.drawH = section.main.h;
+        }
       } else if (section.main) {
         section.main.drawH = section.main.h;
       }
       return;
     }
-    // Horizontal: ancho natural del tramo (sin forzar al modal).
+    // Horizontal: ancho natural del tramo.
     if (section.before) section.before.drawW = section.before.w;
     if (section.after) section.after.drawW = section.after.w;
     const gaps = section.sideGaps || 0;
@@ -612,12 +621,11 @@ function expandSectionsToModalWidth(sections, masterAxis) {
         row.w = Math.max(row.w || 0, mainW);
       });
     }
-    if (section.h < contentMinH) {
-      section.drawH = contentMinH;
-      section.h = contentMinH;
-    }
+    // Master H: no inflar alto al FRAME_MIN (alto = fit).
   });
-  const contentWidth = Math.max(frameMin, ...sections.map((section) => section.w || 0));
+  const contentWidth = masterVertical
+    ? Math.max(1, ...sections.map((section) => section.w || 0), naturalW)
+    : Math.max(frameMin, ...sections.map((section) => section.w || 0), naturalW);
   return { contentWidth, contentMinH: Math.max(contentMinH, naturalH) };
 }
 
@@ -1374,7 +1382,11 @@ export function buildCavaPlanSvg({ name, code, blocks, nomenclature, occupancy =
   contentBottom = Math.max(contentBottom, frameTop + contentMinH);
   const frameY = frameTop;
   const frameW = frameInnerRight - frameInnerLeft + FRAME * 2;
-  const frameH = Math.max(contentBottom - frameTop + FRAME, PLAN_VIEW_FRAME_MIN);
+  // Master V: piso de alto. Master H: alto = contenido.
+  const frameH =
+    masterAxis === "vertical"
+      ? Math.max(contentBottom - frameTop + FRAME, PLAN_VIEW_FRAME_MIN)
+      : Math.max(contentBottom - frameTop + FRAME, 1);
   parts.unshift(
     `<rect x="${frameX}" y="${frameY}" width="${frameW}" height="${frameH}" fill="none" stroke="${INK}" stroke-width="2.5"/>`,
   );

@@ -2158,7 +2158,7 @@ export default function CavaPlan({
         className="flex w-full max-w-full justify-center overflow-x-auto"
         style={{ padding: DOOR_OVERHANG }}
       >
-        {/* Lienzo a ancho mín.; el contenido llena el frame para que “medio” centre. */}
+        {/* Master H: min-width. Master V: min-height. El otro eje = fit del contenido. */}
         <div
           className="relative box-border w-max max-w-full border-2 border-slate-700 bg-white"
           style={{ padding: FRAME_PAD, ...planFrameMinStyle(masterAxis) }}

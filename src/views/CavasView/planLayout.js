@@ -1,17 +1,21 @@
 /** Metadatos gráficos del plano. No afectan nomenclatura ni generate. */
 
 /**
- * Lienzo inicial del plano (H y V iguales).
- * fit-content: solo crece si el contenido supera FRAME_MIN.
+ * Lienzo del plano:
+ * - master horizontal → piso de ancho (alto = fit del contenido)
+ * - master vertical → piso de alto (ancho = fit del contenido)
  */
 export const PLAN_VIEW_FRAME_MIN = 720;
 export const PLAN_VIEW_MAX_WIDTH = 1480;
 /** @deprecated usar PLAN_VIEW_FRAME_MIN */
 export const PLAN_VIEW_MIN_HEIGHT = PLAN_VIEW_FRAME_MIN;
 
-/** Tamaño mínimo del lienzo; el padre usa w-max / fit-content encima. */
-export function planFrameMinStyle(_masterAxis) {
-  return { minWidth: PLAN_VIEW_FRAME_MIN, minHeight: PLAN_VIEW_FRAME_MIN };
+/** Mínimo en el eje libre del master; el otro eje es fit-content. */
+export function planFrameMinStyle(masterAxis) {
+  if (masterAxis === "vertical") {
+    return { minHeight: PLAN_VIEW_FRAME_MIN };
+  }
+  return { minWidth: PLAN_VIEW_FRAME_MIN };
 }
 
 export const EMPTY_PLAN_LAYOUT = {
