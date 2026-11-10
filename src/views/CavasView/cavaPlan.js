@@ -444,26 +444,49 @@ export function aisleCodeFromSelect(blocks, block, selected) {
 }
 
 /** Racks ligados a una sección por aisle_code / herencia. */
-export function relatedRacksForAisle(blocks, aisle) {
+/**
+ * Racks ligados a una sección (aisle_code) + vecinos inmediatos.
+ * @param {boolean} [throughSections] solo absolute/solapar: salta otras secciones
+ *   (pasillo|piso|pasillo) para igualar al rack del otro lado.
+ */
+export function relatedRacksForAisle(blocks, aisle, { throughSections = false } = {}) {
   const list = blocks || [];
   if (!isNamedSection(aisle)) return [];
   const code = String(aisle.code || "").trim();
-  if (code) {
-    const linked = list.filter((block) => {
-      if (block.kind !== "rack") return false;
-      return suggestedAisleCode(list, block) === code;
-    });
-    if (linked.length) return linked;
-  }
+  const linked = code
+    ? list.filter(
+        (block) => block.kind === "rack" && suggestedAisleCode(list, block) === code,
+      )
+    : [];
   const index = list.indexOf(aisle);
-  if (index < 0) return [];
-  for (let cursor = index + 1; cursor < list.length; cursor += 1) {
-    if (list[cursor].kind === "rack") return [list[cursor]];
+  const neighbors = [];
+  if (index >= 0) {
+    for (let cursor = index + 1; cursor < list.length; cursor += 1) {
+      if (list[cursor].kind === "floor") continue;
+      if (throughSections && list[cursor].kind === "section") continue;
+      if (list[cursor].kind === "rack") {
+        neighbors.push(list[cursor]);
+        break;
+      }
+      break;
+    }
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      if (list[cursor].kind === "floor") continue;
+      if (throughSections && list[cursor].kind === "section") continue;
+      if (list[cursor].kind === "rack") {
+        neighbors.push(list[cursor]);
+        break;
+      }
+      break;
+    }
   }
-  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-    if (list[cursor].kind === "rack") return [list[cursor]];
-  }
-  return [];
+  const byKey = new Map();
+  [...linked, ...neighbors].forEach((block) => {
+    const key = block.key || block.id || block.code;
+    if (key == null) return;
+    byKey.set(String(key), block);
+  });
+  return [...byKey.values()];
 }
 
 /** Agrupa racks contiguos (espalda-espalda) y bloques sueltos. */
@@ -491,6 +514,7 @@ export function blocksPayload(blocks) {
         name,
         code: String(block.code || "").trim(),
         rack_count: 0,
+        stretch_full: Boolean(block.stretch_full),
         orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
       };
     }

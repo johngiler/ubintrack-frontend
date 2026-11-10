@@ -236,26 +236,29 @@ function measureRelatedSpan(block, blocks, rackPrefix, planLayout, scopeBlocks, 
   // Túnel: alto/ancho = largo de posiciones (sin contador).
   if (sectionType === "tunel" && floorAlong > 0) return floorAlong;
 
-  const related = relatedRacksForAisle(scope, block);
+  // Solo absolute/solapar: mirar racks al otro lado del piso/sección.
+  const throughSections = floorsOverlappingSection(scope, block).length > 0;
+  const related = relatedRacksForAisle(scope, block, { throughSections });
   const relatedMeasures = related.map((rack) => measureRack(rack, blocks, rackPrefix, planLayout));
   let rackAlong = 0;
   if (vertical) {
+    // Tope 100% de sección V: eje + racks, sin contador KPI (hueco aparte, como H).
     rackAlong = relatedMeasures.length
       ? Math.max(
           0,
           ...relatedMeasures.map(
-            (item) => item.h + (item.places?.length ? AXIS_TOP + AXIS_GAP : 0) + KPI_H + KPI_GAP,
+            (item) => item.h + (item.places?.length ? AXIS_TOP + AXIS_GAP : 0),
           ),
         )
       : 0;
   } else {
+    // Tope 100% de sección H: eje + racks, sin contador KPI de hilera.
     rackAlong = relatedMeasures.length
       ? Math.max(
           0,
           ...relatedMeasures.map((item) => {
             const axisW = item.places?.length ? AXIS_W + AXIS_GAP : 0;
-            const kpiW = item.horizontal ? KPI_SIDE_W + KPI_INNER_GAP : 0;
-            return kpiW + axisW + item.w;
+            return axisW + item.w;
           }),
         )
       : 0;
@@ -296,7 +299,10 @@ function measureBlock(block, blocks, rackPrefix, aislePrefix, planLayout, scopeB
     const scope = scopeBlocks || blocks;
     const relatedSpan = measureRelatedSpan(block, blocks, rackPrefix, planLayout, scope, vertical);
     const fitSpan = sectionType === "division" ? Math.max(base, 48) : sectionFitAlong(label, vertical, base);
+    // Sin 100%: ancho de su relacionado. Con 100%: finalize amplía a la pista.
     const along = relatedSpan > 0 ? Math.max(base, relatedSpan) : fitSpan;
+    // Absolute/solapar: shell independiente del check 100%.
+    const overlayAlong = relatedSpan > 0 ? Math.max(base, relatedSpan) : along;
     // Solapar: el pasillo engrosa al tamaño del piso para centrarlo entre racks.
     const overlayCross = Math.max(
       0,
@@ -312,6 +318,7 @@ function measureBlock(block, blocks, rackPrefix, aislePrefix, planLayout, scopeB
         vertical: true,
         w: cross,
         h: along,
+        overlayAlong,
         label,
         block,
         places: [],
@@ -325,6 +332,7 @@ function measureBlock(block, blocks, rackPrefix, aislePrefix, planLayout, scopeB
       vertical: false,
       w: along,
       h: cross,
+      overlayAlong,
       label,
       block,
       places: [],
@@ -411,13 +419,49 @@ function measureSideColumn(blocks, blocksAll, rackPrefix, aislePrefix, planLayou
   const items = blocks.map((block) =>
     measureBlock(block, blocksAll, rackPrefix, aislePrefix, planLayout, blocksAll),
   );
+  const rackTrackH = Math.max(
+    0,
+    ...items
+      .filter((item) => item.kind === "rack")
+      .map((item) => sideItemDrawnH(item)),
+  );
+  // Igualar alto al cuerpo del relacionado (sin KPI). Con 100%: a la pista sin contador.
+  items.forEach((item) => {
+    if (item.kind !== "section" || !item.vertical) return;
+    const throughSections = floorsOverlappingSection(blocksAll, item.block).length > 0;
+    const related = relatedRacksForAisle(blocksAll, item.block, { throughSections });
+    const relatedKeys = new Set(related.map((rack) => String(rack.key || rack.id || "")));
+    const usesKpiPad = related.some((rack) => rack.orientation === "vertical");
+    const kpiPad = usesKpiPad ? KPI_H + KPI_GAP : 0;
+    const relatedBodyH = Math.max(
+      item.h,
+      ...items
+        .filter(
+          (entry) =>
+            entry.kind === "rack" && relatedKeys.has(String(entry.block.key || entry.block.id || "")),
+        )
+        .map((entry) => Math.max(0, sideItemDrawnH(entry) - sideItemKpiTop(entry))),
+    );
+    const trackBodyH = Math.max(0, rackTrackH - kpiPad);
+    const target =
+      item.block?.stretch_full && trackBodyH > 0
+        ? Math.max(relatedBodyH, trackBodyH)
+        : relatedBodyH;
+    if (target > item.h) {
+      item.h = target;
+      item.overlayAlong = Math.max(item.overlayAlong || 0, target);
+    }
+    item.kpiTopPad = kpiPad;
+  });
   let w = 0;
   let h = 0;
   let laid = 0;
   items.forEach((item) => {
     // Solapar: no suma ancho ni alto a la columna (solo overlay).
     if (item.kind === "floor" && item.overlap) return;
-    h = Math.max(h, item.h + sideItemTop(item));
+    const sectionKpiPad =
+      item.kind === "section" && item.vertical ? item.kpiTopPad || 0 : 0;
+    h = Math.max(h, item.h + sideItemTop(item) + sectionKpiPad);
     if (laid > 0) w += RACK_GAP;
     w += item.w;
     laid += 1;
@@ -447,7 +491,8 @@ function measureMiddleRow(block, blocks, rackPrefix, aislePrefix, planLayout, mi
   };
 }
 
-function finalizeHorizontalRows(middleRows) {
+function finalizeHorizontalRows(middleRows, scopeBlocks = null) {
+  const scope = scopeBlocks || middleRows.map((entry) => entry.block);
   const rackTrack = Math.max(
     0,
     ...middleRows.filter((row) => row.block.kind === "rack").map((row) => row.contentW),
@@ -460,7 +505,19 @@ function finalizeHorizontalRows(middleRows) {
       return;
     }
     if (row.item.kind !== "section") return;
-    row.contentW = row.axisW + row.item.w;
+    // Hueco KPI solo si sigue hilera horizontal (piso/túnel sin rack H: sin pad).
+    const usesKpiPad = relatedRacksForAisle(scope, row.block).some(
+      (rack) => rack.orientation !== "vertical",
+    );
+    row.kpiSideW = usesKpiPad ? KPI_SIDE_W + KPI_INNER_GAP : 0;
+    if (row.block?.stretch_full && rackTrack > 0) {
+      const rackOnly = Math.max(0, rackTrack - (usesKpiPad ? row.kpiSideW : 0));
+      if (rackOnly > row.item.w) {
+        row.item.w = rackOnly;
+        row.item.overlayAlong = Math.max(row.item.overlayAlong || 0, rackOnly);
+      }
+    }
+    row.contentW = row.kpiSideW + row.axisW + row.item.w;
   });
   const trackW = Math.max(rackTrack, ...middleRows.map((row) => row.contentW), 0);
   middleRows.forEach((row) => {
@@ -483,7 +540,7 @@ function measureHorizontalBand(bandBlocks, blocks, rackPrefix, aislePrefix, plan
   const middleRows = list.map((block) =>
     measureMiddleRow(block, blocks, rackPrefix, aislePrefix, planLayout, list),
   );
-  return finalizeHorizontalRows(middleRows);
+  return finalizeHorizontalRows(middleRows, list);
 }
 
 function measureSection(section, blocks, rackPrefix, aislePrefix, planLayout) {
@@ -926,6 +983,14 @@ function sideItemDrawnH(item) {
   return sideItemTop(item) + item.h;
 }
 
+/** Alto de apilado en columna V: sección incluye hueco KPI (como contentW en H). */
+function sideItemStackH(item) {
+  if (item.kind === "section" && item.vertical) {
+    return (item.kpiTopPad || 0) + item.h;
+  }
+  return sideItemDrawnH(item);
+}
+
 function drawSideColumn(parts, column, x, y, sectionH, occupancy, layout, blocks) {
   const items = column.items || [];
   const areaW = Math.max(column.w, column.drawW || column.w);
@@ -946,7 +1011,7 @@ function drawSideColumn(parts, column, x, y, sectionH, occupancy, layout, blocks
     0,
     ...items
       .filter((item) => !(item.kind === "floor" && item.overlap))
-      .map((item) => sideItemDrawnH(item)),
+      .map((item) => sideItemStackH(item)),
   );
   const trackH = Math.max(contentH, sectionH);
 
@@ -973,22 +1038,32 @@ function drawSideColumn(parts, column, x, y, sectionH, occupancy, layout, blocks
     ) {
       if (index === slackAt) cursorX += slack;
       if (laid > 0) cursorX += RACK_GAP;
-      const groupH = Math.max(sideItemDrawnH(item), sideItemDrawnH(right));
+      // Cuerpo sin contador; el grupo suma el hueco KPI (Arriba/Medio/Abajo igual).
+      const kpiPad = Math.max(item.kpiTopPad || 0, right.kpiTopPad || 0);
+      const bodyH = Math.max(
+        item.overlayAlong || 0,
+        right.overlayAlong || 0,
+        item.h,
+        right.h,
+      );
+      const groupH = bodyH + kpiPad;
       const floorAlign = stackAlignOf(layout, mid.block);
       const groupDy = rowAlignOffset(floorAlign, trackH - groupH);
       const startX = cursorX;
-      drawItem(parts, item, cursorX, y + groupDy, occupancy);
+      const leftDy = rowAlignOffset(stackAlignOf(layout, item.block), bodyH - item.h);
+      drawItem(parts, item, cursorX, y + groupDy + kpiPad + leftDy, occupancy);
       cursorX += item.w + RACK_GAP;
-      drawItem(parts, right, cursorX, y + groupDy, occupancy);
+      const rightDy = rowAlignOffset(stackAlignOf(layout, right.block), bodyH - right.h);
+      drawItem(parts, right, cursorX, y + groupDy + kpiPad + rightDy, occupancy);
       cursorX += right.w;
       const spanW = cursorX - startX;
-      // Cabe en el alto del tramo (no desborda el marco).
+      // Absolute: shell = overlayAlong/pista (no depende de stretch_full).
       drawFloorOverlayInBox(
         parts,
         mid,
         startX,
-        y + groupDy,
-        groupH,
+        y + groupDy + kpiPad,
+        bodyH,
         spanW,
         occupancy,
         { vertical: true, align: floorAlign },
@@ -1000,21 +1075,26 @@ function drawSideColumn(parts, column, x, y, sectionH, occupancy, layout, blocks
     if (index === slackAt) cursorX += slack;
     if (laid > 0) cursorX += RACK_GAP;
     laid += 1;
-    const itemH = sideItemDrawnH(item);
-    const itemDy = rowAlignOffset(stackAlignOf(layout, item.block), trackH - itemH);
+    const stackH = sideItemStackH(item);
+    const itemDy = rowAlignOffset(stackAlignOf(layout, item.block), trackH - stackH);
     if ((item.kind === "section" || item.kind === "floor") && item.vertical) {
-      drawItem(parts, item, cursorX, y + itemDy, occupancy);
+      // Sección V: hueco KPI arriba (mismo ancla en Arriba/Medio/Abajo).
+      const kpiPad = item.kind === "section" ? item.kpiTopPad || 0 : 0;
+      drawItem(parts, item, cursorX, y + itemDy + kpiPad, occupancy);
       if (item.kind === "section") {
         floorsOverlappingSection(stripBlocks, item.block).forEach((floorBlock) => {
           const floorItem = items.find((entry) => entry.block === floorBlock);
           if (!floorItem) return;
           const floorAlign = stackAlignOf(layout, floorBlock);
+          const overlayH = item.overlayAlong || item.h;
+          const overlayStackH = overlayH + kpiPad;
+          const overlayDy = rowAlignOffset(floorAlign, trackH - overlayStackH);
           drawFloorOverlayInBox(
             parts,
             floorItem,
             cursorX,
-            y + itemDy,
-            item.h,
+            y + overlayDy + kpiPad,
+            overlayH,
             item.w,
             occupancy,
             { vertical: true, align: floorAlign },
@@ -1112,8 +1192,10 @@ function drawHorizontalRows(parts, rows, x, y, trackW, occupancy, layout, blocks
       const startY = midY;
       const drawSectionRow = (entry) => {
         const contentW = entry.contentW || entry.item.w;
-        const dx = rowAlignOffset(floorAlign, trackW - contentW);
-        const rowX = x + dx;
+        // Alineación propia de la sección dentro de la pista (100% off = fit).
+        let rowX = x + rowAlignOffset(rowAlignOf(layout, entry.block), trackW - contentW);
+        // Hueco del contador de hilera (tope 100% no lo incluye).
+        rowX += entry.kpiSideW || 0;
         drawItem(parts, entry.item, rowX, midY, occupancy);
         midY += entry.h;
       };
@@ -1121,7 +1203,7 @@ function drawHorizontalRows(parts, rows, x, y, trackW, occupancy, layout, blocks
       midY += ROW_GAP;
       drawSectionRow(bottom);
       const spanH = midY - startY;
-      // Cabe en el ancho de la pista (no desborda el marco).
+      // Absolute: shell = pista (no depende de stretch_full).
       drawFloorOverlayInBox(
         parts,
         mid.item,
@@ -1149,6 +1231,9 @@ function drawHorizontalRows(parts, rows, x, y, trackW, occupancy, layout, blocks
       const kpis = blockOccupancyKpis(row.block, blocks, occupancy);
       drawHileraKpiSide(parts, kpis.total, rowX, gridY, gridH);
       rowX += row.kpiSideW;
+    } else if (row.kpiSideW && row.item.kind === "section") {
+      // Misma sangría que la hilera; el 100% no cubre el contador.
+      rowX += row.kpiSideW;
     }
     if (row.axisW) {
       const places = orderedDepthPlaces(depthCodesOf(row.block), depthAxisOf(layout, row.block));
@@ -1167,12 +1252,14 @@ function drawHorizontalRows(parts, rows, x, y, trackW, occupancy, layout, blocks
         const floorRow = list.find((entry) => entry.block === floorBlock);
         if (!floorRow) return;
         const floorAlign = rowAlignOf(layout, floorBlock);
+        const overlayW = Math.min(row.item.overlayAlong || row.item.w, trackW);
+        const overlayDx = rowAlignOffset(floorAlign, trackW - overlayW);
         drawFloorOverlayInBox(
           parts,
           floorRow.item,
-          rowX,
+          x + overlayDx,
           bodyY,
-          row.item.w,
+          overlayW,
           row.item.h,
           occupancy,
           { vertical: false, align: floorAlign },

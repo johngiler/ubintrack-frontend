@@ -168,6 +168,7 @@ function emptySection(orientation = "horizontal", blocks = [], sectionType = "pa
     name,
     code: uniqueAisleToken(name, used),
     rack_count: 0,
+    stretch_full: section_type === "pasillo",
     orientation: axis,
   };
 }
@@ -219,6 +220,12 @@ function blocksFromApi(blocks) {
           : block.depth || "",
       overlap: kind === "floor" ? block.overlap === true : false,
       always_visible: kind === "floor" ? block.always_visible === true : false,
+      stretch_full:
+        kind === "section"
+          ? block.stretch_full !== undefined && block.stretch_full !== null
+            ? Boolean(block.stretch_full)
+            : section_type === "pasillo"
+          : false,
       orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
       label_side: block.label_side === "above" ? "above" : "below",
       aisle_code: block.aisle_code || "",
@@ -1036,6 +1043,18 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                                     event.target.value,
                                   ),
                                 }))
+                              }
+                            />
+                            <Form.Check
+                              type="checkbox"
+                              id={`cava-section-stretch-${block.key}`}
+                              className="!mb-0 whitespace-nowrap text-[11px] leading-tight"
+                              label="100% ancho"
+                              title="Ocupar todo el eje de la hilera relacionada"
+                              checked={Boolean(block.stretch_full)}
+                              disabled={readOnly}
+                              onChange={(event) =>
+                                updateBlock(block.key, { stretch_full: event.target.checked })
                               }
                             />
                           </>

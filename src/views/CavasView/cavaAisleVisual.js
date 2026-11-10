@@ -142,12 +142,23 @@ export function sectionBandBaseSize(sectionType, { emptySize = UI_AISLE_SIZE } =
 }
 
 /**
- * Largo en el eje libre: crece con el vecino relacionado/contiguo;
- * si no hay, fit (0 = fit-content en UI).
+ * Largo en el eje libre del widget de sección:
+ * - sin 100%: ancho/alto total de su relacionado
+ * - con 100%: max(relacionado, pista) para llegar al final del tramo
  */
-export function sectionAlongSpan(_block, { relatedSpan = 0 } = {}) {
+export function sectionAlongSpan(block, { relatedSpan = 0, trackSpan = 0 } = {}) {
   const related = Math.max(0, Number(relatedSpan) || 0);
-  return related > 0 ? related : 0;
+  const track = Math.max(0, Number(trackSpan) || 0);
+  if (block?.stretch_full) return Math.max(related, track);
+  return related;
+}
+
+/** Shell del absolute/pista: el largo visual de la banda (o el del overlay). */
+export function sectionShellAlong(alongSpan, { hasOverlay = false, overlaySpan = 0 } = {}) {
+  const along = Math.max(0, Number(alongSpan) || 0);
+  if (along > 0) return along;
+  if (hasOverlay) return Math.max(0, Number(overlaySpan) || 0);
+  return 0;
 }
 
 export { UI_CELL, SVG_CELL };

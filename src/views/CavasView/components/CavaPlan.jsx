@@ -64,6 +64,7 @@ import {
   chunkAislePlaces,
   sectionAlongSpan,
   sectionBandBaseSize,
+  sectionShellAlong,
 } from "../cavaAisleVisual";
 import CellPositionsMenu from "./CellPositionsMenu";
 import HileraKpisMenu from "./HileraKpisMenu";
@@ -130,12 +131,19 @@ function horizontalRackSpan(block) {
   return AXIS_SIDE + AXIS_GAP + tokens.length * CELL + Math.max(tokens.length - 1, 0) * PIECE_GAP;
 }
 
-/** Ancho total de la fila horizontal: KPI izquierdo + eje + racks (mismo que el pasillo). */
+/** Ancho total de la fila horizontal: KPI izquierdo + eje + racks. */
 function horizontalRowSpan(block) {
   const rack = horizontalRackSpan(block);
   if (!rack) return 0;
   return HILERA_KPI_SIDE_W + HILERA_KPI_INNER_GAP + rack;
 }
+
+/** Tope 100% de sección horizontal: eje + racks, sin contador de hilera. */
+function horizontalSectionSpan(block) {
+  return horizontalRackSpan(block);
+}
+
+const HILERA_KPI_PAD = HILERA_KPI_SIDE_W + HILERA_KPI_INNER_GAP;
 
 /** Alto de hilera vertical (KPI + eje superior + racks apilados). */
 function verticalRackSpan(block) {
@@ -146,6 +154,17 @@ function verticalRackSpan(block) {
   const axisBlock = places.length >= 1 ? AXIS_TOP + AXIS_GAP : 0;
   return kpiBlock + axisBlock + tokens.length * CELL + Math.max(tokens.length - 1, 0) * PIECE_GAP;
 }
+
+/** Alto de sección vertical: eje + racks, sin contador (como horizontalSectionSpan). */
+function verticalSectionSpan(block) {
+  const tokens = rackTokensOf(block);
+  const places = depthCodesOf(block);
+  if (!tokens.length || !places.length) return 0;
+  const axisBlock = places.length >= 1 ? AXIS_TOP + AXIS_GAP : 0;
+  return axisBlock + tokens.length * CELL + Math.max(tokens.length - 1, 0) * PIECE_GAP;
+}
+
+const VERTICAL_KPI_PAD = HILERA_KPI_TOP_H + PIECE_GAP;
 
 /** Alto/ancho del piso a lo largo (solo posiciones, sin KPI). */
 function floorAlongSpan(block, { vertical = false, planLayout = null } = {}) {
@@ -252,8 +271,8 @@ function maxSpan(blocks, spanOf) {
 }
 
 /** Ancho/alto del pasillo = hilera relacionada (o la más ancha del tramo). */
-function aisleSpanFor(aisle, scope, spanOf) {
-  const related = relatedRacksForAisle(scope, aisle);
+function aisleSpanFor(aisle, scope, spanOf, { throughSections = false } = {}) {
+  const related = relatedRacksForAisle(scope, aisle, { throughSections });
   const racks = related.length ? related : (scope || []).filter((block) => block.kind === "rack");
   return Math.max(0, maxSpan(racks, spanOf));
 }
@@ -296,12 +315,17 @@ function floorSpanForSection(section, scope, { vertical = false, planLayout = nu
  * Túnel: alto/ancho = largo de posiciones de piso (sin contador).
  * Resto: racks ligados, o piso en reposo.
  */
-function relatedSpanForSection(section, scope, spanOf, { vertical = false, planLayout = null } = {}) {
+function relatedSpanForSection(
+  section,
+  scope,
+  spanOf,
+  { vertical = false, planLayout = null, throughSections = false } = {},
+) {
   const floorSpan = floorSpanForSection(section, scope, { vertical, planLayout });
   if (normalizeSectionType(section?.section_type) === "tunel" && floorSpan > 0) {
     return floorSpan;
   }
-  const rackSpan = aisleSpanFor(section, scope, spanOf);
+  const rackSpan = aisleSpanFor(section, scope, spanOf, { throughSections });
   if (rackSpan > 0) return rackSpan;
   if (floorSpan > 0) return floorSpan;
   const restingFloorSpan = Math.max(
@@ -666,6 +690,8 @@ function RackBand({
   kpiTotal = 0,
   kpiActive = false,
   onKpiClick,
+  /** Ref al cuerpo (eje + racks), sin contador — para medir relacionado de sección. */
+  bodyRef = null,
 }) {
   const tokens = rackTokensOf(block);
   const levels = Number(block.levels) || 0;
@@ -720,7 +746,12 @@ function RackBand({
   return (
     <div className="inline-flex flex-col items-start" style={{ gap: PIECE_GAP }}>
       {kpiAbove}
-      <div className="flex flex-col items-start" style={{ gap: AXIS_GAP }}>
+      <div
+        ref={bodyRef}
+        data-rack-body={block.key}
+        className="flex flex-col items-start"
+        style={{ gap: AXIS_GAP }}
+      >
         {showTopAxis ? (
           <div style={{ marginLeft: labelOffset }}>
             <DepthAxis places={places} layout="top" />
@@ -898,7 +929,7 @@ function AisleBand({
   const sectionType = normalizeSectionType(block.section_type);
   const label = aisleDisplayName(block);
   const base = sectionBandBaseSize(sectionType, { emptySize: AISLE_SIZE });
-  const along = sectionAlongSpan(block, { relatedSpan: relatedSpan || trackSpan });
+  const along = sectionAlongSpan(block, { relatedSpan, trackSpan });
   const fillAlong = along >= AISLE_LABEL_MIN_ALONG;
   const bandW = fillAlong ? Math.max(base, along) : "fit-content";
   const bandH = Math.max(base, Number(crossSpan) || 0);
@@ -956,7 +987,8 @@ function VerticalAisleBand({
   const label = aisleDisplayName(block);
   const base = sectionBandBaseSize(sectionType, { emptySize: AISLE_SIZE });
   const along = sectionAlongSpan(block, {
-    relatedSpan: columnHeight || relatedSpan || trackSpan,
+    relatedSpan: columnHeight || relatedSpan,
+    trackSpan,
   });
   const fillAlong = along >= AISLE_LABEL_MIN_ALONG;
   const bandH = fillAlong ? Math.max(base, along) : "fit-content";
@@ -1084,10 +1116,9 @@ function VerticalFloorBand({
         ? "flex-end"
         : "flex-start";
   if (!places.length) return null;
-  const fromEnd = align === "end";
   const showKpi = kpiTotal != null && typeof onKpiClick === "function";
   const translucent = inOverlay || floorOverlaps(block);
-  // KPI fuera de flujo: alto = solo posiciones. Abajo → arriba; Arriba → debajo.
+  // KPI fuera de flujo, siempre arriba (como hilera V y SVG). Arriba/Medio/Abajo no lo mueven.
   return (
     <div
       className="relative h-max w-max shrink-0"
@@ -1108,11 +1139,7 @@ function VerticalFloorBand({
       {showKpi ? (
         <div
           className="absolute left-1/2 z-[1] -translate-x-1/2"
-          style={
-            fromEnd
-              ? { bottom: "100%", marginBottom: AISLE_POS_GAP_UI }
-              : { top: "100%", marginTop: AISLE_POS_GAP_UI }
-          }
+          style={{ bottom: "100%", marginBottom: AISLE_POS_GAP_UI }}
         >
           <HileraKpiBadge
             total={kpiTotal}
@@ -1160,7 +1187,9 @@ export default function CavaPlan({
   const [occupancy, setOccupancy] = useState({});
   const [occupancyTick, setOccupancyTick] = useState(0);
   const [measuredTrackW, setMeasuredTrackW] = useState(0);
-  const rackSpanRefs = useRef(new Map());
+  const [measuredTrackH, setMeasuredTrackH] = useState(0);
+  /** Cuerpo de hilera (sin contador): { node, vertical }. */
+  const rackBodyRefs = useRef(new Map());
   const cavaKpis = useMemo(
     () => cavaOccupancyKpis(occupancy, { blocks, planLayout: layout }),
     [occupancy, blocks, layout],
@@ -1174,34 +1203,84 @@ export default function CavaPlan({
     setFloorPreview(null);
   }, [cavaId, planLayout]);
 
-  const refreshTrackWidth = () => {
-    let max = 0;
-    rackSpanRefs.current.forEach((node) => {
-      if (node) max = Math.max(max, Math.ceil(node.getBoundingClientRect().width));
+  const refreshRackBodyMeasures = () => {
+    let maxBodyW = 0;
+    let maxBodyH = 0;
+    rackBodyRefs.current.forEach((entry) => {
+      const node = entry?.node;
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      if (entry.vertical) {
+        maxBodyH = Math.max(maxBodyH, Math.ceil(rect.height));
+      } else {
+        maxBodyW = Math.max(maxBodyW, Math.ceil(rect.width));
+      }
     });
-    setMeasuredTrackW((prev) => (prev === max ? prev : max));
+    // Pista = cuerpo + hueco del contador (H izquierda / V arriba).
+    const nextW = maxBodyW > 0 ? maxBodyW + HILERA_KPI_PAD : 0;
+    const nextH = maxBodyH > 0 ? maxBodyH + VERTICAL_KPI_PAD : 0;
+    setMeasuredTrackW((prev) => (prev === nextW ? prev : nextW));
+    setMeasuredTrackH((prev) => (prev === nextH ? prev : nextH));
   };
 
-  const setRackSpanRef = (key, node) => {
-    if (node) rackSpanRefs.current.set(key, node);
-    else rackSpanRefs.current.delete(key);
+  /**
+   * Largo real del relacionado sin contador (ancho H / alto V).
+   * El widget de sección debe igualar solo este cuerpo.
+   */
+  function measuredRelatedRackAlong(
+    section,
+    scope,
+    { throughSections = false, vertical = false } = {},
+  ) {
+    const related = relatedRacksForAisle(scope, section, { throughSections });
+    if (!related.length) return 0;
+    return Math.max(
+      0,
+      ...related.map((rack) => {
+        const entry = rackBodyRefs.current.get(rack.key);
+        const node = entry?.node;
+        if (!node) return 0;
+        const rect = node.getBoundingClientRect();
+        const alongVertical = vertical || rack.orientation === "vertical";
+        return Math.max(0, Math.ceil(alongVertical ? rect.height : rect.width));
+      }),
+    );
+  }
+
+  /** Hueco KPI izquierdo si la sección sigue una hilera horizontal. */
+  function sectionUsesHileraKpiPad(section, scope) {
+    return relatedRacksForAisle(scope, section).some(
+      (rack) => rack.orientation !== "vertical",
+    );
+  }
+
+  /** Hueco KPI superior si la sección sigue una hilera vertical (arriba y abajo igual). */
+  function sectionUsesVerticalKpiPad(section, scope) {
+    return relatedRacksForAisle(scope, section).some(
+      (rack) => rack.orientation === "vertical",
+    );
+  }
+
+  const setRackBodyRef = (key, node, { vertical = false } = {}) => {
+    if (node) rackBodyRefs.current.set(key, { node, vertical: Boolean(vertical) });
+    else rackBodyRefs.current.delete(key);
   };
 
   useLayoutEffect(() => {
-    // Doble rAF: tras pintar racks medir el ancho real de la hilera más ancha.
+    // Doble rAF: tras pintar racks medir cuerpo (sin contador) y pista.
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
-      refreshTrackWidth();
-      raf2 = requestAnimationFrame(refreshTrackWidth);
+      refreshRackBodyMeasures();
+      raf2 = requestAnimationFrame(refreshRackBodyMeasures);
     });
-    const nodes = [...rackSpanRefs.current.values()];
+    const nodes = [...rackBodyRefs.current.values()].map((entry) => entry.node).filter(Boolean);
     if (!nodes.length || typeof ResizeObserver === "undefined") {
       return () => {
         cancelAnimationFrame(raf1);
         cancelAnimationFrame(raf2);
       };
     }
-    const observer = new ResizeObserver(() => refreshTrackWidth());
+    const observer = new ResizeObserver(() => refreshRackBodyMeasures());
     nodes.forEach((node) => observer.observe(node));
     return () => {
       cancelAnimationFrame(raf1);
@@ -1387,6 +1466,11 @@ export default function CavaPlan({
         kpiTotal={kpis.total}
         kpiActive={kpiActive}
         onKpiClick={vertical ? (event) => selectHileraKpi(block, event) : undefined}
+        bodyRef={
+          vertical
+            ? (node) => setRackBodyRef(block.key, node, { vertical: true })
+            : undefined
+        }
       />
     );
   }
@@ -1404,8 +1488,6 @@ export default function CavaPlan({
     return (
       <div key={block.key} className={`flex w-full items-start ${justifyClass(align)}`}>
         <div
-          ref={(node) => setRackSpanRef(block.key, node)}
-          data-rack-span={block.key}
           className="flex w-max shrink-0 items-start"
           style={{ gap: HILERA_KPI_INNER_GAP }}
         >
@@ -1421,7 +1503,13 @@ export default function CavaPlan({
               />
             </div>
           </div>
-          <div className="flex w-max shrink-0 items-start" style={{ gap: AXIS_GAP }}>
+          {/* Cuerpo sin contador: mide el ancho del relacionado de sección. */}
+          <div
+            ref={(node) => setRackBodyRef(block.key, node, { vertical: false })}
+            data-rack-body={block.key}
+            className="flex w-max shrink-0 items-start"
+            style={{ gap: AXIS_GAP }}
+          >
             {showAxis ? (
               <DepthAxis
                 places={drawnAxis}
@@ -1453,44 +1541,74 @@ export default function CavaPlan({
           if (entry.type === "span2") {
             const { sections, floor } = entry;
             const floorAlign = rowAlignOf(layout, floor);
+            // span2 = absolute/solapar: puede mirar racks al otro lado del piso.
             const relatedSpan = Math.max(
               floorAlongSpan(floor, { vertical: false, planLayout: layout }),
               ...sections.map((section) =>
-                relatedSpanForSection(section, middle, horizontalRowSpan, {
-                  vertical: false,
-                  planLayout: layout,
+                Math.max(
+                  relatedSpanForSection(section, middle, horizontalSectionSpan, {
+                    vertical: false,
+                    planLayout: layout,
+                    throughSections: true,
+                  }),
+                  measuredRelatedRackAlong(section, middle, { throughSections: true }),
+                ),
+              ),
+            );
+            const usesKpiPad = sections.some((section) =>
+              sectionUsesHileraKpiPad(section, middle),
+            );
+            const kpiPad = usesKpiPad ? HILERA_KPI_PAD : 0;
+            // Pista medida sin contador (tope del 100%).
+            const sectionTrackW = Math.max(0, trackW - kpiPad);
+            const shellAlong = Math.max(
+              relatedSpan,
+              ...sections.map((section) =>
+                sectionAlongSpan(section, {
+                  relatedSpan,
+                  trackSpan: sectionTrackW,
                 }),
               ),
             );
-            const along = sectionAlongSpan(sections[0], { relatedSpan });
+            const shellW = sectionShellAlong(shellAlong, {
+              hasOverlay: true,
+              overlaySpan: relatedSpan,
+            });
             return (
               <div
                 key={`span-${floor.key}`}
                 className={`relative flex w-full items-start ${justifyClass(floorAlign)}`}
               >
                 <div
-                  className="relative flex w-full flex-col"
-                  style={{ gap: PIECE_GAP, width: along > 0 ? along : undefined }}
+                  className="relative flex shrink-0 items-start"
+                  style={usesKpiPad ? { gap: HILERA_KPI_INNER_GAP } : undefined}
                 >
-                  {sections.map((section) => (
-                    <AisleBand
-                      key={section.key}
-                      block={section}
-                      align={floorAlign}
-                      trackSpan={trackW}
-                      relatedSpan={relatedSpan}
-                    />
-                  ))}
-                  {/* Entre los dos pasillos (eje fino centrado); ancho según alineación del piso. */}
-                  <div className="pointer-events-auto absolute inset-0 z-[1]">
-                    <div
-                      className="absolute"
-                      style={overlayPositionStyle(floorAlign, { vertical: false })}
-                    >
-                      {renderFloorOverlayWithKpi(floor, {
-                        vertical: false,
-                        align: floorAlign,
-                      })}
+                  {usesKpiPad ? (
+                    <div className="shrink-0" style={{ width: HILERA_KPI_SIDE_W }} aria-hidden />
+                  ) : null}
+                  <div
+                    className="relative flex flex-col"
+                    style={{ gap: PIECE_GAP, width: shellW > 0 ? shellW : undefined }}
+                  >
+                    {sections.map((section) => (
+                      <AisleBand
+                        key={section.key}
+                        block={section}
+                        align={floorAlign}
+                        trackSpan={sectionTrackW}
+                        relatedSpan={relatedSpan}
+                      />
+                    ))}
+                    <div className="pointer-events-auto absolute inset-0 z-[1]">
+                      <div
+                        className="absolute"
+                        style={overlayPositionStyle(floorAlign, { vertical: false })}
+                      >
+                        {renderFloorOverlayWithKpi(floor, {
+                          vertical: false,
+                          align: floorAlign,
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1530,13 +1648,18 @@ export default function CavaPlan({
               </div>
             );
           }
-          const relatedSpan = relatedSpanForSection(block, middle, horizontalRowSpan, {
-            vertical: false,
-            planLayout: layout,
-          });
-          const along = sectionAlongSpan(block, { relatedSpan });
           const overlayFloors = floorsOverlappingSection(middle, block).filter((floor) =>
             floorShowsPositions(floor, layout),
+          );
+          // Solo absolute/solapar mira racks al otro lado; sin eso = solo relacionados.
+          const throughSections = floorsOverlappingSection(middle, block).length > 0;
+          const relatedSpan = Math.max(
+            relatedSpanForSection(block, middle, horizontalSectionSpan, {
+              vertical: false,
+              planLayout: layout,
+              throughSections,
+            }),
+            measuredRelatedRackAlong(block, middle, { throughSections }),
           );
           const overlayCross = overlayFloorCross(overlayFloors, {
             vertical: false,
@@ -1545,37 +1668,57 @@ export default function CavaPlan({
           const sectionAlign = overlayFloors.length
             ? rowAlignOf(layout, overlayFloors[0])
             : align;
+          const usesKpiPad = sectionUsesHileraKpiPad(block, middle);
+          const kpiPad = usesKpiPad ? HILERA_KPI_PAD : 0;
+          // Pista medida sin contador (tope del 100%). Sin 100% = solo relacionado.
+          const sectionTrackW = Math.max(0, trackW - kpiPad);
+          const bandAlong = sectionAlongSpan(block, {
+            relatedSpan,
+            trackSpan: sectionTrackW,
+          });
+          const shellW = sectionShellAlong(bandAlong, {
+            hasOverlay: overlayFloors.length > 0,
+            overlaySpan: relatedSpan,
+          });
           return (
             <div
               key={block.key}
               className={`relative flex w-full items-start ${justifyClass(sectionAlign)}`}
             >
               <div
-                className="relative shrink-0"
-                style={along > 0 ? { width: along } : undefined}
+                className="relative flex shrink-0 items-start"
+                style={usesKpiPad ? { gap: HILERA_KPI_INNER_GAP } : undefined}
               >
-                <AisleBand
-                  block={block}
-                  align={align}
-                  trackSpan={trackW}
-                  relatedSpan={relatedSpan}
-                  crossSpan={overlayCross}
-                />
-                {overlayFloors.map((floorBlock) => {
-                  const floorAlign = rowAlignOf(layout, floorBlock);
-                  return (
-                    <div
-                      key={`ov-${floorBlock.key}`}
-                      className="pointer-events-auto absolute z-[1]"
-                      style={overlayPositionStyle(floorAlign, { vertical: false })}
-                    >
-                      {renderFloorOverlayWithKpi(floorBlock, {
-                        vertical: false,
-                        align: floorAlign,
-                      })}
-                    </div>
-                  );
-                })}
+                {usesKpiPad ? (
+                  <div className="shrink-0" style={{ width: HILERA_KPI_SIDE_W }} aria-hidden />
+                ) : null}
+                <div
+                  className="relative flex flex-col"
+                  style={shellW > 0 ? { width: shellW } : undefined}
+                >
+                  <AisleBand
+                    block={block}
+                    align={align}
+                    trackSpan={sectionTrackW}
+                    relatedSpan={relatedSpan}
+                    crossSpan={overlayCross}
+                  />
+                  {overlayFloors.map((floorBlock) => {
+                    const floorAlign = rowAlignOf(layout, floorBlock);
+                    return (
+                      <div
+                        key={`ov-${floorBlock.key}`}
+                        className="pointer-events-auto absolute z-[1]"
+                        style={overlayPositionStyle(floorAlign, { vertical: false })}
+                      >
+                        {renderFloorOverlayWithKpi(floorBlock, {
+                          vertical: false,
+                          align: floorAlign,
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           );
@@ -1606,10 +1749,15 @@ export default function CavaPlan({
   /** Columnas verticales (flanco en master H, o tramo medio en master V). */
   function renderVerticalStrip(sideBlocks, { fill = false } = {}) {
     const items = sideBlocks || [];
-    const trackH = trackSpanFor(items, verticalRackSpan, {
-      vertical: true,
-      planLayout: layout,
-    });
+    const estimated = Math.max(
+      trackSpanFor(items, verticalRackSpan, {
+        vertical: true,
+        planLayout: layout,
+      }),
+      1,
+    );
+    // Pista medida (cuerpo + hueco KPI); el widget de sección usa pista − contador.
+    const trackH = Math.max(estimated, measuredTrackH);
     const packed = packOverlapStrip(items, layout);
     return (
       <div
@@ -1626,41 +1774,76 @@ export default function CavaPlan({
                   : floorAlign === "end"
                     ? "flex-end"
                     : "flex-start";
+              // span2 = absolute/solapar: puede mirar racks al otro lado del piso.
+              // Relacionado = cuerpo sin contador (fórmula + DOM).
               const relatedSpan = Math.max(
                 floorAlongSpan(floor, { vertical: true, planLayout: layout }),
                 ...sections.map((section) =>
-                  relatedSpanForSection(section, items, verticalRackSpan, {
-                    vertical: true,
-                    planLayout: layout,
-                  }),
+                  Math.max(
+                    relatedSpanForSection(section, items, verticalSectionSpan, {
+                      vertical: true,
+                      planLayout: layout,
+                      throughSections: true,
+                    }),
+                    measuredRelatedRackAlong(section, items, {
+                      throughSections: true,
+                      vertical: true,
+                    }),
+                  ),
                 ),
               );
+              const usesKpiPad = sections.some((section) =>
+                sectionUsesVerticalKpiPad(section, items),
+              );
+              const kpiPad = usesKpiPad ? VERTICAL_KPI_PAD : 0;
+              const sectionTrackH = Math.max(0, trackH - kpiPad);
+              const shellAlong = Math.max(
+                relatedSpan,
+                ...sections.map((section) =>
+                  sectionAlongSpan(section, { relatedSpan, trackSpan: sectionTrackH }),
+                ),
+              );
+              const shellH = sectionShellAlong(shellAlong, {
+                hasOverlay: true,
+                overlaySpan: relatedSpan,
+              });
+              const groupH = shellH > 0 ? shellH + kpiPad : undefined;
               return (
                 <div
                   key={`span-${floor.key}`}
-                  className="relative flex shrink-0"
-                  style={{ gap: PIECE_GAP, alignSelf }}
+                  className="relative flex shrink-0 flex-col"
+                  style={{
+                    alignSelf,
+                    height: groupH,
+                  }}
                 >
-                  {sections.map((section) => (
-                    <VerticalAisleBand
-                      key={section.key}
-                      block={section}
-                      align={floorAlign}
-                      trackSpan={trackH}
-                      relatedSpan={relatedSpan}
-                      columnHeight={relatedSpan > 0 ? relatedSpan : 0}
-                    />
-                  ))}
-                  {/* Entre los dos pasillos (eje fino centrado); alto según alineación del piso. */}
-                  <div className="pointer-events-auto absolute inset-0 z-[1]">
-                    <div
-                      className="absolute"
-                      style={overlayPositionStyle(floorAlign, { vertical: true })}
-                    >
-                      {renderFloorOverlayWithKpi(floor, {
-                        vertical: true,
-                        align: floorAlign,
-                      })}
+                  {usesKpiPad ? (
+                    <div className="shrink-0" style={{ height: kpiPad }} aria-hidden />
+                  ) : null}
+                  <div
+                    className="relative flex shrink-0"
+                    style={{ gap: PIECE_GAP, height: shellH > 0 ? shellH : undefined }}
+                  >
+                    {sections.map((section) => (
+                      <VerticalAisleBand
+                        key={section.key}
+                        block={section}
+                        align={floorAlign}
+                        trackSpan={sectionTrackH}
+                        relatedSpan={relatedSpan}
+                      />
+                    ))}
+                    {/* Entre los dos pasillos (eje fino centrado); alto según alineación del piso. */}
+                    <div className="pointer-events-auto absolute inset-0 z-[1]">
+                      <div
+                        className="absolute"
+                        style={overlayPositionStyle(floorAlign, { vertical: true })}
+                      >
+                        {renderFloorOverlayWithKpi(floor, {
+                          vertical: true,
+                          align: floorAlign,
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1668,17 +1851,28 @@ export default function CavaPlan({
             }
 
             const block = entry.block;
-            const relatedSpan = isSectionBlock(block)
-              ? relatedSpanForSection(block, items, verticalRackSpan, {
-                  vertical: true,
-                  planLayout: layout,
-                })
-              : 0;
             const overlayFloors = isSectionBlock(block)
               ? floorsOverlappingSection(items, block).filter((floor) =>
                   floorShowsPositions(floor, layout),
                 )
               : [];
+            // Solo absolute/solapar mira racks al otro lado; sin eso = solo relacionados.
+            const throughSections =
+              isSectionBlock(block) && floorsOverlappingSection(items, block).length > 0;
+            // Relacionado = cuerpo sin contador (fórmula + DOM). Arriba/Medio/Abajo igual.
+            const relatedSpan = isSectionBlock(block)
+              ? Math.max(
+                  relatedSpanForSection(block, items, verticalSectionSpan, {
+                    vertical: true,
+                    planLayout: layout,
+                    throughSections,
+                  }),
+                  measuredRelatedRackAlong(block, items, {
+                    throughSections,
+                    vertical: true,
+                  }),
+                )
+              : 0;
             const overlayCross = overlayFloorCross(overlayFloors, {
               vertical: true,
               planLayout: layout,
@@ -1688,37 +1882,61 @@ export default function CavaPlan({
               : stackAlignOf(layout, block);
             const alignSelf =
               align === "center" ? "center" : align === "end" ? "flex-end" : "flex-start";
+            const usesKpiPad =
+              isSectionBlock(block) && sectionUsesVerticalKpiPad(block, items);
+            const kpiPad = usesKpiPad ? VERTICAL_KPI_PAD : 0;
+            const sectionTrackH = Math.max(0, trackH - kpiPad);
+            const bandAlong = isSectionBlock(block)
+              ? sectionAlongSpan(block, { relatedSpan, trackSpan: sectionTrackH })
+              : 0;
+            const shellH = isSectionBlock(block)
+              ? sectionShellAlong(bandAlong, {
+                  hasOverlay: overlayFloors.length > 0,
+                  overlaySpan: relatedSpan,
+                })
+              : 0;
+            const groupH = isSectionBlock(block) && shellH > 0 ? shellH + kpiPad : undefined;
             return (
               <div
                 key={block.key}
-                className="relative flex shrink-0"
-                style={{ alignSelf }}
+                className={`relative flex shrink-0 ${isSectionBlock(block) ? "flex-col" : ""}`}
+                style={{
+                  alignSelf,
+                  height: groupH,
+                }}
               >
                 {isSectionBlock(block) ? (
                   <>
-                    <VerticalAisleBand
-                      block={block}
-                      align={align}
-                      trackSpan={trackH}
-                      relatedSpan={relatedSpan}
-                      columnHeight={relatedSpan > 0 ? relatedSpan : 0}
-                      crossSpan={overlayCross}
-                    />
-                    {overlayFloors.map((floorBlock) => {
-                      const floorAlign = stackAlignOf(layout, floorBlock);
-                      return (
-                        <div
-                          key={`ov-${floorBlock.key}`}
-                          className="pointer-events-auto absolute z-[1]"
-                          style={overlayPositionStyle(floorAlign, { vertical: true })}
-                        >
-                          {renderFloorOverlayWithKpi(floorBlock, {
-                            vertical: true,
-                            align: floorAlign,
-                          })}
-                        </div>
-                      );
-                    })}
+                    {usesKpiPad ? (
+                      <div className="shrink-0" style={{ height: kpiPad }} aria-hidden />
+                    ) : null}
+                    <div
+                      className="relative flex shrink-0"
+                      style={shellH > 0 ? { height: shellH } : undefined}
+                    >
+                      <VerticalAisleBand
+                        block={block}
+                        align={align}
+                        trackSpan={sectionTrackH}
+                        relatedSpan={relatedSpan}
+                        crossSpan={overlayCross}
+                      />
+                      {overlayFloors.map((floorBlock) => {
+                        const floorAlign = stackAlignOf(layout, floorBlock);
+                        return (
+                          <div
+                            key={`ov-${floorBlock.key}`}
+                            className="pointer-events-auto absolute z-[1]"
+                            style={overlayPositionStyle(floorAlign, { vertical: true })}
+                          >
+                            {renderFloorOverlayWithKpi(floorBlock, {
+                              vertical: true,
+                              align: floorAlign,
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </>
                 ) : isFloorBlock(block) ? (
                   (() => {
