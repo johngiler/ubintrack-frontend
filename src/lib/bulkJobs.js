@@ -1,6 +1,6 @@
 import httpClient from "@/services/httpClient";
 
-const ASYNC_DETAIL = "En proceso. Puedes continuar mientras se procesa.";
+export const ASYNC_DETAIL = "En proceso. Puedes continuar mientras se procesa.";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -28,10 +28,14 @@ export async function waitForBulkJob(id, { isCurrent = () => true, intervalMs = 
 }
 
 /**
- * Tras un bulk: si quedó en cola, suelta la UI ya; al terminar avisa en la vista.
- * Devuelve { async: boolean } para que el caller limpie selección / cierre modal.
+ * Tras un bulk: si quedó en cola, suelta la UI ya.
+ * Con onAsyncStart (tracker de sección), el seguimiento y el aviso final
+ * los hace el tracker (persiste al cambiar de vista / refresh).
  */
-export function followBulkJob(result, { showAlert, onFinished } = {}) {
+export function followBulkJob(
+  result,
+  { showAlert, onFinished, onAsyncStart, onAsyncEnd } = {},
+) {
   if (!isBulkJobOpen(result) || !result?.id) {
     const failed = result?.success === false || result?.status === "failed";
     showAlert?.(
@@ -42,9 +46,21 @@ export function followBulkJob(result, { showAlert, onFinished } = {}) {
     return { async: false };
   }
 
-  showAlert?.("success", result.detail || result.message || ASYNC_DETAIL);
+  const message = result.detail || result.message || ASYNC_DETAIL;
+  onAsyncStart?.({
+    id: result.id,
+    message,
+    kind: result.kind,
+  });
+
+  // Tracker de la sección observa (y reanuda tras refresh / cambio de vista).
+  if (onAsyncStart) {
+    return { async: true };
+  }
+
   void waitForBulkJob(result.id)
     .then((finalJob) => {
+      onAsyncEnd?.(result.id);
       if (!finalJob) return;
       const failed = finalJob.status === "failed" || finalJob.success === false;
       showAlert?.(
@@ -56,6 +72,7 @@ export function followBulkJob(result, { showAlert, onFinished } = {}) {
       onFinished?.(finalJob);
     })
     .catch(() => {
+      onAsyncEnd?.(result.id);
       showAlert?.("danger", "No se pudo completar la operación.");
     });
 

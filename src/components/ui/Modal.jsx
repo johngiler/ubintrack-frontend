@@ -123,7 +123,7 @@ Modal.Footer = function ModalFooter({ children, className }) {
   );
 };
 
-Modal.Section = function ModalSection({ title, children, className }) {
+Modal.Section = function ModalSection({ title, actions, children, className }) {
   return (
     <section
       className={cn(
@@ -131,10 +131,19 @@ Modal.Section = function ModalSection({ title, children, className }) {
         className,
       )}
     >
-      {title ? (
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-          {title}
-        </h3>
+      {title || actions ? (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          {title ? (
+            <h3 className="mb-0 text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
+              {title}
+            </h3>
+          ) : (
+            <span />
+          )}
+          {actions ? (
+            <div className="flex shrink-0 items-center gap-1">{actions}</div>
+          ) : null}
+        </div>
       ) : null}
       {children}
     </section>

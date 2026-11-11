@@ -15,6 +15,7 @@ export default function ModalConfirm({
   binIds,
   onDelete,
   showAlert,
+  trackAsyncJob,
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [formError, setFormError] = useState("");
@@ -31,6 +32,8 @@ export default function ModalConfirm({
         const result = await bulkDeleteBins(ids);
         followBulkJob(result, {
           showAlert,
+          onAsyncStart: trackAsyncJob?.start,
+          onAsyncEnd: trackAsyncJob?.finish,
           onFinished: (job) => {
             if (job?.status === "failed" || job?.success === false) return;
             void onDelete?.();

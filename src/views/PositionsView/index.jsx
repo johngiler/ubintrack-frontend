@@ -37,6 +37,8 @@ import Select from "@/components/ui/Select";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import AsyncProcessBanner from "@/components/wms/AsyncProcessBanner";
+import { useAsyncProcessTracker } from "@/hooks/useAsyncProcessTracker";
 import PositionsViewSkeleton from "./PositionsViewSkeleton";
 import {
   getPositions,
@@ -44,8 +46,6 @@ import {
   getPositionIds,
   getCavas,
   getCava,
-  printPosition,
-  regeneratePositionTag,
 } from "@/services/storageService";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { aisleDisplayName, isSectionBlock } from "../CavasView/cavaPlan";
@@ -73,6 +73,13 @@ function boolFilter(value) {
   return value === "true" || value === true;
 }
 
+/** Impresión solo si hay imagen QR y ZPL. */
+function canPrintPosition(position) {
+  return Boolean(
+    position?.qr_code_image && String(position?.zpl_code || "").trim(),
+  );
+}
+
 export default function PositionsView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "storage", "position");
@@ -93,9 +100,7 @@ export default function PositionsView() {
   const [showBulkPrintModal, setShowBulkPrintModal] = useState(false);
   const [showBulkRegenerateModal, setShowBulkRegenerateModal] = useState(false);
   const [showBulkFlagsModal, setShowBulkFlagsModal] = useState(false);
-  const [regeneratingId, setRegeneratingId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-
   useEffect(() => {
     const initialSearch = searchParams.get("search") || "";
     if (initialSearch) {
@@ -159,7 +164,7 @@ export default function PositionsView() {
 
   const showAlertMessage = useCallback((variant, message) => {
     setAlert({ show: true, variant, message });
-    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
+    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 4000);
   }, []);
 
   const apiFilters = {
@@ -181,6 +186,16 @@ export default function PositionsView() {
     key: swrKeys.positions(currentPage, debouncedSearchTerm, apiFilters),
     fetcher: () => getPositions(currentPage, apiFilters, debouncedSearchTerm),
     pageSize: PAGE_SIZE,
+  });
+
+  const asyncProcess = useAsyncProcessTracker("positions", {
+    onSettled: ({ failed, message }) => {
+      showAlertMessage(failed ? "danger" : "success", message);
+      if (!failed) {
+        setSelectedIds([]);
+        void loadPositions();
+      }
+    },
   });
 
   useEffect(() => {
@@ -260,8 +275,18 @@ export default function PositionsView() {
     try {
       const data = await getPositionIds(apiFilters, debouncedSearchTerm);
       setSelectedIds(Array.isArray(data?.ids) ? data.ids : []);
-    } catch {
-      showAlertMessage("danger", "No se pudieron seleccionar todas");
+      if (data?.truncated) {
+        showAlertMessage(
+          "warning",
+          data.detail ||
+            `Se seleccionaron ${data.count} de ${data.total}.`,
+        );
+      }
+    } catch (error) {
+      showAlertMessage(
+        "danger",
+        getApiErrorMessage(error, "No se pudieron seleccionar todas"),
+      );
     } finally {
       setIsSelectingAll(false);
     }
@@ -284,32 +309,6 @@ export default function PositionsView() {
     setShowModal(true);
   };
 
-  const handlePrint = async (position) => {
-    try {
-      await printPosition(position.id);
-      showAlertMessage("success", `Etiqueta enviada a impresión para ${position.code}`);
-    } catch {
-      showAlertMessage("danger", `Error al imprimir la etiqueta de ${position.code}`);
-    }
-  };
-
-  const handleRegenerate = async (position) => {
-    if (!position?.id || regeneratingId) return;
-    setRegeneratingId(position.id);
-    try {
-      await regeneratePositionTag(position.id);
-      showAlertMessage("success", "Etiqueta regenerada.");
-      await loadPositions();
-    } catch (error) {
-      showAlertMessage(
-        "danger",
-        getApiErrorMessage(error, "No se pudo regenerar la etiqueta."),
-      );
-    } finally {
-      setRegeneratingId(null);
-    }
-  };
-
   const openBulkDelete = () => {
     setSelectedPosition(null);
     setBulkDeleteIds(selectedIds);
@@ -324,6 +323,7 @@ export default function PositionsView() {
 
   return (
     <Fragment>
+      <AsyncProcessBanner jobs={asyncProcess.jobs} />
       {alert.show && (
         <Alert variant={alert.variant} className="mb-3">
           {alert.message}
@@ -531,16 +531,22 @@ export default function PositionsView() {
                         Regenerar etiquetas
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon={Printer}
-                      onClick={() => setShowBulkPrintModal(true)}
-                      title="Imprimir etiquetas seleccionadas"
-                      className="shrink-0 whitespace-nowrap"
-                    >
-                      Imprimir
-                    </Button>
+                    {positions.some(
+                      (position) =>
+                        selectedIds.includes(position.id) &&
+                        canPrintPosition(position),
+                    ) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={Printer}
+                        onClick={() => setShowBulkPrintModal(true)}
+                        title="Imprimir etiquetas seleccionadas"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        Imprimir
+                      </Button>
+                    ) : null}
                     {perms.delete && (
                       <Button
                         variant="danger"
@@ -693,33 +699,6 @@ export default function PositionsView() {
                               <div className="flex items-center gap-1">
                                 <IconButton
                                   size="sm"
-                                  className="text-emerald-600 hover:bg-emerald-50"
-                                  onClick={() => handlePrint(position)}
-                                  title="Imprimir etiqueta"
-                                >
-                                  <Printer className="h-4 w-4" />
-                                </IconButton>
-                                {perms.change && (
-                                  <IconButton
-                                    size="sm"
-                                    className="text-amber-600 hover:bg-amber-50"
-                                    onClick={() => handleRegenerate(position)}
-                                    disabled={regeneratingId === position.id}
-                                    title="Regenerar etiqueta"
-                                  >
-                                    {regeneratingId === position.id ? (
-                                      <span
-                                        className="spinner-border spinner-border-sm"
-                                        role="status"
-                                        aria-hidden="true"
-                                      />
-                                    ) : (
-                                      <RefreshCw className="h-4 w-4" />
-                                    )}
-                                  </IconButton>
-                                )}
-                                <IconButton
-                                  size="sm"
                                   className="text-sky-600 hover:bg-sky-50"
                                   onClick={() => handleShowModal(position, "view")}
                                   title="Ver posición"
@@ -856,6 +835,7 @@ export default function PositionsView() {
         positionIds={bulkDeleteIds || undefined}
         onDelete={handleAfterDelete}
         showAlert={showAlertMessage}
+        trackAsyncJob={asyncProcess}
       />
 
       <ModalBulkFlags
@@ -875,6 +855,7 @@ export default function PositionsView() {
         positionIds={selectedIds}
         onPrinted={() => setSelectedIds([])}
         showAlert={showAlertMessage}
+        trackAsyncJob={asyncProcess}
       />
 
       <ModalBulkRegenerate
@@ -886,6 +867,7 @@ export default function PositionsView() {
           await loadPositions();
         }}
         showAlert={showAlertMessage}
+        trackAsyncJob={asyncProcess}
       />
     </Fragment>
   );

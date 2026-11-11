@@ -50,7 +50,6 @@ import {
   deleteBinProduct,
   updateBinProduct,
   createBinProduct,
-  printBinTag,
   exportBinsToExcel,
   almacenarBinsMasivo,
   getCriteriosAlmacenamiento,
@@ -60,6 +59,8 @@ import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import AsyncProcessBanner from "@/components/wms/AsyncProcessBanner";
+import { useAsyncProcessTracker } from "@/hooks/useAsyncProcessTracker";
 import BinsViewSkeleton from "./BinsViewSkeleton";
 import {
   WmsExpandItemsButton,
@@ -88,6 +89,11 @@ function boolFilter(value) {
   return value === "true" || value === true;
 }
 
+/** Impresión solo si hay imagen y ZPL. */
+function canPrintBin(bin) {
+  return Boolean(bin?.tag_image && String(bin?.zpl_code || "").trim());
+}
+
 const BinsView = () => {
   const user = useAuth().user;
   const perms = canCRUD(user, "inventory", "bin");
@@ -105,7 +111,6 @@ const BinsView = () => {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [printingBinId, setPrintingBinId] = useState(null);
   const [errorResponse, setErrorResponse] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isAlmacenando, setIsAlmacenando] = useState(false);
@@ -128,8 +133,6 @@ const BinsView = () => {
   const [massStoreStrategy, setMassStoreStrategy] = useState("");
   const [massStoreCriteria, setMassStoreCriteria] = useState([]);
   const [massStoreError, setMassStoreError] = useState(null);
-
-
   // Estado para la pestaña inicial del modal
   const [initialTab, setInitialTab] = useState("details");
 
@@ -161,6 +164,21 @@ const BinsView = () => {
     key: swrKeys.bins(currentPage, debouncedSearchTerm, apiFilters),
     fetcher: () => getBins(currentPage, apiFilters, debouncedSearchTerm),
     pageSize: PAGE_SIZE,
+  });
+
+  const showAlert = (variant, message) => {
+    setAlert({ show: true, variant, message });
+    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 4000);
+  };
+
+  const asyncProcess = useAsyncProcessTracker("bins", {
+    onSettled: ({ failed, message }) => {
+      showAlert(failed ? "danger" : "success", message);
+      if (!failed) {
+        setSelectedBinIds([]);
+        void loadEntries();
+      }
+    },
   });
 
   useEffect(() => {
@@ -290,11 +308,6 @@ const BinsView = () => {
     }
   };
 
-  const showAlert = (variant, message) => {
-    setAlert({ show: true, variant, message });
-    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
-  };
-
   const handleNewEntry = () => {
     handleShowModal(null, "create");
   };
@@ -305,21 +318,6 @@ const BinsView = () => {
       [field]: value,
     }));
     setSearchParams({});
-  };
-
-  const handlePrintTag = async (binId) => {
-    if (printingBinId) return;
-
-    setPrintingBinId(binId);
-    try {
-      await printBinTag(binId);
-      showAlert("success", "Etiqueta enviada a impresión");
-    } catch (error) {
-      console.error("Error al imprimir etiqueta:", error);
-      showAlert("danger", "Error al imprimir la etiqueta");
-    } finally {
-      setPrintingBinId(null);
-    }
   };
 
   const handleExportExcel = async () => {
@@ -475,8 +473,17 @@ const BinsView = () => {
     try {
       const data = await getBinIds(apiFilters, debouncedSearchTerm);
       setSelectedBinIds(Array.isArray(data?.ids) ? data.ids : []);
-    } catch {
-      showAlert("danger", "No se pudieron seleccionar todos");
+      if (data?.truncated) {
+        showAlert(
+          "warning",
+          data.detail || `Se seleccionaron ${data.count} de ${data.total}.`,
+        );
+      }
+    } catch (error) {
+      showAlert(
+        "danger",
+        getApiErrorMessage(error, "No se pudieron seleccionar todos"),
+      );
     } finally {
       setIsSelectingAll(false);
     }
@@ -575,6 +582,7 @@ const BinsView = () => {
 
   return (
     <Fragment>
+      <AsyncProcessBanner jobs={asyncProcess.jobs} />
       {alert.show && (
         <Alert variant={alert.variant} className="mb-3">
           {alert.message}
@@ -749,16 +757,21 @@ const BinsView = () => {
                         Regenerar etiquetas
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon={Printer}
-                      onClick={() => setShowBulkPrintModal(true)}
-                      title="Imprimir etiquetas seleccionadas"
-                      className="shrink-0 whitespace-nowrap"
-                    >
-                      Imprimir
-                    </Button>
+                    {entries.some(
+                      (entry) =>
+                        selectedBinIds.includes(entry.id) && canPrintBin(entry),
+                    ) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={Printer}
+                        onClick={() => setShowBulkPrintModal(true)}
+                        title="Imprimir etiquetas seleccionadas"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        Imprimir
+                      </Button>
+                    ) : null}
                     {perms.delete && (
                       <Button
                         variant="danger"
@@ -956,21 +969,6 @@ const BinsView = () => {
                             </Table.Cell>
                             <Table.Cell>
                               <div className="flex items-center gap-1">
-                                {!user?.client && (
-                                  <IconButton
-                                    size="sm"
-                                    className="text-emerald-600 hover:bg-emerald-50"
-                                    onClick={() => handlePrintTag(entry.id)}
-                                    disabled={printingBinId === entry.id}
-                                    title="Imprimir etiqueta"
-                                  >
-                                    {printingBinId === entry.id ? (
-                                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                    ) : (
-                                      <Printer className="h-4 w-4" />
-                                    )}
-                                  </IconButton>
-                                )}
                                 <IconButton
                                   size="sm"
                                   className="text-amber-600 hover:bg-amber-50"
@@ -1121,6 +1119,7 @@ const BinsView = () => {
         binIds={bulkDeleteIds || undefined}
         onDelete={handleAfterDelete}
         showAlert={showAlert}
+        trackAsyncJob={asyncProcess}
       />
 
       <ModalBulkPrint
@@ -1129,6 +1128,7 @@ const BinsView = () => {
         binIds={selectedBinIds}
         onPrinted={() => setSelectedBinIds([])}
         showAlert={showAlert}
+        trackAsyncJob={asyncProcess}
       />
 
       <ModalBulkRegenerate
@@ -1140,6 +1140,7 @@ const BinsView = () => {
           await loadEntries();
         }}
         showAlert={showAlert}
+        trackAsyncJob={asyncProcess}
       />
 
       <ModalBulkActive

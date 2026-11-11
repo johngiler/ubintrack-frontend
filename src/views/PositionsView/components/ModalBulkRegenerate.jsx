@@ -14,6 +14,7 @@ export default function ModalBulkRegenerate({
   positionIds = [],
   onDone,
   showAlert,
+  trackAsyncJob,
 }) {
   const [isWorking, setIsWorking] = useState(false);
   const [formError, setFormError] = useState("");
@@ -26,6 +27,8 @@ export default function ModalBulkRegenerate({
       const result = await bulkRegeneratePositionTags(positionIds);
       followBulkJob(result, {
         showAlert,
+        onAsyncStart: trackAsyncJob?.start,
+        onAsyncEnd: trackAsyncJob?.finish,
         onFinished: (job) => {
           if (job?.status === "failed" || job?.success === false) return;
           void onDone?.();

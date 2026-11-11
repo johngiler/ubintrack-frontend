@@ -12,7 +12,11 @@ export function cavaTitleOf(name, code) {
   const token = String(code || "").trim();
   const given = String(name || "").trim();
   if (given) {
-    return token && !given.endsWith(token) ? `${given} ${token}` : given;
+    // Solo concatenar código numérico legacy («Anden»+«1»). A1/PC ya van en nomenclatura.
+    if (token && /^\d+$/.test(token) && !given.endsWith(token)) {
+      return `${given} ${token}`;
+    }
+    return given;
   }
   return token ? `Cava ${token}` : "Cava";
 }

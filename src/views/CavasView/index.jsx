@@ -20,6 +20,8 @@ import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
+import AsyncProcessBanner from "@/components/wms/AsyncProcessBanner";
+import { useAsyncProcessTracker } from "@/hooks/useAsyncProcessTracker";
 import CavasViewSkeleton from "./CavasViewSkeleton";
 import { getCavas, getCavaPositionTotals } from "@/services/storageService";
 import { canCRUD } from "@/services/httpClient";
@@ -61,7 +63,7 @@ export default function CavasView() {
 
   const showAlertMessage = useCallback((variant, message) => {
     setAlert({ show: true, variant, message });
-    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
+    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 4000);
   }, []);
 
   const {
@@ -85,6 +87,13 @@ export default function CavasView() {
   const refreshCavas = useCallback(async () => {
     await Promise.all([loadCavas(), loadPositionTotals()]);
   }, [loadCavas, loadPositionTotals]);
+
+  const asyncProcess = useAsyncProcessTracker("cavas", {
+    onSettled: ({ failed, message }) => {
+      showAlertMessage(failed ? "danger" : "success", message);
+      if (!failed) void refreshCavas();
+    },
+  });
 
   useEffect(() => {
     if (error) showAlertMessage("danger", "Error al cargar las cámaras");
@@ -115,6 +124,7 @@ export default function CavasView() {
 
   return (
     <Fragment>
+      <AsyncProcessBanner jobs={asyncProcess.jobs} />
       {alert.show && (
         <Alert variant={alert.variant} className="mb-3">
           {alert.message}
@@ -359,6 +369,7 @@ export default function CavasView() {
         mode={modalMode}
         onSave={refreshCavas}
         showAlert={showAlertMessage}
+        trackAsyncJob={asyncProcess}
       />
 
       <ModalConfirm

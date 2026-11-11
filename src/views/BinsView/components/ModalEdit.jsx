@@ -11,6 +11,7 @@ import {
   Tabs,
   Tab,
   Badge,
+  Alert,
 } from "@/components/ui/bootstrap";
 import { IconButton } from "@/components/ui/Button";
 import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
@@ -26,10 +27,12 @@ import {
 } from "@/services/orderService";
 
 import {
+  getBin,
   regenerateBinTag,
   printBinTag,
 } from "@/services/inventoryService";
 import { getApiErrorMessage } from "@/services/httpClient";
+import { bustMediaUrl } from "@/lib/mediaUrl";
 import BinMovementsTimeline from "./BinMovementsTimeline";
 
 const ModalEdit = ({
@@ -511,12 +514,16 @@ const ModalEdit = ({
     if (!selectedEntry?.id || isPrinting) return;
 
     setIsPrinting(true);
+    setBackendErrors(null);
     try {
       await printBinTag(selectedEntry.id);
-      // Opcional: mostrar mensaje de éxito
     } catch (error) {
-      console.error("Error al imprimir etiqueta:", error);
-      // Opcional: mostrar mensaje de error
+      setBackendErrors(
+        getApiErrorMessage(
+          error,
+          "No se pudo imprimir la etiqueta. Verifique la impresora.",
+        ),
+      );
     } finally {
       setIsPrinting(false);
     }
@@ -529,12 +536,21 @@ const ModalEdit = ({
     setBackendErrors(null);
     try {
       const response = await regenerateBinTag(selectedEntry.id);
-      if (response?.tag_image) {
-        setSelectedEntry((prev) => ({
-          ...prev,
-          tag_image: response.tag_image,
-        }));
+      const refreshed = await getBin(selectedEntry.id).catch(() => null);
+      const nextTag = bustMediaUrl(
+        response?.tag_image || refreshed?.tag_image || "",
+      );
+      const nextZpl = response?.zpl_code || refreshed?.zpl_code || "";
+      if (!nextTag && !response?.success) {
+        setBackendErrors("No se pudo regenerar la etiqueta.");
+        return;
       }
+      setSelectedEntry((prev) => ({
+        ...prev,
+        ...(refreshed || {}),
+        tag_image: nextTag || prev.tag_image,
+        zpl_code: nextZpl || prev.zpl_code,
+      }));
     } catch (error) {
       setBackendErrors(
         getApiErrorMessage(error, "No se pudo regenerar la etiqueta."),
@@ -841,64 +857,79 @@ const ModalEdit = ({
                 setValidationErrors={setValidationErrors}
               />
             </Modal.Section>
-            {selectedEntry?.tag_image && (
-              <Modal.Section title="Etiqueta del bin" className="!p-3.5">
-                <div className="mb-3 flex justify-end gap-2">
-                  <IconButton
-                    variant="ghost"
+            {selectedEntry?.id ? (
+              <Modal.Section
+                title="Etiqueta del bin"
+                className="!p-3.5"
+                actions={
+                  <>
+                    {selectedEntry?.tag_image &&
+                    String(selectedEntry?.zpl_code || "").trim() ? (
+                      <IconButton
+                        variant="ghost"
                         size="sm"
-                    className="h-8 w-8 text-sky-600 hover:bg-sky-50"
+                        className="h-8 w-8 text-sky-600 hover:bg-sky-50"
                         onClick={handlePrintTag}
-                        disabled={isPrinting || !selectedEntry?.id}
+                        disabled={isPrinting}
                         title="Imprimir etiqueta"
-                    aria-label="Imprimir etiqueta"
+                        aria-label="Imprimir etiqueta"
                       >
                         {isPrinting ? (
                           <span
-                            className="spinner-border spinner-border-sm"
+                            className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
                             role="status"
                             aria-hidden="true"
-                      />
-                    ) : (
-                      <Printer className="h-4 w-4" />
-                    )}
-                  </IconButton>
-                  <IconButton
-                    variant="ghost"
-                        size="sm"
-                    className="h-8 w-8 text-sky-600 hover:bg-sky-50"
-                        onClick={handleRegenerateTag}
-                        disabled={isRegenerating || !selectedEntry?.id}
-                        title="Regenerar etiqueta"
-                    aria-label="Regenerar etiqueta"
-                      >
-                        {isRegenerating ? (
-                          <span
-                            className="spinner-border spinner-border-sm"
-                            role="status"
-                            aria-hidden="true"
-                      />
+                          />
                         ) : (
-                      <RefreshCw className="h-4 w-4" />
+                          <Printer className="h-4 w-4" />
                         )}
-                  </IconButton>
-                    </div>
-                <div className="text-center">
-                      <a
-                        href={selectedEntry.tag_image}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    className="inline-block"
-                      >
-                        <img
-                          src={selectedEntry.tag_image}
-                      alt="Etiqueta del bin"
-                      className="mx-auto max-h-[400px] w-auto rounded-md border border-[var(--border-subtle)] object-contain"
+                      </IconButton>
+                    ) : null}
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 text-sky-600 hover:bg-sky-50"
+                      onClick={handleRegenerateTag}
+                      disabled={isRegenerating}
+                      title="Regenerar etiqueta"
+                      aria-label="Regenerar etiqueta"
+                    >
+                      {isRegenerating ? (
+                        <span
+                          className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                          role="status"
+                          aria-hidden="true"
                         />
-                      </a>
-                    </div>
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </IconButton>
+                  </>
+                }
+              >
+                {selectedEntry.tag_image ? (
+                  <div className="text-center">
+                    <a
+                      href={selectedEntry.tag_image}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block"
+                    >
+                      <img
+                        key={selectedEntry.tag_image}
+                        src={selectedEntry.tag_image}
+                        alt="Etiqueta del bin"
+                        className="mx-auto max-h-[400px] w-auto rounded-md border border-[var(--border-subtle)] object-contain"
+                      />
+                    </a>
+                  </div>
+                ) : (
+                  <p className="mb-0 text-sm text-slate-500">
+                    Sin imagen de etiqueta. Use regenerar para crearla.
+                  </p>
+                )}
               </Modal.Section>
-            )}
+            ) : null}
           </Form>
   );
 
@@ -923,9 +954,16 @@ const ModalEdit = ({
         </div>
       </Modal.Header>
       <Modal.Body>
-        {backendErrors && (
-          <div className="alert alert-danger mb-3">{backendErrors}</div>
-        )}
+        {backendErrors ? (
+          <Alert
+            variant="danger"
+            dismissible
+            onClose={() => setBackendErrors(null)}
+            className="mb-3"
+          >
+            {backendErrors}
+          </Alert>
+        ) : null}
 
         {isViewMode && selectedEntry?.id ? (
           <Tabs activeKey={activeTab} onSelect={setActiveTab} id="bin-tabs">

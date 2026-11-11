@@ -14,6 +14,7 @@ export default function ModalBulkPrint({
   positionIds = [],
   onPrinted,
   showAlert,
+  trackAsyncJob,
 }) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [formError, setFormError] = useState("");
@@ -26,6 +27,8 @@ export default function ModalBulkPrint({
       const result = await bulkPrintPositions(positionIds);
       followBulkJob(result, {
         showAlert,
+        onAsyncStart: trackAsyncJob?.start,
+        onAsyncEnd: trackAsyncJob?.finish,
         onFinished: (job) => {
           if (job?.status === "failed" || job?.success === false) return;
           void onPrinted?.();
@@ -35,7 +38,10 @@ export default function ModalBulkPrint({
       if (isBulkJobOpen(result)) void onPrinted?.();
     } catch (error) {
       setFormError(
-        getApiErrorMessage(error, "No se pudo completar la operación."),
+        getApiErrorMessage(
+          error,
+          "No se pudo imprimir la etiqueta. Verifique la impresora.",
+        ),
       );
     } finally {
       setIsPrinting(false);

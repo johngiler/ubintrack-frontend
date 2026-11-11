@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, X } from "lucide-react";
+import { Printer, RefreshCw, Save, X } from "lucide-react";
 
 import { Modal, Button, Form, Row, Col, Alert } from "@/components/ui/bootstrap";
+import { IconButton } from "@/components/ui/Button";
 import Select from "@/components/ui/Select";
-import { createPosition, updatePosition, getCavas } from "@/services/storageService";
+import {
+  createPosition,
+  updatePosition,
+  getCavas,
+  getPosition,
+  printPosition,
+  regeneratePositionTag,
+} from "@/services/storageService";
 import { getApiErrorMessage } from "@/services/httpClient";
 import {
   canEnablePicking,
@@ -15,6 +23,7 @@ import {
   withPickingChange,
   withPushChange,
 } from "@/lib/positionFlags";
+import { bustMediaUrl } from "@/lib/mediaUrl";
 import { cavaTitleOf, statusLabels } from "../positionLabels";
 
 const EMPTY_POSITION = {
@@ -33,8 +42,16 @@ function isBlank(value) {
   return !String(value ?? "").trim();
 }
 
+function canPrintPosition(position) {
+  return Boolean(
+    position?.qr_code_image && String(position?.zpl_code || "").trim(),
+  );
+}
+
 export default function ModalEdit({ show, onHide, position, mode, onSave, showAlert }) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [formData, setFormData] = useState(EMPTY_POSITION);
   const [cavas, setCavas] = useState([]);
   const [isLoadingCavas, setIsLoadingCavas] = useState(false);
@@ -43,6 +60,7 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
 
   const readOnly = mode === "view";
   const isEditMode = mode === "edit";
+  const hasSavedPosition = Boolean(formData?.id);
 
   useEffect(() => {
     if (!show) return undefined;
@@ -68,6 +86,14 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
   }, [show]);
 
   useEffect(() => {
+    if (!show) {
+      setShowValidation(false);
+      setFormError(null);
+      setIsPrinting(false);
+      setIsRegenerating(false);
+      return;
+    }
+    // Solo al abrir / cambiar de posición: no pisar imagen tras regenerar.
     if (position) {
       setFormData({
         ...position,
@@ -81,11 +107,56 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
     } else {
       setFormData(EMPTY_POSITION);
     }
-    if (!show) {
-      setShowValidation(false);
-      setFormError(null);
+  }, [show, position?.id]);
+
+  const handlePrintTag = async () => {
+    if (!formData?.id || isPrinting || !canPrintPosition(formData)) return;
+    setIsPrinting(true);
+    setFormError(null);
+    try {
+      await printPosition(formData.id);
+      showAlert?.("success", "Etiqueta enviada a impresión");
+    } catch (error) {
+      setFormError(
+        getApiErrorMessage(
+          error,
+          "No se pudo imprimir la etiqueta. Verifique la impresora.",
+        ),
+      );
+    } finally {
+      setIsPrinting(false);
     }
-  }, [position, show]);
+  };
+
+  const handleRegenerateTag = async () => {
+    if (!formData?.id || isRegenerating) return;
+    setIsRegenerating(true);
+    setFormError(null);
+    try {
+      const response = await regeneratePositionTag(formData.id);
+      const refreshed = await getPosition(formData.id).catch(() => null);
+      const nextQr = bustMediaUrl(
+        response?.qr_code_image || refreshed?.qr_code_image || "",
+      );
+      const nextZpl = response?.zpl_code || refreshed?.zpl_code || "";
+      setFormData((prev) => ({
+        ...prev,
+        ...(refreshed
+          ? {
+              ...refreshed,
+              cava_id: refreshed.cava?.id ?? refreshed.cava_id ?? prev.cava_id,
+            }
+          : {}),
+        qr_code_image: nextQr || prev.qr_code_image,
+        zpl_code: nextZpl || prev.zpl_code,
+      }));
+      await onSave?.();
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "No se pudo regenerar la etiqueta."));
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   const handleSave = async () => {
     const cavaMissing = !formData.cava_id;
@@ -312,21 +383,6 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
               </Form.Group>
             </Col>
 
-            {readOnly && formData.qr_code_image && (
-              <Col md={12}>
-                <Form.Group className="mb-0">
-                  <Form.Label>Código QR</Form.Label>
-                  <div className="text-center">
-                    <img
-                      src={formData.qr_code_image}
-                      alt={`QR ${formData.code}`}
-                      className="mx-auto max-w-[200px] rounded-lg border border-slate-200"
-                    />
-                  </div>
-                </Form.Group>
-              </Col>
-            )}
-
             <Col md={6}>
               <Form.Group className="mb-0">
                 <Form.Label>Estado</Form.Label>
@@ -380,6 +436,81 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
                 </Form.Text>
               </Form.Group>
             </Col>
+
+            {hasSavedPosition ? (
+              <Col md={12}>
+                <Modal.Section
+                  title="Etiqueta de posición"
+                  className="!mb-0 !p-3.5"
+                  actions={
+                    <>
+                      {canPrintPosition(formData) ? (
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 text-sky-600 hover:bg-sky-50"
+                          onClick={handlePrintTag}
+                          disabled={isPrinting}
+                          title="Imprimir etiqueta"
+                          aria-label="Imprimir etiqueta"
+                        >
+                          {isPrinting ? (
+                            <span
+                              className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                              role="status"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <Printer className="h-4 w-4" />
+                          )}
+                        </IconButton>
+                      ) : null}
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 text-sky-600 hover:bg-sky-50"
+                        onClick={handleRegenerateTag}
+                        disabled={isRegenerating}
+                        title="Regenerar etiqueta"
+                        aria-label="Regenerar etiqueta"
+                      >
+                        {isRegenerating ? (
+                          <span
+                            className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                            role="status"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </IconButton>
+                    </>
+                  }
+                >
+                  {formData.qr_code_image ? (
+                    <div className="text-center">
+                      <a
+                        href={formData.qr_code_image}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block"
+                      >
+                        <img
+                          key={formData.qr_code_image}
+                          src={formData.qr_code_image}
+                          alt={`QR ${formData.code || ""}`}
+                          className="mx-auto max-h-[280px] w-auto rounded-md border border-[var(--border-subtle)] object-contain"
+                        />
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="mb-0 text-sm text-slate-500">
+                      Sin imagen de etiqueta. Use regenerar para crearla.
+                    </p>
+                  )}
+                </Modal.Section>
+              </Col>
+            ) : null}
           </Row>
         </Form>
       </Modal.Body>

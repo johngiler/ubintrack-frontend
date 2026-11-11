@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, DoorOpen, GripVertical, LayoutGrid, Plus, Save, Trash2, X } from "lucide-react";
 
 import { Modal, Button, Form, Alert } from "@/components/ui/bootstrap";
+import AsyncProcessBanner from "@/components/wms/AsyncProcessBanner";
 import NumberInput from "@/components/ui/NumberInput";
 import Select from "@/components/ui/Select";
 import { getApiErrorMessage } from "@/services/httpClient";
@@ -21,6 +22,7 @@ import {
   aisleCodeFromSelect,
   aisleDisplayName,
   aisleSelectValue,
+  aisleTokenFromName,
   blocksPayload,
   cavaTitleOf,
   countSlots,
@@ -95,7 +97,7 @@ const COMPACT_SELECT_STYLES = {
 
 const EMPTY_NOMENCLATURE = {
   separator: "-",
-  cava_prefix: "C",
+  cava_prefix: "",
   aisle_prefix: "",
   rack_prefix: "R",
   level_prefix: "N",
@@ -240,7 +242,17 @@ function messageFromError(error, fallback) {
   return firstText(error?.response?.data) || fallback;
 }
 
-export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert }) {
+const GEN_ASYNC_MESSAGE = "En proceso. Puedes continuar mientras se crean.";
+
+export default function ModalEdit({
+  show,
+  onHide,
+  cava,
+  mode,
+  onSave,
+  showAlert,
+  trackAsyncJob,
+}) {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [formError, setFormError] = useState("");
@@ -257,6 +269,8 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
   const [dragKey, setDragKey] = useState(null);
   /** Undo de un paso al cambiar orientación master (restaurar si no hubo ediciones). */
   const masterUndoRef = useRef(null);
+  /** Si el usuario editó el código a mano, no lo reescribimos al cambiar el nombre. */
+  const codeManualRef = useRef(false);
 
   const readOnly = mode === "view";
   const watchToken = useRef(0);
@@ -301,10 +315,18 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
     masterUndoRef.current = null;
     if (cava) {
       const blocks = blocksFromApi(cava.blocks);
+      const derived = aisleTokenFromName(cava.name || "");
+      const raw = String(cava.code || "").trim();
+      // Legacy numérico («Anden»+«1» → A1); token alfabético se respeta.
+      let code = raw;
+      if (!raw || /^\d+$/.test(raw)) {
+        code = derived && !/\d$/.test(derived) && raw ? `${derived}${raw}` : derived || raw;
+      }
+      codeManualRef.current = Boolean(raw && !/^\d+$/.test(raw) && raw !== derived);
       setFormData({
         ...EMPTY_CAVA,
         ...cava,
-        code: cava.code || "",
+        code,
         storage_id: cava.storage?.id ?? cava.storage_id ?? "",
         temp_min: cava.temp_min ?? "",
         temp_max: cava.temp_max ?? "",
@@ -313,6 +335,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
         plan_layout: hydratePlanLayout(cava.plan_layout, blocks),
       });
     } else {
+      codeManualRef.current = false;
       setFormData(EMPTY_CAVA);
     }
     if (!show) {
@@ -450,6 +473,27 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
     await persistAndClose();
   };
 
+  const generationJobId = (cavaId) => `cava-generation-${cavaId}`;
+
+  const beginGenerationWatch = (cavaId, detail) => {
+    const message = detail || GEN_ASYNC_MESSAGE;
+    setIsGenerating(true);
+    setNoticeVariant("success");
+    setNotice(message);
+    const numericId = Number(cavaId);
+    trackAsyncJob?.start?.({
+      id: generationJobId(cavaId),
+      message,
+      kind: "cava_generation",
+      meta: Number.isFinite(numericId) ? { cavaId: numericId } : {},
+    });
+  };
+
+  const endGenerationWatch = (cavaId) => {
+    setIsGenerating(false);
+    if (cavaId != null) trackAsyncJob?.finish?.(generationJobId(cavaId));
+  };
+
   const applyGenerationResult = async (job) => {
     const failed = job?.status === "failed";
     setNoticeVariant(failed ? "danger" : "success");
@@ -470,17 +514,15 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
       .then(async (job) => {
         if (ignore || watchToken.current !== token) return;
         if (!generationIsOpen(job.status)) {
-          setIsGenerating(false);
+          endGenerationWatch(cava.id);
           return;
         }
-        setIsGenerating(true);
-        setNoticeVariant("success");
-        setNotice(job.detail || "En proceso. Puedes continuar mientras se crean.");
+        beginGenerationWatch(cava.id, job.detail);
         try {
           const current = await waitForGeneration(cava.id, () => watchToken.current === token);
           if (current && watchToken.current === token) await applyGenerationResult(current);
         } finally {
-          if (watchToken.current === token) setIsGenerating(false);
+          if (watchToken.current === token) endGenerationWatch(cava.id);
         }
       })
       .catch(() => {});
@@ -496,23 +538,28 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
     setConfirmGenerate(false);
     const token = watchToken.current + 1;
     watchToken.current = token;
-    setIsGenerating(true);
+    let trackedCavaId = cava?.id || formData?.id || null;
+    beginGenerationWatch(trackedCavaId || "pending", GEN_ASYNC_MESSAGE);
     try {
       const saved = await persist();
       if (!saved || watchToken.current !== token) return;
+      trackedCavaId = saved.id;
+      if (trackedCavaId) {
+        trackAsyncJob?.finish?.("cava-generation-pending");
+        beginGenerationWatch(trackedCavaId, GEN_ASYNC_MESSAGE);
+      }
       let job;
       try {
         job = await generateCavaPositions(saved.id);
       } catch (error) {
         if (error?.response?.status !== 409) throw error;
-        job = { status: "pending", detail: "En proceso. Puedes continuar mientras se crean." };
+        job = { status: "pending", detail: GEN_ASYNC_MESSAGE };
       }
       if (!generationIsOpen(job.status)) {
         await applyGenerationResult(job);
         return;
       }
-      setNoticeVariant("success");
-      setNotice(job.detail || "En proceso. Puedes continuar mientras se crean.");
+      beginGenerationWatch(saved.id, job.detail || GEN_ASYNC_MESSAGE);
       const current = await waitForGeneration(saved.id, () => watchToken.current === token);
       if (current && watchToken.current === token) await applyGenerationResult(current);
     } catch (error) {
@@ -520,7 +567,7 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
         setFormError(messageFromError(error, "No se pudo iniciar la generación."));
       }
     } finally {
-      if (watchToken.current === token) setIsGenerating(false);
+      if (watchToken.current === token) endGenerationWatch(trackedCavaId || "pending");
     }
   };
 
@@ -554,7 +601,13 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
       </Modal.Header>
       <Modal.Body>
         {formError ? <Alert variant="danger" className="mb-3">{formError}</Alert> : null}
-        {notice ? <Alert variant={noticeVariant} className="mb-3">{notice}</Alert> : null}
+        {isGenerating ? (
+          <AsyncProcessBanner message={notice || GEN_ASYNC_MESSAGE} />
+        ) : notice ? (
+          <Alert variant={noticeVariant} className="mb-3">
+            {notice}
+          </Alert>
+        ) : null}
         <Form onSubmit={(event) => event.preventDefault()}>
           <div className="grid grid-cols-12 items-end gap-x-3 gap-y-3">
             <Form.Group className="col-span-8 mb-0">
@@ -564,7 +617,16 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                 isInvalid={nameMissing}
                 value={formData.name || ""}
                 readOnly={readOnly}
-                onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                onChange={(event) => {
+                  const name = event.target.value;
+                  setFormData((current) => {
+                    const next = { ...current, name };
+                    if (!codeManualRef.current) {
+                      next.code = aisleTokenFromName(name);
+                    }
+                    return next;
+                  });
+                }}
               />
             </Form.Group>
             <Form.Group className="col-span-4 mb-0">
@@ -573,8 +635,11 @@ export default function ModalEdit({ show, onHide, cava, mode, onSave, showAlert 
                 className={FIELD_CLASS}
                 value={formData.code || ""}
                 readOnly={readOnly}
-                placeholder="9"
-                onChange={(event) => setFormData({ ...formData, code: event.target.value })}
+                placeholder="A1"
+                onChange={(event) => {
+                  codeManualRef.current = true;
+                  setFormData({ ...formData, code: event.target.value });
+                }}
               />
             </Form.Group>
             <Form.Group className="col-span-4 mb-0">
