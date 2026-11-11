@@ -40,8 +40,6 @@ import {
 import Select from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
-import { ConditionBadge } from "@/views/CavasView/cavaLabels";
-
 import {
   getBins,
   getBinIds,
@@ -573,13 +571,6 @@ const BinsView = () => {
     setSelectedBinIds([]);
   };
 
-  const getBinConditions = (entry) =>
-    [...new Set(
-      (entry.bin_products || [])
-        .map((bep) => bep.entry_product?.product?.condition)
-        .filter(Boolean),
-    )];
-
   return (
     <Fragment>
       <AsyncProcessBanner jobs={asyncProcess.jobs} />
@@ -842,9 +833,6 @@ const BinsView = () => {
                       <Table.HeaderCell className="min-w-[130px] normal-case tracking-normal">
                                           Productos
                       </Table.HeaderCell>
-                      <Table.HeaderCell className="min-w-[120px] normal-case tracking-normal">
-                                          Condición
-                      </Table.HeaderCell>
                       <Table.HeaderCell className="min-w-[130px] normal-case tracking-normal">
                                           Posición
                       </Table.HeaderCell>
@@ -859,7 +847,6 @@ const BinsView = () => {
                   <Table.Body>
                     {entries.map((entry) => {
                       const isExpanded = Boolean(expandedGroups[entry.id]);
-                      const conditions = getBinConditions(entry);
 
                       return (
                         <Fragment key={entry.id}>
@@ -924,17 +911,6 @@ const BinsView = () => {
                                 />
                               ) : (
                                 <WmsExpandItemsEmpty />
-                              )}
-                            </Table.Cell>
-                            <Table.Cell>
-                              {conditions.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {conditions.map((condition) => (
-                                    <ConditionBadge key={condition} condition={condition} />
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400">—</span>
                               )}
                             </Table.Cell>
                             <Table.Cell>
@@ -1017,7 +993,7 @@ const BinsView = () => {
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.15 }}
                               >
-                                <td colSpan={showSelection ? 8 : 7} className="p-0">
+                                <td colSpan={showSelection ? 7 : 6} className="p-0">
                                   <BinExpandedProducts
                                     entry={entry}
                                     user={user}
