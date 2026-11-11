@@ -107,23 +107,62 @@ export async function getCategories() {
   return response.data;
 }
 
+function binsListQuery(filters = {}, search = "", page) {
+  const params = new URLSearchParams();
+  if (page) params.set("page", String(page));
+  if (filters.status) params.set("status", String(filters.status));
+  if (typeof filters.is_active === "boolean") {
+    params.set("is_active", String(filters.is_active));
+  }
+  if (filters.has_position === true || filters.has_position === "true") {
+    params.set("has_position", "true");
+  } else if (filters.has_position === false || filters.has_position === "false") {
+    params.set("has_position", "false");
+  }
+  if (search) params.set("search", String(search));
+  return params;
+}
+
 // Bins
 export async function getBins(page = 1, filters = {}, search = "") {
-  let url = `/api/bins/?page=${page}`;
+  const qs = binsListQuery(filters, search, page).toString();
+  const response = await httpClient.get(qs ? `/api/bins/?${qs}` : "/api/bins/");
+  return response.data;
+}
 
-  if (filters.status) {
-    url += `&status=${filters.status}`;
-  }
+/** IDs del listado con los mismos filtros/búsqueda (sin paginar). */
+export async function getBinIds(filters = {}, search = "") {
+  const params = binsListQuery(filters, search);
+  const qs = params.toString();
+  const response = await httpClient.get(
+    qs ? `/api/bins/ids/?${qs}` : "/api/bins/ids/",
+  );
+  return response.data;
+}
 
-  if (typeof filters.is_active === "boolean") {
-    url += `&is_active=${filters.is_active}`;
-  }
+export async function bulkDeleteBins(ids) {
+  const response = await httpClient.delete("/api/bins/bulk-delete/", {
+    data: { ids },
+  });
+  return response.data;
+}
 
-  if (search) {
-    url += `&search=${search}`;
-  }
+export async function bulkPrintBins(ids) {
+  const response = await httpClient.post(
+    "/api/bins/bulk-print/",
+    { ids },
+    { timeout: 60000 },
+  );
+  return response.data;
+}
 
-  const response = await httpClient.get(url);
+/** Solo is_active en masa. */
+export async function bulkUpdateBinFlags(ids, flags = {}) {
+  const payload = { ids };
+  if (typeof flags.is_active === "boolean") payload.is_active = flags.is_active;
+  const response = await httpClient.post("/api/bins/bulk-update-flags/", payload, {
+    timeout: 60000,
+  });
   return response.data;
 }
 

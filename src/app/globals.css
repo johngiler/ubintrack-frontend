@@ -587,3 +587,37 @@ body {
   opacity: 0.85;
   transform: translateY(-1px);
 }
+
+/* Inputs date: icono de calendario alineado a la derecha (modales y formularios) */
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+input[type="time"],
+.form-control[type="date"],
+.form-control[type="datetime-local"],
+.form-control[type="month"],
+.form-control[type="week"],
+.form-control[type="time"] {
+  position: relative;
+  padding-inline-end: 2.25rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+.form-control[type="date"]::-webkit-calendar-picker-indicator,
+.form-control[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.form-control[type="month"]::-webkit-calendar-picker-indicator,
+.form-control[type="week"]::-webkit-calendar-picker-indicator,
+.form-control[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset-inline-end: 0.55rem;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  cursor: pointer;
+  opacity: 1;
+}

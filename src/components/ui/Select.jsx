@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import ReactSelect from "react-select";
+import ReactSelect, { components as rsComponents } from "react-select";
 
 import { cn } from "@/lib/cn";
 import { splitBootstrapFieldProps } from "@/lib/bootstrapFieldProps";
@@ -16,6 +16,11 @@ import {
 
 function resolveSelectComponent() {
   return resolveReactSelectComponent(ReactSelect);
+}
+
+function SafeInput(props) {
+  const { value, ...rest } = props;
+  return <rsComponents.Input {...rest} value={value ?? ""} />;
 }
 
 /**
@@ -84,13 +89,14 @@ export default function Select(props) {
         instanceId={id}
         classNamePrefix="react-select"
         options={options}
-        value={selected}
+        value={selected ?? null}
         onChange={createSelectChangeHandler(onChange, name)}
         isDisabled={Boolean(disabled ?? isDisabled)}
         placeholder={placeholder ?? "Seleccionar…"}
         isClearable={Boolean(isClearable)}
         isSearchable={isSearchable ?? options.length > 8}
         styles={mergedStyles}
+        components={{ ...(rest.components || {}), Input: SafeInput }}
         noOptionsMessage={rest.noOptionsMessage ?? (() => "Sin opciones")}
         menuPortalTarget={typeof document !== "undefined" ? document.body : null}
         menuPosition="fixed"

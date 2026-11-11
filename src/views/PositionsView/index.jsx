@@ -399,7 +399,8 @@ export default function PositionsView() {
                       transition={{ duration: 0.18 }}
                       className="overflow-hidden"
                     >
-                      <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {/* p-1: el anillo de focus de react-select no debe quedar recortado por overflow-hidden */}
+                      <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] p-1 pt-3 sm:grid-cols-2 lg:grid-cols-3">
                         <Form.Group className="mb-0">
                           <Form.Label className="text-xs">Cava</Form.Label>
                           <Select

@@ -561,7 +561,7 @@ const ModalEdit = ({
                         <AsyncSelect
                           inputId="entry-select"
                           name="entry"
-                          value={selectedEntry?.entry}
+                          value={selectedEntry?.entry ?? null}
                           loadOptions={loadEntryOptions}
                           defaultOptions={defaultEntries}
                     isDisabled={isViewMode || !isCreateMode}
@@ -686,7 +686,7 @@ const ModalEdit = ({
                   <AsyncSelect
                     inputId="position-select"
                     name="position"
-                    value={selectedEntry?.position}
+                    value={selectedEntry?.position ?? null}
                     loadOptions={loadPositionsOptions}
                     isDisabled={isViewMode}
                     isLoading={isLoadingData}

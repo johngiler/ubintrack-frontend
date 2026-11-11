@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Archive,
@@ -10,12 +10,14 @@ import {
   Download,
   ExternalLink,
   Eye,
+  Filter,
   FilterX,
   History,
   MapPin,
   Pencil,
   Plus,
   Printer,
+  SlidersHorizontal,
   Trash2,
   XCircle,
 } from "lucide-react";
@@ -41,7 +43,7 @@ import { ConditionBadge } from "@/views/CavasView/cavaLabels";
 
 import {
   getBins,
-  deleteBin,
+  getBinIds,
   createBin,
   updateBin,
   deleteBinProduct,
@@ -64,10 +66,25 @@ import {
 } from "@/components/wms/WmsExpandItemsButton";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
+import ModalBulkPrint from "./components/ModalBulkPrint";
+import ModalBulkActive from "./components/ModalBulkActive";
 import ModalQRValidation from "./components/ModalQRValidation";
 import BinExpandedProducts from "./components/BinExpandedProducts";
 import { formatDate } from "@/lib/format";
 import { statusBadgeVariant, statusLabels } from "./binLabels";
+
+const PAGE_SIZE = 20;
+
+const EMPTY_FILTERS = {
+  status: "",
+  is_active: "",
+  has_position: "",
+};
+
+function boolFilter(value) {
+  if (value === "" || value == null) return undefined;
+  return value === "true" || value === true;
+}
 
 const BinsView = () => {
   const user = useAuth().user;
@@ -83,9 +100,9 @@ const BinsView = () => {
   const [searchTerm, setSearchTerm] = useState(
     () => searchParams.get("bin_code") || ""
   );
-  const [filters, setFilters] = useState({ status: "", is_active: "" });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [printingBinId, setPrintingBinId] = useState(null);
   const [errorResponse, setErrorResponse] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -99,6 +116,10 @@ const BinsView = () => {
   // Estado para modal de confirmación de almacenar masivo
   const [showAlmacenarModal, setShowAlmacenarModal] = useState(false);
   const [selectedBinIds, setSelectedBinIds] = useState([]);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState(null);
+  const [showBulkPrintModal, setShowBulkPrintModal] = useState(false);
+  const [showBulkActiveModal, setShowBulkActiveModal] = useState(false);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
   const [massStorePreview, setMassStorePreview] = useState([]);
   const [massStoreStep, setMassStoreStep] = useState("idle"); // idle | calculating | preview | applying
   const [massStoreStrategy, setMassStoreStrategy] = useState("");
@@ -109,12 +130,21 @@ const BinsView = () => {
   // Estado para la pestaña inicial del modal
   const [initialTab, setInitialTab] = useState("details");
 
-  const PAGE_SIZE = 20;
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 500);
+
+  const apiFilters = useMemo(
+    () => ({
+      ...filters,
+      is_active: boolFilter(filters.is_active),
+      has_position: boolFilter(filters.has_position),
+    }),
+    [filters],
+  );
 
   // bin_code de la URL ya viene en el estado inicial de searchTerm (sin fetch aparte)
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedBinIds([]);
   }, [debouncedSearchTerm, filters]);
 
   const {
@@ -125,8 +155,8 @@ const BinsView = () => {
     error: listError,
     mutate: loadEntries,
   } = usePaginatedList({
-    key: swrKeys.bins(currentPage, debouncedSearchTerm, filters),
-    fetcher: () => getBins(currentPage, filters, debouncedSearchTerm),
+    key: swrKeys.bins(currentPage, debouncedSearchTerm, apiFilters),
+    fetcher: () => getBins(currentPage, apiFilters, debouncedSearchTerm),
     pageSize: PAGE_SIZE,
   });
 
@@ -164,22 +194,20 @@ const BinsView = () => {
 
   const handleShowConfirmDelete = (entry) => {
     setSelectedEntry(entry);
+    setBulkDeleteIds(null);
     setShowConfirmModal(true);
   };
 
-  const handleDeleteEntry = async () => {
-    setIsDeleting(true);
-    try {
-      await deleteBin(selectedEntry.id);
-      await loadEntries();
-      setShowConfirmModal(false);
-      showAlert("success", "Bin eliminado exitosamente");
-    } catch (error) {
-      console.error("Error al eliminar el bin:", error);
-      showAlert("danger", "Error al eliminar el bin");
-    } finally {
-      setIsDeleting(false);
-    }
+  const openBulkDelete = () => {
+    setSelectedEntry(null);
+    setBulkDeleteIds(selectedBinIds);
+    setShowConfirmModal(true);
+  };
+
+  const handleAfterDelete = async () => {
+    setSelectedBinIds([]);
+    setBulkDeleteIds(null);
+    await loadEntries();
   };
 
   const handleSaveEntry = async (entryData, productsToDelete = []) => {
@@ -273,6 +301,7 @@ const BinsView = () => {
       ...prev,
       [field]: value,
     }));
+    setSearchParams({});
   };
 
   const handlePrintTag = async (binId) => {
@@ -296,7 +325,7 @@ const BinsView = () => {
     setIsExporting(true);
     try {
       const result = await exportBinsToExcel({
-        filters,
+        filters: apiFilters,
         search: debouncedSearchTerm,
         filename: `Bins_${new Date().toISOString().split("T")[0]}.xls`,
       });
@@ -316,14 +345,14 @@ const BinsView = () => {
 
   // Almacenamiento masivo: abrir modal → elegir criterio → sugerir → confirmar
   const loadMassStorePreview = async (strategy) => {
-    if (selectedBinIds.length === 0 || !strategy) return;
+    if (selectedCriterionBinIds.length === 0 || !strategy) return;
 
     setIsAlmacenando(true);
     setMassStoreStep("calculating");
     setMassStoreError(null);
     try {
       const result = await almacenarBinsMasivo({
-        binIds: selectedBinIds,
+        binIds: selectedCriterionBinIds,
         strategy,
         confirm: false,
       });
@@ -347,7 +376,7 @@ const BinsView = () => {
   };
 
   const openAlmacenarMasivo = async () => {
-    if (isAlmacenando || selectedBinIds.length === 0) return;
+    if (isAlmacenando || selectedCriterionBinIds.length === 0) return;
 
     setMassStoreError(null);
     setMassStorePreview([]);
@@ -385,14 +414,14 @@ const BinsView = () => {
   };
 
   const handleAlmacenarMasivo = async () => {
-    if (isAlmacenando || selectedBinIds.length === 0 || !massStoreStrategy) return;
+    if (isAlmacenando || selectedCriterionBinIds.length === 0 || !massStoreStrategy) return;
 
     setIsAlmacenando(true);
     setMassStoreStep("applying");
     setMassStoreError(null);
     try {
       const result = await almacenarBinsMasivo({
-        binIds: selectedBinIds,
+        binIds: selectedCriterionBinIds,
         strategy: massStoreStrategy,
         confirm: true,
         assignments: massStorePreview,
@@ -424,23 +453,29 @@ const BinsView = () => {
   };
 
   const toggleBinSelection = (binId) => {
-    const bin = entries.find((e) => e.id === binId);
-    if (bin?.position) return;
     setSelectedBinIds((prev) =>
       prev.includes(binId) ? prev.filter((id) => id !== binId) : [...prev, binId]
     );
   };
 
   const toggleSelectAllVisible = () => {
-    const selectableIds = entries
-      .filter((e) => !e.position)
-      .map((e) => e.id);
-    if (selectableIds.length === 0) return;
-    const allSelected = selectableIds.every((id) => selectedBinIds.includes(id));
-    if (allSelected) {
-      setSelectedBinIds((prev) => prev.filter((id) => !selectableIds.includes(id)));
-    } else {
-      setSelectedBinIds((prev) => [...new Set([...prev, ...selectableIds])]);
+    if (!visibleIds.length) return;
+    if (allVisibleSelected) {
+      setSelectedBinIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+    setSelectedBinIds((prev) => [...new Set([...prev, ...visibleIds])]);
+  };
+
+  const handleSelectAllFiltered = async () => {
+    setIsSelectingAll(true);
+    try {
+      const data = await getBinIds(apiFilters, debouncedSearchTerm);
+      setSelectedBinIds(Array.isArray(data?.ids) ? data.ids : []);
+    } catch {
+      showAlert("danger", "No se pudieron seleccionar todos");
+    } finally {
+      setIsSelectingAll(false);
     }
   };
 
@@ -476,19 +511,56 @@ const BinsView = () => {
     showAlert("success", "Bin almacenado exitosamente");
   };
 
-  const hasFilters = Boolean(searchTerm || filters.status || filters.is_active !== "");
+  const visibleIds = useMemo(() => entries.map((row) => row.id), [entries]);
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedBinIds.includes(id));
+  const selectedCount = selectedBinIds.length;
+  const showBulkActions = selectedCount > 0;
+  const showSelection = perms.change || perms.delete;
+
+  const activeFilterCount = [
+    filters.status,
+    filters.is_active,
+    filters.has_position,
+  ].filter(Boolean).length;
+
+  const hasFilters = Boolean(debouncedSearchTerm) || activeFilterCount > 0;
+
+  const showSelectAllFiltered =
+    allVisibleSelected &&
+    Boolean(totalItems) &&
+    totalItems > visibleIds.length &&
+    selectedCount < totalItems;
 
   const binCanApplyCriterion = (bin) => Boolean(bin && !bin.position);
 
-  const selectableVisibleIds = entries
-    .filter(binCanApplyCriterion)
-    .map((e) => e.id);
-  const showCriterionSelection = perms.change && selectableVisibleIds.length > 0;
+  const selectedCriterionBinIds = useMemo(() => {
+    // Con filtro «sin posición», toda la selección aplica al criterio.
+    if (filters.has_position === "false") return selectedBinIds;
+    const byId = new Map(entries.map((e) => [e.id, e]));
+    return selectedBinIds.filter((id) => binCanApplyCriterion(byId.get(id)));
+  }, [entries, selectedBinIds, filters.has_position]);
+
+  const selectedForCriterionCount = selectedCriterionBinIds.length;
+
+  const statusOptions = useMemo(
+    () => Object.entries(statusLabels).map(([value, label]) => ({ value, label })),
+    [],
+  );
+  const activeOptions = [
+    { value: "true", label: "Activo" },
+    { value: "false", label: "Inactivo" },
+  ];
+  const positionOptions = [
+    { value: "true", label: "Con posición" },
+    { value: "false", label: "Sin posición" },
+  ];
 
   const clearFilters = () => {
     setSearchTerm("");
-    setFilters({ status: "", is_active: "" });
+    setFilters(EMPTY_FILTERS);
     setSearchParams({});
+    setSelectedBinIds([]);
   };
 
   const getBinConditions = (entry) =>
@@ -532,101 +604,188 @@ const BinsView = () => {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
-                <WmsSearchBar
-                  id="search-bin"
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        if (searchParams.toString()) {
-                          setSearchParams({});
-                        }
-                      }}
-                  onClear={() => {
-                          setSearchTerm("");
-                          setSearchParams({});
-                        }}
-                  placeholder="Buscar por código de bin, entrada o sku…"
-                  className="!w-[280px] !min-w-[280px] !max-w-[280px] shrink-0"
-                />
-                    <Form.Select
-                      id="status-filter"
-                      name="status-filter"
-                      size="sm"
-                      value={filters.status}
-                  onChange={(e) => handleFilterChange("status", e.target.value)}
-                      aria-label="Filtrar por estado"
-                  className="!w-[160px] shrink-0"
-                      style={{ minWidth: "160px" }}
-                    >
-                      <option value="">Todos los estados</option>
-                      {Object.entries(statusLabels).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </Form.Select>
-                    <Form.Select
-                        id="is-active-filter"
-                      size="sm"
-                      value={filters.is_active}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setFilters((f) => ({
-                          ...f,
-                          is_active: val === "" ? "" : val === "true",
-                        }));
-                        setCurrentPage(1);
-                      }}
-                  aria-label="Filtrar por activo"
-                  className="!w-[150px] shrink-0"
-                  style={{ minWidth: "150px" }}
-                    >
-                      <option value="">Activo/Inactivo</option>
-                      <option value="true">Activo</option>
-                      <option value="false">Inactivo</option>
-                    </Form.Select>
-                {hasFilters && (
-                    <Button
-                    variant="outline"
-                      size="sm"
-                    icon={FilterX}
-                    onClick={clearFilters}
-                    title="Limpiar filtros"
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                          Limpiar filtros
-                    </Button>
+              <div className="flex w-full flex-col gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2">
+                  <WmsSearchBar
+                    id="search-bin"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      if (searchParams.toString()) setSearchParams({});
+                    }}
+                    onClear={() => {
+                      setSearchTerm("");
+                      setSearchParams({});
+                    }}
+                    placeholder="Buscar por código de bin, entrada o sku…"
+                    className="!w-[280px] !min-w-[220px] !max-w-full shrink-0"
+                  />
+                  <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={FilterX}
+                        onClick={clearFilters}
+                        title="Limpiar filtros"
+                        className="whitespace-nowrap"
+                      >
+                        Limpiar
+                      </Button>
                     )}
-                {perms.change && selectedBinIds.length > 0 && (
-                          <Button
-                            variant="success"
-                            size="sm"
-                    icon={Archive}
-                    onClick={openAlmacenarMasivo}
-                            disabled={isAlmacenando}
-                    loading={isAlmacenando && !showAlmacenarModal}
-                    title="Aplicar criterio de almacenamiento para los bins seleccionados"
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                    {isAlmacenando && !showAlmacenarModal
-                      ? "Procesando…"
-                      : `Aplicar criterio (${selectedBinIds.length})`}
-                          </Button>
-                      )}
-                <div className="ml-auto shrink-0 pl-2">
-                  {perms.add && !user?.client && (
                     <Button
-                      variant="primary"
+                      variant={filtersOpen || activeFilterCount > 0 ? "secondary" : "outline"}
                       size="sm"
-                      icon={Plus}
+                      icon={Filter}
+                      onClick={() => setFiltersOpen((open) => !open)}
+                      title={filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
                       className="whitespace-nowrap"
-                      onClick={handleNewEntry}
+                      aria-expanded={filtersOpen}
                     >
-                      Nuevo bin
+                      Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                     </Button>
-                  )}
+                    {perms.add && !user?.client && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={Plus}
+                        className="whitespace-nowrap"
+                        onClick={handleNewEntry}
+                      >
+                        Nuevo bin
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {filtersOpen ? (
+                    <motion.div
+                      key="bins-filters"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      {/* p-1: el anillo de focus de react-select no debe quedar recortado por overflow-hidden */}
+                      <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] p-1 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Estado</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por estado"
+                            placeholder="Todos"
+                            options={statusOptions}
+                            value={filters.status}
+                            onChange={(e) =>
+                              handleFilterChange("status", e.target.value || "")
+                            }
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Activo</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por activo"
+                            placeholder="Todos"
+                            options={activeOptions}
+                            value={filters.is_active}
+                            onChange={(e) =>
+                              handleFilterChange("is_active", e.target.value || "")
+                            }
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Posición</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por posición"
+                            placeholder="Todos"
+                            options={positionOptions}
+                            value={filters.has_position}
+                            onChange={(e) =>
+                              handleFilterChange("has_position", e.target.value || "")
+                            }
+                          />
+                        </Form.Group>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+
+                {showBulkActions ? (
+                  <div className="flex w-full flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-2">
+                    <span className="text-xs text-slate-600">
+                      {selectedCount} seleccionados
+                    </span>
+                    {perms.change && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={SlidersHorizontal}
+                        onClick={() => setShowBulkActiveModal(true)}
+                        title="Activar o desactivar"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        Activar / desactivar
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={Printer}
+                      onClick={() => setShowBulkPrintModal(true)}
+                      title="Imprimir etiquetas seleccionadas"
+                      className="shrink-0 whitespace-nowrap"
+                    >
+                      Imprimir
+                    </Button>
+                    {perms.delete && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        icon={Trash2}
+                        onClick={openBulkDelete}
+                        title="Eliminar bins seleccionados"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        Eliminar
+                      </Button>
+                    )}
+                    {perms.change && selectedForCriterionCount > 0 && (
+                      <Button
+                        variant="success"
+                        size="sm"
+                        icon={Archive}
+                        onClick={openAlmacenarMasivo}
+                        disabled={isAlmacenando}
+                        loading={isAlmacenando && !showAlmacenarModal}
+                        title="Aplicar criterio solo a bins sin posición"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        {isAlmacenando && !showAlmacenarModal
+                          ? "Procesando…"
+                          : `Aplicar criterio (${selectedForCriterionCount})`}
+                      </Button>
+                    )}
+                    {showSelectAllFiltered ? (
+                      <button
+                        type="button"
+                        className="cursor-pointer text-xs font-medium text-sky-700 hover:underline disabled:opacity-50"
+                        onClick={handleSelectAllFiltered}
+                        disabled={isSelectingAll}
+                      >
+                        {isSelectingAll
+                          ? "Seleccionando…"
+                          : `Seleccionar todos los filtrados (${totalItems})`}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </Card.Header>
             <Card.Body className="p-0">
@@ -636,18 +795,13 @@ const BinsView = () => {
                 <Table hover responsive className="mb-0 min-w-[980px]">
                   <Table.Head>
                     <tr>
-                      {showCriterionSelection && (
+                      {showSelection && (
                         <Table.HeaderCell className="w-10 normal-case tracking-normal">
                           <Form.Check
                             type="checkbox"
-                            checked={
-                              selectableVisibleIds.length > 0 &&
-                              selectableVisibleIds.every((id) =>
-                                selectedBinIds.includes(id)
-                              )
-                            }
+                            checked={allVisibleSelected}
                             onChange={toggleSelectAllVisible}
-                            aria-label="Seleccionar todos sin posición"
+                            aria-label="Seleccionar todos los visibles"
                           />
                         </Table.HeaderCell>
                       )}
@@ -678,21 +832,18 @@ const BinsView = () => {
                     {entries.map((entry) => {
                       const isExpanded = Boolean(expandedGroups[entry.id]);
                       const conditions = getBinConditions(entry);
-                      const canSelectForCriterion = binCanApplyCriterion(entry);
 
                       return (
                         <Fragment key={entry.id}>
                           <Table.Row>
-                            {showCriterionSelection && (
+                            {showSelection && (
                               <Table.Cell>
-                                {canSelectForCriterion ? (
-                                  <Form.Check
-                                    type="checkbox"
-                                    checked={selectedBinIds.includes(entry.id)}
-                                    onChange={() => toggleBinSelection(entry.id)}
-                                    aria-label={`Seleccionar ${entry.code}`}
-                                  />
-                                ) : null}
+                                <Form.Check
+                                  type="checkbox"
+                                  checked={selectedBinIds.includes(entry.id)}
+                                  onChange={() => toggleBinSelection(entry.id)}
+                                  aria-label={`Seleccionar ${entry.code}`}
+                                />
                               </Table.Cell>
                             )}
                             <Table.Cell>
@@ -853,7 +1004,7 @@ const BinsView = () => {
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.15 }}
                               >
-                                <td colSpan={showCriterionSelection ? 8 : 7} className="p-0">
+                                <td colSpan={showSelection ? 8 : 7} className="p-0">
                                   <BinExpandedProducts
                                     entry={entry}
                                     user={user}
@@ -946,11 +1097,33 @@ const BinsView = () => {
       />
 
       <ModalConfirm
-        showConfirmModal={showConfirmModal}
-        setShowConfirmModal={setShowConfirmModal}
-        isDeleting={isDeleting}
-        handleDeleteEntry={handleDeleteEntry}
-        selectedEntry={selectedEntry}
+        show={showConfirmModal}
+        onHide={() => {
+          setShowConfirmModal(false);
+          setBulkDeleteIds(null);
+        }}
+        bin={selectedEntry}
+        binIds={bulkDeleteIds || undefined}
+        onDelete={handleAfterDelete}
+        showAlert={showAlert}
+      />
+
+      <ModalBulkPrint
+        show={showBulkPrintModal}
+        onHide={() => setShowBulkPrintModal(false)}
+        binIds={selectedBinIds}
+        showAlert={showAlert}
+      />
+
+      <ModalBulkActive
+        show={showBulkActiveModal}
+        onHide={() => setShowBulkActiveModal(false)}
+        binIds={selectedBinIds}
+        onSaved={async () => {
+          setSelectedBinIds([]);
+          await loadEntries();
+        }}
+        showAlert={showAlert}
       />
 
       <ModalQRValidation

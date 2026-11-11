@@ -15,7 +15,40 @@ function resolveAsyncSelectComponent() {
 
 /** Evita value=undefined en el <input> interno (React 19 / react-select). */
 function SafeInput(props) {
-  return <rsComponents.Input {...props} value={props.value ?? ""} />;
+  const { value, ...rest } = props;
+  return <rsComponents.Input {...rest} value={value ?? ""} />;
+}
+
+function defaultOptionValue(option) {
+  if (option == null) return "";
+  if (option.value != null) return option.value;
+  if (option.id != null) return option.id;
+  return "";
+}
+
+function defaultOptionLabel(option) {
+  if (option == null) return "";
+  if (option.label != null && option.label !== "") return option.label;
+  if (option.code != null && option.code !== "") return String(option.code);
+  if (option.name != null && option.name !== "") return String(option.name);
+  if (option.value != null) return String(option.value);
+  if (option.id != null) return String(option.id);
+  return "";
+}
+
+function normalizeSelectValue(value) {
+  if (value == null || value === "") return null;
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeSelectValue(item)).filter(Boolean);
+  }
+  if (typeof value !== "object") {
+    return { value, label: String(value) };
+  }
+  const nextValue = value.value ?? value.id ?? null;
+  const nextLabel =
+    value.label ?? value.code ?? value.name ?? (nextValue != null ? String(nextValue) : "");
+  if (nextValue == null) return null;
+  return { ...value, value: nextValue, label: nextLabel };
 }
 
 export default function AsyncSelect(props) {
@@ -30,7 +63,10 @@ export default function AsyncSelect(props) {
     inputValue: inputValueProp,
     onInputChange,
     components: componentsProp,
-    defaultValue,
+    defaultValue: _defaultValue,
+    defaultInputValue: _defaultInputValue,
+    getOptionValue: getOptionValueProp,
+    getOptionLabel: getOptionLabelProp,
     ...rest
   } = domProps;
 
@@ -52,7 +88,7 @@ export default function AsyncSelect(props) {
   );
 
   const mergedComponents = useMemo(
-    () => ({ Input: SafeInput, ...componentsProp }),
+    () => ({ ...componentsProp, Input: SafeInput }),
     [componentsProp],
   );
 
@@ -60,10 +96,11 @@ export default function AsyncSelect(props) {
     (newValue, actionMeta) => {
       const fromParent = onInputChange?.(newValue, actionMeta);
       const resolved = typeof fromParent === "string" ? fromParent : newValue;
+      const safe = resolved ?? "";
       if (!isInputControlled) {
-        setInternalInputValue(resolved ?? "");
+        setInternalInputValue(safe);
       }
-      return resolved ?? "";
+      return safe;
     },
     [isInputControlled, onInputChange],
   );
@@ -73,18 +110,21 @@ export default function AsyncSelect(props) {
   }
 
   const inputValue = isInputControlled ? (inputValueProp ?? "") : internalInputValue;
+  const normalizedValue = normalizeSelectValue(value);
 
   return (
     <div className={cn(size === "sm" ? "text-xs" : "text-sm", className)}>
       <SelectComponent
         {...rest}
-        value={value ?? null}
+        value={normalizedValue}
         inputValue={inputValue}
         onInputChange={handleInputChange}
         components={mergedComponents}
         classNamePrefix={classNamePrefix}
         loadOptions={loadOptions}
         styles={mergedStyles}
+        getOptionValue={getOptionValueProp ?? defaultOptionValue}
+        getOptionLabel={getOptionLabelProp ?? defaultOptionLabel}
         menuPortalTarget={typeof document !== "undefined" ? document.body : null}
         menuPosition="fixed"
       />
