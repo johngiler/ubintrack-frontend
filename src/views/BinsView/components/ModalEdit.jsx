@@ -746,6 +746,51 @@ const ModalEdit = ({
                 </Form.Group>
               </Col>
 
+              <Col md={6} className="mb-0">
+                <Form.Group controlId="lpn-input" className="mb-0">
+                  <Form.Label className="!text-xs !font-medium !text-slate-600">LPN</Form.Label>
+                  <Form.Control
+                    name="lpn"
+                    value={selectedEntry?.lpn || ""}
+                    onChange={(e) => handleChange("lpn", e.target.value)}
+                    disabled={isViewMode}
+                    placeholder="LPN"
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={6} className="mb-0">
+                <Form.Group controlId="barcode-input" className="mb-0">
+                  <Form.Label className="!text-xs !font-medium !text-slate-600">
+                    Código de barra
+                  </Form.Label>
+                  <Form.Control
+                    name="barcode"
+                    value={selectedEntry?.barcode || ""}
+                    onChange={(e) => handleChange("barcode", e.target.value)}
+                    disabled={isViewMode}
+                    placeholder="Código de barra"
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col xs={12} className="mb-0">
+                <Form.Group controlId="observation-input" className="mb-0">
+                  <Form.Label className="!text-xs !font-medium !text-slate-600">
+                    Observación
+                  </Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    name="observation"
+                    value={selectedEntry?.observation || ""}
+                    onChange={(e) => handleChange("observation", e.target.value)}
+                    disabled={isViewMode}
+                    placeholder="Observación"
+                  />
+                </Form.Group>
+              </Col>
+
               {selectedEntry?.related_exits?.length > 0 && (
                 <Col xs={12} className="mb-0">
                   <Form.Group className="mb-0">

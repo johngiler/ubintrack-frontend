@@ -199,6 +199,9 @@ const BinsView = () => {
         status: entryData.status,
         client_id: entryData.client?.id || entryData.entry.client?.id,
         is_active: entryData.is_active !== false,
+        lpn: entryData.lpn || "",
+        barcode: entryData.barcode || "",
+        observation: entryData.observation || "",
       };
 
       if (entryData.id) {

@@ -83,7 +83,7 @@ export default function EntryProductLines({
             </div>
 
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 sm:grid-cols-6 lg:grid-cols-12">
-              <div className="col-span-2 sm:col-span-6 lg:col-span-5">
+              <div className="col-span-2 sm:col-span-6 lg:col-span-3">
                 <CompactFieldLabel required>Producto</CompactFieldLabel>
                 <Form.Group controlId={`product-${index}`} className="mb-0">
                   <AsyncSelect
@@ -218,6 +218,29 @@ export default function EntryProductLines({
                   {validationErrors.products[index]?.real_quantity ? (
                     <Form.Text className="text-danger">
                       {validationErrors.products[index].real_quantity}
+                    </Form.Text>
+                  ) : null}
+                </Form.Group>
+              </div>
+
+              <div className="col-span-1 sm:col-span-3 lg:col-span-2">
+                <CompactFieldLabel>Producción</CompactFieldLabel>
+                <Form.Group controlId={`production_date-${index}`} className="mb-0">
+                  <Form.Control
+                    name={`production_date-${index}`}
+                    type="date"
+                    size="sm"
+                    value={product.production_date || ""}
+                    disabled={isViewMode}
+                    onChange={(e) => {
+                      handleProductChange(index, "production_date", e.target.value);
+                      clearProductFieldError(setValidationErrors, index, "production_date");
+                    }}
+                    isInvalid={!!validationErrors.products[index]?.production_date}
+                  />
+                  {validationErrors.products[index]?.production_date ? (
+                    <Form.Text className="text-danger">
+                      {validationErrors.products[index].production_date}
                     </Form.Text>
                   ) : null}
                 </Form.Group>

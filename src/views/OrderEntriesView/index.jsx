@@ -188,6 +188,7 @@ const Entries = () => {
             quantity: 0,
             real_quantity: 0,
             batch: "",
+            production_date: null,
             expiration_date: null,
           },
         ],
@@ -266,6 +267,7 @@ const Entries = () => {
                 quantity: product.quantity,
                 real_quantity: product.real_quantity,
                 batch: product.batch,
+                production_date: product.production_date || null,
                 expiration_date: product.expiration_date,
               };
               await updateEntryProduct(product.id, productData);
@@ -312,6 +314,7 @@ const Entries = () => {
             quantity: product.quantity,
             real_quantity: product.real_quantity,
             batch: product.batch,
+            production_date: product.production_date || null,
             expiration_date: product.expiration_date,
           };
 

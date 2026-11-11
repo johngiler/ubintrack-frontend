@@ -110,6 +110,12 @@ function ProductCard({ ep, index, expandedProducts, setExpandedProducts, navigat
           <p className="font-medium text-slate-800">{ep.batch || "N/A"}</p>
         </div>
         <div>
+          <span className="text-xs text-slate-500">Producción</span>
+          <p className="font-medium text-slate-800">
+            {ep.production_date ? formatDate(ep.production_date) : "N/A"}
+          </p>
+        </div>
+        <div>
           <span className="text-xs text-slate-500">Vence</span>
           <p className="font-medium text-slate-800">
             {ep.expiration_date ? formatDate(ep.expiration_date) : "N/A"}
