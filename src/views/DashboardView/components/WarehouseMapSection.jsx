@@ -17,26 +17,11 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { getPositionNomenclature } from "@/services/storageService";
+import { blocksFromApi } from "@/views/CavasView/cavaBlocks";
 import { cavaTitleOf } from "@/views/CavasView/cavaPlan";
 import CavaPlan from "@/views/CavasView/components/CavaPlan";
 import { hydratePlanLayout } from "@/views/CavasView/planLayout";
 import { getConditionBadgeVariant } from "../dashboardUtils";
-
-function blocksOf(cava) {
-  return (cava.blocks || []).map((block, index) => ({
-    key: block.id ? `id-${block.id}` : `${block.kind}-${block.code}-${index}`,
-    id: block.id,
-    sort_order: block.sort_order ?? index,
-    kind: block.kind,
-    code: block.code || "",
-    rack_count: block.rack_count || 1,
-    levels: block.levels || "",
-    depth: block.depth || "",
-    orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
-    label_side: block.label_side === "above" ? "above" : "below",
-    aisle_code: block.aisle_code || "",
-  }));
-}
 
 function shareOf(part, total) {
   if (!total) return 0;
@@ -112,7 +97,8 @@ function CavaSummaryCard({ cava, onSelect }) {
 }
 
 function CavaHeatmapModal({ cava, nomenclature, onHide }) {
-  const blocks = cava ? blocksOf(cava) : [];
+  // Misma hidratación que en Cámaras → mismo CavaPlan, mismos campos (piso, sección…).
+  const blocks = cava ? blocksFromApi(cava.blocks) : [];
   const planLayout = cava ? hydratePlanLayout(cava.plan_layout, blocks) : null;
   return (
     <Modal show={Boolean(cava)} onHide={onHide} size="xl" className="max-w-[min(96vw,1250px)]">
