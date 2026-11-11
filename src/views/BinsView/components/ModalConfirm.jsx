@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Trash2, X } from "lucide-react";
 
-import { Modal, Button } from "@/components/ui/bootstrap";
+import { Modal, Button, Alert } from "@/components/ui/bootstrap";
 import { bulkDeleteBins, deleteBin } from "@/services/inventoryService";
 import { getApiErrorMessage } from "@/services/httpClient";
+import { followBulkJob, isBulkJobOpen } from "@/lib/bulkJobs";
 
 export default function ModalConfirm({
   show,
@@ -16,33 +17,43 @@ export default function ModalConfirm({
   showAlert,
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [formError, setFormError] = useState("");
   const fromSelection = Array.isArray(binIds) && binIds.length > 0;
   const ids = fromSelection ? binIds : bin?.id ? [bin.id] : [];
   const isBulk = fromSelection;
 
   async function handleDelete() {
     if (!ids.length) return;
+    setFormError("");
     setIsDeleting(true);
     try {
       if (isBulk) {
         const result = await bulkDeleteBins(ids);
-        await onDelete?.();
+        followBulkJob(result, {
+          showAlert,
+          onFinished: (job) => {
+            if (job?.status === "failed" || job?.success === false) return;
+            void onDelete?.();
+          },
+        });
         onHide();
-        showAlert?.("success", result?.message || "Bins eliminados");
+        if (isBulkJobOpen(result)) void onDelete?.();
       } else {
         await deleteBin(ids[0]);
         await onDelete?.();
         onHide();
-        showAlert?.("success", "Bin eliminado correctamente");
+        showAlert?.("success", "Bin eliminado");
       }
     } catch (error) {
-      showAlert?.(
-        "danger",
-        getApiErrorMessage(
-          error,
-          isBulk ? "Error al eliminar los bins" : "Error al eliminar el bin",
-        ),
+      const msg = getApiErrorMessage(
+        error,
+        isBulk ? "No se pudo completar la operación." : "No se pudo eliminar el bin.",
       );
+      if (isBulk) {
+        setFormError(msg);
+      } else {
+        showAlert?.("danger", msg);
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -56,6 +67,11 @@ export default function ModalConfirm({
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {formError ? (
+          <Alert variant="danger" className="mb-3">
+            {formError}
+          </Alert>
+        ) : null}
         {isBulk ? (
           <>
             ¿Eliminar <strong>{ids.length}</strong> bins seleccionados? No se borran
@@ -63,7 +79,7 @@ export default function ModalConfirm({
           </>
         ) : (
           <>
-            ¿Está seguro que desea eliminar el bin <strong>{bin?.code}</strong>?
+            ¿Eliminar el bin <strong>{bin?.code}</strong>?
           </>
         )}
       </Modal.Body>

@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { Trash2, X } from "lucide-react";
 
-import { Modal, Button } from "@/components/ui/bootstrap";
+import { Modal, Button, Alert } from "@/components/ui/bootstrap";
 import { bulkDeletePositions, deletePosition } from "@/services/storageService";
+import { getApiErrorMessage } from "@/services/httpClient";
+import { followBulkJob, isBulkJobOpen } from "@/lib/bulkJobs";
 
 export default function ModalConfirm({
   show,
@@ -15,6 +17,7 @@ export default function ModalConfirm({
   showAlert,
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [formError, setFormError] = useState("");
   const fromSelection = Array.isArray(positionIds) && positionIds.length > 0;
   const ids = fromSelection
     ? positionIds
@@ -25,24 +28,38 @@ export default function ModalConfirm({
 
   async function handleDelete() {
     if (!ids.length) return;
+    setFormError("");
     setIsDeleting(true);
     try {
       if (isBulk) {
         const result = await bulkDeletePositions(ids);
-        await onDelete();
+        followBulkJob(result, {
+          showAlert,
+          onFinished: (job) => {
+            if (job?.status === "failed" || job?.success === false) return;
+            void onDelete?.();
+          },
+        });
         onHide();
-        showAlert("success", result?.message || "Posiciones eliminadas");
+        if (isBulkJobOpen(result)) void onDelete?.();
       } else {
         await deletePosition(ids[0]);
-        await onDelete();
+        await onDelete?.();
         onHide();
-        showAlert("success", "Posición eliminada correctamente");
+        showAlert?.("success", "Posición eliminada");
       }
-    } catch {
-      showAlert(
-        "danger",
-        isBulk ? "Error al eliminar las posiciones" : "Error al eliminar la posición",
+    } catch (error) {
+      const msg = getApiErrorMessage(
+        error,
+        isBulk
+          ? "No se pudo completar la operación."
+          : "No se pudo eliminar la posición.",
       );
+      if (isBulk) {
+        setFormError(msg);
+      } else {
+        showAlert?.("danger", msg);
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -56,6 +73,11 @@ export default function ModalConfirm({
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {formError ? (
+          <Alert variant="danger" className="mb-3">
+            {formError}
+          </Alert>
+        ) : null}
         {isBulk ? (
           <>
             ¿Eliminar <strong>{ids.length}</strong> posiciones seleccionadas? Solo se
@@ -63,8 +85,7 @@ export default function ModalConfirm({
           </>
         ) : (
           <>
-            ¿Está seguro que desea eliminar la posición{" "}
-            <strong>{position?.code}</strong>?
+            ¿Eliminar la posición <strong>{position?.code}</strong>?
           </>
         )}
       </Modal.Body>

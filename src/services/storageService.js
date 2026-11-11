@@ -233,6 +233,7 @@ export async function getPositionIds(filters = {}, search = "") {
 export async function bulkDeletePositions(ids) {
   const response = await httpClient.delete("/api/positions/bulk-delete/", {
     data: { ids },
+    timeout: 60000,
   });
   return response.data;
 }
@@ -240,6 +241,15 @@ export async function bulkDeletePositions(ids) {
 export async function bulkPrintPositions(ids) {
   const response = await httpClient.post(
     "/api/positions/bulk-print/",
+    { ids },
+    { timeout: 60000 },
+  );
+  return response.data;
+}
+
+export async function bulkRegeneratePositionTags(ids) {
+  const response = await httpClient.post(
+    "/api/positions/bulk-regenerate-tags/",
     { ids },
     { timeout: 60000 },
   );

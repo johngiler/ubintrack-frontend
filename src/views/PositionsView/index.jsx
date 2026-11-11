@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   Printer,
+  RefreshCw,
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
@@ -44,14 +45,16 @@ import {
   getCavas,
   getCava,
   printPosition,
-  bulkPrintPositions,
+  regeneratePositionTag,
 } from "@/services/storageService";
-import { canCRUD } from "@/services/httpClient";
+import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { aisleDisplayName, isSectionBlock } from "../CavasView/cavaPlan";
 import { cavaTitleOf, statusBadgeVariant, statusLabels } from "./positionLabels";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
 import ModalBulkFlags from "./components/ModalBulkFlags";
+import ModalBulkPrint from "./components/ModalBulkPrint";
+import ModalBulkRegenerate from "./components/ModalBulkRegenerate";
 import PositionExpandedBins from "./components/PositionExpandedBins";
 
 const PAGE_SIZE = 50;
@@ -87,8 +90,10 @@ export default function PositionsView() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleteIds, setBulkDeleteIds] = useState(null);
   const [isSelectingAll, setIsSelectingAll] = useState(false);
-  const [isBulkPrinting, setIsBulkPrinting] = useState(false);
+  const [showBulkPrintModal, setShowBulkPrintModal] = useState(false);
+  const [showBulkRegenerateModal, setShowBulkRegenerateModal] = useState(false);
   const [showBulkFlagsModal, setShowBulkFlagsModal] = useState(false);
+  const [regeneratingId, setRegeneratingId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
@@ -288,16 +293,20 @@ export default function PositionsView() {
     }
   };
 
-  const handleBulkPrint = async () => {
-    if (!selectedIds.length) return;
-    setIsBulkPrinting(true);
+  const handleRegenerate = async (position) => {
+    if (!position?.id || regeneratingId) return;
+    setRegeneratingId(position.id);
     try {
-      const result = await bulkPrintPositions(selectedIds);
-      showAlertMessage("success", result?.message || "Etiquetas enviadas a impresión");
-    } catch {
-      showAlertMessage("danger", "Error al imprimir las etiquetas");
+      await regeneratePositionTag(position.id);
+      showAlertMessage("success", "Etiqueta regenerada.");
+      await loadPositions();
+    } catch (error) {
+      showAlertMessage(
+        "danger",
+        getApiErrorMessage(error, "No se pudo regenerar la etiqueta."),
+      );
     } finally {
-      setIsBulkPrinting(false);
+      setRegeneratingId(null);
     }
   };
 
@@ -510,17 +519,27 @@ export default function PositionsView() {
                         Cambiar flags
                       </Button>
                     )}
+                    {perms.change && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={RefreshCw}
+                        onClick={() => setShowBulkRegenerateModal(true)}
+                        title="Regenerar QR seleccionados"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        Regenerar etiquetas
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
                       icon={Printer}
-                      onClick={handleBulkPrint}
-                      disabled={isBulkPrinting}
-                      loading={isBulkPrinting}
+                      onClick={() => setShowBulkPrintModal(true)}
                       title="Imprimir etiquetas seleccionadas"
                       className="shrink-0 whitespace-nowrap"
                     >
-                      {isBulkPrinting ? "Imprimiendo…" : "Imprimir"}
+                      Imprimir
                     </Button>
                     {perms.delete && (
                       <Button
@@ -680,6 +699,25 @@ export default function PositionsView() {
                                 >
                                   <Printer className="h-4 w-4" />
                                 </IconButton>
+                                {perms.change && (
+                                  <IconButton
+                                    size="sm"
+                                    className="text-amber-600 hover:bg-amber-50"
+                                    onClick={() => handleRegenerate(position)}
+                                    disabled={regeneratingId === position.id}
+                                    title="Regenerar etiqueta"
+                                  >
+                                    {regeneratingId === position.id ? (
+                                      <span
+                                        className="spinner-border spinner-border-sm"
+                                        role="status"
+                                        aria-hidden="true"
+                                      />
+                                    ) : (
+                                      <RefreshCw className="h-4 w-4" />
+                                    )}
+                                  </IconButton>
+                                )}
                                 <IconButton
                                   size="sm"
                                   className="text-sky-600 hover:bg-sky-50"
@@ -825,6 +863,25 @@ export default function PositionsView() {
         onHide={() => setShowBulkFlagsModal(false)}
         positionIds={selectedIds}
         onSaved={async () => {
+          setSelectedIds([]);
+          await loadPositions();
+        }}
+        showAlert={showAlertMessage}
+      />
+
+      <ModalBulkPrint
+        show={showBulkPrintModal}
+        onHide={() => setShowBulkPrintModal(false)}
+        positionIds={selectedIds}
+        onPrinted={() => setSelectedIds([])}
+        showAlert={showAlertMessage}
+      />
+
+      <ModalBulkRegenerate
+        show={showBulkRegenerateModal}
+        onHide={() => setShowBulkRegenerateModal(false)}
+        positionIds={selectedIds}
+        onDone={async () => {
           setSelectedIds([]);
           await loadPositions();
         }}

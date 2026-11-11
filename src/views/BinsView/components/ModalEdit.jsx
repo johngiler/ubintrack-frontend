@@ -29,6 +29,7 @@ import {
   regenerateBinTag,
   printBinTag,
 } from "@/services/inventoryService";
+import { getApiErrorMessage } from "@/services/httpClient";
 import BinMovementsTimeline from "./BinMovementsTimeline";
 
 const ModalEdit = ({
@@ -525,19 +526,19 @@ const ModalEdit = ({
     if (!selectedEntry?.id || isRegenerating) return;
 
     setIsRegenerating(true);
+    setBackendErrors(null);
     try {
       const response = await regenerateBinTag(selectedEntry.id);
-      // Actualizar la URL de la imagen si el backend la devuelve
-      if (response && response.tag_image) {
+      if (response?.tag_image) {
         setSelectedEntry((prev) => ({
           ...prev,
           tag_image: response.tag_image,
         }));
       }
-      // Opcional: mostrar mensaje de éxito
     } catch (error) {
-      console.error("Error al regenerar etiqueta:", error);
-      // Opcional: mostrar mensaje de error
+      setBackendErrors(
+        getApiErrorMessage(error, "No se pudo regenerar la etiqueta."),
+      );
     } finally {
       setIsRegenerating(false);
     }

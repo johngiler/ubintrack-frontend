@@ -143,6 +143,7 @@ export async function getBinIds(filters = {}, search = "") {
 export async function bulkDeleteBins(ids) {
   const response = await httpClient.delete("/api/bins/bulk-delete/", {
     data: { ids },
+    timeout: 60000,
   });
   return response.data;
 }
@@ -150,6 +151,15 @@ export async function bulkDeleteBins(ids) {
 export async function bulkPrintBins(ids) {
   const response = await httpClient.post(
     "/api/bins/bulk-print/",
+    { ids },
+    { timeout: 60000 },
+  );
+  return response.data;
+}
+
+export async function bulkRegenerateBinTags(ids) {
+  const response = await httpClient.post(
+    "/api/bins/bulk-regenerate-tags/",
     { ids },
     { timeout: 60000 },
   );

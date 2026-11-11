@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Printer, X } from "lucide-react";
 
-import { Modal, Button } from "@/components/ui/bootstrap";
+import { Modal, Button, Alert } from "@/components/ui/bootstrap";
 import { bulkPrintBins } from "@/services/inventoryService";
 import { getApiErrorMessage } from "@/services/httpClient";
+import { followBulkJob, isBulkJobOpen } from "@/lib/bulkJobs";
 
 export default function ModalBulkPrint({
   show,
@@ -15,19 +16,26 @@ export default function ModalBulkPrint({
   showAlert,
 }) {
   const [isPrinting, setIsPrinting] = useState(false);
+  const [formError, setFormError] = useState("");
 
   async function handlePrint() {
     if (!binIds.length) return;
+    setFormError("");
     setIsPrinting(true);
     try {
       const result = await bulkPrintBins(binIds);
-      await onPrinted?.();
+      followBulkJob(result, {
+        showAlert,
+        onFinished: (job) => {
+          if (job?.status === "failed" || job?.success === false) return;
+          void onPrinted?.();
+        },
+      });
       onHide();
-      showAlert?.("success", result?.message || "Etiquetas enviadas a impresión");
+      if (isBulkJobOpen(result)) void onPrinted?.();
     } catch (error) {
-      showAlert?.(
-        "danger",
-        getApiErrorMessage(error, "Error al imprimir las etiquetas"),
+      setFormError(
+        getApiErrorMessage(error, "No se pudo completar la operación."),
       );
     } finally {
       setIsPrinting(false);
@@ -40,6 +48,11 @@ export default function ModalBulkPrint({
         <Modal.Title>Confirmar impresión</Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {formError ? (
+          <Alert variant="danger" className="mb-3">
+            {formError}
+          </Alert>
+        ) : null}
         ¿Imprimir etiquetas de <strong>{binIds.length}</strong> bins seleccionados?
         Los que no tengan etiqueta se omitirán.
       </Modal.Body>

@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   Printer,
+  RefreshCw,
   SlidersHorizontal,
   Trash2,
   XCircle,
@@ -67,6 +68,7 @@ import {
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
 import ModalBulkPrint from "./components/ModalBulkPrint";
+import ModalBulkRegenerate from "./components/ModalBulkRegenerate";
 import ModalBulkActive from "./components/ModalBulkActive";
 import ModalQRValidation from "./components/ModalQRValidation";
 import BinExpandedProducts from "./components/BinExpandedProducts";
@@ -118,6 +120,7 @@ const BinsView = () => {
   const [selectedBinIds, setSelectedBinIds] = useState([]);
   const [bulkDeleteIds, setBulkDeleteIds] = useState(null);
   const [showBulkPrintModal, setShowBulkPrintModal] = useState(false);
+  const [showBulkRegenerateModal, setShowBulkRegenerateModal] = useState(false);
   const [showBulkActiveModal, setShowBulkActiveModal] = useState(false);
   const [isSelectingAll, setIsSelectingAll] = useState(false);
   const [massStorePreview, setMassStorePreview] = useState([]);
@@ -734,6 +737,18 @@ const BinsView = () => {
                         Activar / desactivar
                       </Button>
                     )}
+                    {perms.change && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={RefreshCw}
+                        onClick={() => setShowBulkRegenerateModal(true)}
+                        title="Regenerar etiquetas seleccionadas"
+                        className="shrink-0 whitespace-nowrap"
+                      >
+                        Regenerar etiquetas
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -1112,6 +1127,18 @@ const BinsView = () => {
         show={showBulkPrintModal}
         onHide={() => setShowBulkPrintModal(false)}
         binIds={selectedBinIds}
+        onPrinted={() => setSelectedBinIds([])}
+        showAlert={showAlert}
+      />
+
+      <ModalBulkRegenerate
+        show={showBulkRegenerateModal}
+        onHide={() => setShowBulkRegenerateModal(false)}
+        binIds={selectedBinIds}
+        onDone={async () => {
+          setSelectedBinIds([]);
+          await loadEntries();
+        }}
         showAlert={showAlert}
       />
 
