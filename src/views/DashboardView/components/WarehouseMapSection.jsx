@@ -101,7 +101,7 @@ function CavaHeatmapModal({ cava, nomenclature, onHide }) {
   const blocks = cava ? blocksFromApi(cava.blocks) : [];
   const planLayout = cava ? hydratePlanLayout(cava.plan_layout, blocks) : null;
   return (
-    <Modal show={Boolean(cava)} onHide={onHide} size="xl" className="max-w-[min(96vw,1250px)]">
+    <Modal show={Boolean(cava)} onHide={onHide} size="xl" className="max-w-[min(96vw,1480px)]">
       {cava ? (
         <>
           <Modal.Header>
@@ -168,10 +168,24 @@ export default function WarehouseMapSection({
   const [selectedCava, setSelectedCava] = useState(null);
   const [nomenclature, setNomenclature] = useState(null);
 
-  const cavas = useMemo(
-    () => warehouseData?.storage?.cavas || [],
-    [warehouseData],
-  );
+  const cavas = useMemo(() => {
+    const list = [...(warehouseData?.storage?.cavas || [])];
+    list.sort((a, b) => {
+      const byName = String(a?.name || "").localeCompare(String(b?.name || ""), "es", {
+        sensitivity: "base",
+        numeric: true,
+      });
+      if (byName !== 0) return byName;
+      // Varias «Cámara» se distinguen por code (título: «Cámara 9»).
+      const byCode = String(a?.code || "").localeCompare(String(b?.code || ""), "es", {
+        sensitivity: "base",
+        numeric: true,
+      });
+      if (byCode !== 0) return byCode;
+      return (a?.id || 0) - (b?.id || 0);
+    });
+    return list;
+  }, [warehouseData]);
   const storageName = warehouseData?.storage?.name || "Almacén";
 
   useEffect(() => {
