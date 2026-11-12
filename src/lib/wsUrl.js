@@ -71,16 +71,6 @@ export function notificationHref(item) {
       return `/storage/positions${q}`;
     case "cava":
       return `/storage/cavas${q}`;
-    case "product":
-      return `/inventory/products${q}`;
-    case "client":
-      return `/core/clients${q}`;
-    case "user":
-      return `/core/users${q}`;
-    case "profile":
-      return `/core/profiles${q}`;
-    case "tariff":
-      return `/finance/tariffs${q}`;
     default: {
       const target = item?.target;
       if (target === "cavas_list") return `/storage/cavas${q}`;
@@ -90,11 +80,6 @@ export function notificationHref(item) {
       if (target === "positions_list" || target === "position_detail") {
         return `/storage/positions${q}`;
       }
-      if (target === "products_list") return `/inventory/products${q}`;
-      if (target === "clients_list") return `/core/clients${q}`;
-      if (target === "users_list") return `/core/users${q}`;
-      if (target === "profiles_list") return `/core/profiles${q}`;
-      if (target === "tariffs_list") return `/finance/tariffs${q}`;
       return "/dashboard";
     }
   }

@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import WmsFeedSkeleton from "@/components/wms/WmsFeedSkeleton";
 import { useNotifications } from "@/context/NotificationContext";
+import { actorSubtitle, withoutActorPrefix } from "@/lib/actorDisplay";
 import { notificationHref } from "@/lib/wsUrl";
 import { cn } from "@/lib/cn";
 
@@ -142,11 +143,11 @@ export function NotificationDropdown() {
                         item.is_read ? "font-medium" : "font-semibold",
                       )}
                     >
-                      {item.message}
+                      {withoutActorPrefix(item.message, item.actor_display)}
                     </span>
-                    {item.actor_display ? (
+                    {actorSubtitle(item.actor_display) ? (
                       <span className="mt-0.5 block text-xs text-[var(--foreground-muted)]">
-                        {item.actor_display}
+                        {actorSubtitle(item.actor_display)}
                       </span>
                     ) : null}
                     <span className="mt-0.5 block text-[11px] text-[var(--foreground-muted)]">

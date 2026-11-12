@@ -13,6 +13,7 @@ import Select from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { useActivityInfinite } from "@/hooks/useActivityInfinite";
 import { swrKeys } from "@/lib/swr/keys";
+import { withoutActorPrefix } from "@/lib/actorDisplay";
 import { formatDateTime } from "@/lib/format";
 import { fetchActivityActors } from "@/services/activityService";
 
@@ -182,7 +183,7 @@ export default function SectionHistoryModal({
                       <History className="mt-0.5 h-4 w-4 shrink-0 text-[var(--foreground-muted)]" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-[var(--foreground)]">
-                          {item.summary}
+                          {withoutActorPrefix(item.summary, item.actor_display)}
                         </p>
                         <p className="mt-1 text-xs text-[var(--foreground-muted)]">
                           {item.actor_display || "Sistema"}

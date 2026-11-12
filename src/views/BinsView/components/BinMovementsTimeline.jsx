@@ -203,9 +203,7 @@ const BinMovementsTimeline = ({ binId, active }) => {
                 <div className="text-start text-sm-end">
                   <small className="text-muted">
                     <TimelineUser className={`${inlineIconClass} me-1`} />
-                    {movement.created_by.full_name ||
-                      movement.created_by.email ||
-                      movement.created_by.username}
+                    {movement.created_by.full_name || "Usuario"}
                   </small>
                 </div>
               )}

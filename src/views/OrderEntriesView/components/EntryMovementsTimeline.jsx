@@ -75,7 +75,7 @@ export default function EntryMovementsTimeline({ entryId, active }) {
               </p>
             )}
             <p className="mt-1 text-xs text-[var(--foreground-muted)]">
-              {m.created_by?.full_name || m.created_by?.username || "Sistema"}
+              {m.created_by?.full_name || "Sistema"}
               {" · "}
               {formatDateTime(m.created_at)}
             </p>
