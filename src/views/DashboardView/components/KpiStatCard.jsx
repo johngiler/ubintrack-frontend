@@ -6,22 +6,23 @@ import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 import ProgressRing from "./ProgressRing";
 
-function BreakdownCell({ label, value, subValue, tone = "slate" }) {
-  const toneMap = {
-    sky: "text-sky-600 dark:text-sky-400",
-    amber: "text-amber-600 dark:text-amber-400",
-    emerald: "text-emerald-600 dark:text-emerald-400",
-    red: "text-red-600 dark:text-red-400",
-    orange: "text-orange-500 dark:text-orange-400",
-  };
+const TONE_MAP = {
+  sky: "text-sky-600 dark:text-sky-400",
+  amber: "text-amber-600 dark:text-amber-400",
+  emerald: "text-emerald-600 dark:text-emerald-400",
+  red: "text-red-600 dark:text-red-400",
+  orange: "text-orange-500 dark:text-orange-400",
+  slate: "text-slate-500 dark:text-slate-400",
+};
 
+function BreakdownCell({ label, value, subValue, tone = "slate" }) {
   return (
-    <div className="flex-1 border-slate-100 px-2 py-2.5 text-center not-last:border-r dark:border-[var(--border-subtle)]">
-      <p className={`text-lg font-semibold tabular-nums ${toneMap[tone] || "text-slate-800 dark:text-slate-200"}`}>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center border-slate-100 px-2 py-2.5 text-center not-last:border-r dark:border-[var(--border-subtle)]">
+      <p className={`text-lg font-semibold tabular-nums ${TONE_MAP[tone] || "text-slate-800 dark:text-slate-200"}`}>
         {value ?? 0}
       </p>
       <p className="mt-0.5 text-[11px] font-medium text-slate-500 dark:text-[var(--foreground-muted)]">{label}</p>
-      {subValue !== undefined ? (
+      {subValue !== undefined && subValue !== null ? (
         <p className="mt-0.5 text-sm font-medium tabular-nums text-slate-700 dark:text-slate-300">{subValue}</p>
       ) : null}
     </div>
@@ -32,7 +33,7 @@ export default function KpiStatCard({
   title,
   total,
   icon: Icon,
-  iconTone,
+  iconTone = "sky",
   breakdown,
   ringValue,
   href,
@@ -47,32 +48,32 @@ export default function KpiStatCard({
   const card = (
     <Card
       className={cn(
-        "h-full",
+        "flex h-full flex-col overflow-hidden",
         href &&
           "transition-shadow hover:shadow-[var(--shadow-md)] hover:ring-1 hover:ring-[var(--border)]",
       )}
     >
-      <div className="flex items-start justify-between gap-3 p-4 pb-3">
-        <div>
+      <div className="flex h-[92px] shrink-0 items-center justify-between gap-3 px-4">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-[var(--foreground-muted)]">
             {title}
           </p>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900 dark:text-[var(--foreground)]">
+          <p className="mt-1 text-3xl font-bold tabular-nums leading-none text-slate-900 dark:text-[var(--foreground)]">
             {total ?? 0}
           </p>
         </div>
-        {ringValue !== undefined ? (
+        {ringValue !== undefined && ringValue !== null ? (
           <ProgressRing value={ringValue} />
         ) : Icon ? (
           <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${iconToneMap[iconTone] || iconToneMap.sky}`}
+            className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl ring-1 ${iconToneMap[iconTone] || iconToneMap.sky}`}
           >
-            <Icon className="h-5 w-5" strokeWidth={2} />
+            <Icon className="h-7 w-7" strokeWidth={2} />
           </div>
         ) : null}
       </div>
       {breakdown?.length ? (
-        <div className="flex border-t border-slate-100 bg-slate-50/50 dark:border-[var(--border-subtle)] dark:bg-[var(--surface)]/40">
+        <div className="flex min-h-0 flex-1 border-t border-slate-100 bg-slate-50/50 dark:border-[var(--border-subtle)] dark:bg-[var(--surface)]/40">
           {breakdown.map((item) => (
             <BreakdownCell key={item.label} {...item} />
           ))}

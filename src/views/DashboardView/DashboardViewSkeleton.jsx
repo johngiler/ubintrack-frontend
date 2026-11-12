@@ -3,18 +3,21 @@
 import Skeleton from "@/components/ui/Skeleton";
 import WmsTableSkeleton from "@/components/wms/WmsTableSkeleton";
 
-function KpiCardSkeleton({ withRing = false }) {
+function KpiCardSkeleton({ withRing = false, breakdown = 3 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white dark:bg-[var(--surface)]">
-      <div className="flex items-start justify-between gap-3 p-4 pb-3">
+      <div className="flex h-[92px] items-center justify-between gap-3 px-4">
         <div className="space-y-2">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-8 w-16" />
         </div>
-        <Skeleton className={withRing ? "h-11 w-11 rounded-full" : "h-11 w-11 rounded-xl"} />
+        <Skeleton className={withRing ? "h-16 w-16 rounded-full" : "h-16 w-16 rounded-2xl"} />
       </div>
-      <div className="grid grid-cols-3 border-t border-slate-100 dark:border-[var(--border-subtle)]">
-        {Array.from({ length: 3 }).map((_, i) => (
+      <div
+        className="grid border-t border-slate-100 dark:border-[var(--border-subtle)]"
+        style={{ gridTemplateColumns: `repeat(${breakdown}, minmax(0, 1fr))` }}
+      >
+        {Array.from({ length: breakdown }).map((_, i) => (
           <div key={i} className="space-y-1.5 px-2 py-2.5 text-center">
             <Skeleton className="mx-auto h-5 w-8" />
             <Skeleton className="mx-auto h-2.5 w-14" />
@@ -50,7 +53,7 @@ export default function DashboardViewSkeleton() {
         <KpiCardSkeleton />
         <KpiCardSkeleton />
         <KpiCardSkeleton />
-        <KpiCardSkeleton withRing />
+        <KpiCardSkeleton withRing breakdown={4} />
       </div>
 
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-white dark:bg-[var(--surface)]">
@@ -78,13 +81,11 @@ export default function DashboardViewSkeleton() {
         </div>
         <WmsTableSkeleton
           rows={5}
-          minWidth={760}
           columns={[
-            { kind: "text", min: 160, head: 56 },
-            { kind: "wide", min: 220, head: 120 },
-            { kind: "short", min: 80, head: 36 },
-            { kind: "short", min: 90, head: 60 },
-            { kind: "short", min: 80, head: 52 },
+            { kind: "text", min: 160, head: 72 },
+            { kind: "text", min: 100, head: 48 },
+            { kind: "text", min: 100, head: 56 },
+            { kind: "badge", min: 90, head: 52 },
           ]}
         />
       </div>

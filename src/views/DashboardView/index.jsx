@@ -8,7 +8,6 @@ import {
   Boxes,
   Calendar,
   LayoutDashboard,
-  MapPin,
   Upload,
 } from "lucide-react";
 
@@ -162,8 +161,6 @@ export default function DashboardView() {
               title="Posiciones"
               href="/storage/positions"
               total={positions?.total_count}
-              icon={MapPin}
-              iconTone="violet"
               ringValue={positions?.total_percentage}
               breakdown={[
                 {
@@ -183,6 +180,12 @@ export default function DashboardView() {
                   value: `${Math.round(positions?.free_percentage || 0)}%`,
                   subValue: positions?.free_count,
                   tone: "emerald",
+                },
+                {
+                  label: "Inactivas",
+                  value: `${Math.round(positions?.inactive_percentage || 0)}%`,
+                  subValue: positions?.inactive_count,
+                  tone: "slate",
                 },
               ]}
             />
