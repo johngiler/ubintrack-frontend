@@ -21,7 +21,7 @@ import { blocksFromApi } from "@/views/CavasView/cavaBlocks";
 import { cavaTitleOf } from "@/views/CavasView/cavaPlan";
 import CavaPlan from "@/views/CavasView/components/CavaPlan";
 import { hydratePlanLayout } from "@/views/CavasView/planLayout";
-import { getConditionBadgeVariant } from "../dashboardUtils";
+import { formatCavaTemperature, getConditionBadgeVariant } from "../dashboardUtils";
 
 function shareOf(part, total) {
   if (!total) return 0;
@@ -57,7 +57,7 @@ function CavaSummaryCard({ cava, onSelect }) {
 
       <p className="mb-3 inline-flex items-center gap-1 text-xs text-sky-700 dark:text-sky-400">
         <Thermometer className="h-3.5 w-3.5" />
-        {cava.current_temp ?? "—"}°C
+        {formatCavaTemperature(cava)}
         <span className="text-slate-400 dark:text-slate-500">·</span>
         <span className="text-slate-500 dark:text-[var(--foreground-muted)]">{total} posiciones</span>
       </p>
@@ -109,7 +109,7 @@ function CavaHeatmapModal({ cava, nomenclature, onHide }) {
             <Modal.Subtitle>
               <span className="inline-flex items-center gap-1">
                 <Thermometer className="h-3.5 w-3.5" />
-                {cava.current_temp ?? "—"}°C
+                {formatCavaTemperature(cava)}
                 {cava.condition ? ` · ${cava.condition}` : ""}
               </span>
             </Modal.Subtitle>

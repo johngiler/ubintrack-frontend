@@ -17,6 +17,21 @@ export function getConditionBadgeVariant(condition) {
   return "default";
 }
 
+/** Rango configurado en la cava (temp_min / temp_max). */
+export function formatCavaTemperature(cava) {
+  if (!cava) return "—";
+  const min = cava.temp_min;
+  const max = cava.temp_max;
+  const hasMin = min !== null && min !== undefined && min !== "";
+  const hasMax = max !== null && max !== undefined && max !== "";
+  if (!hasMin && !hasMax) return "—";
+  if (hasMin && hasMax) {
+    if (Number(min) === Number(max)) return `${min}°C`;
+    return `${min} / ${max}°C`;
+  }
+  return `${hasMin ? min : max}°C`;
+}
+
 export const MONTH_LABELS = [
   "Ene",
   "Feb",
