@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Printer, RefreshCw, Save, X } from "lucide-react";
 
-import { Modal, Button, Form, Row, Col, Alert } from "@/components/ui/bootstrap";
+import { Modal, Button, Form, Row, Col, Alert, Tabs, Tab } from "@/components/ui/bootstrap";
 import { IconButton } from "@/components/ui/Button";
 import Select from "@/components/ui/Select";
 import {
@@ -25,6 +25,7 @@ import {
 } from "@/lib/positionFlags";
 import { bustMediaUrl } from "@/lib/mediaUrl";
 import { cavaTitleOf, statusLabels } from "../positionLabels";
+import PositionMovementsTimeline from "./PositionMovementsTimeline";
 
 const EMPTY_POSITION = {
   cava_id: "",
@@ -48,7 +49,15 @@ function canPrintPosition(position) {
   );
 }
 
-export default function ModalEdit({ show, onHide, position, mode, onSave, showAlert }) {
+export default function ModalEdit({
+  show,
+  onHide,
+  position,
+  mode,
+  onSave,
+  showAlert,
+  initialTab = "details",
+}) {
   const [isSaving, setIsSaving] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -57,10 +66,15 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
   const [isLoadingCavas, setIsLoadingCavas] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [activeTab, setActiveTab] = useState(initialTab || "details");
 
   const readOnly = mode === "view";
   const isEditMode = mode === "edit";
   const hasSavedPosition = Boolean(formData?.id);
+
+  useEffect(() => {
+    if (show) setActiveTab(initialTab || "details");
+  }, [show, initialTab]);
 
   useEffect(() => {
     if (!show) return undefined;
@@ -248,6 +262,8 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
             {formError}
           </Alert>
         ) : null}
+        <Tabs activeKey={activeTab} onSelect={setActiveTab} id="position-tabs">
+          <Tab eventKey="details" title="Detalles">
         <Form onSubmit={(e) => e.preventDefault()}>
           <Row className="gap-y-3">
             {readOnly && formData.code && (
@@ -513,6 +529,16 @@ export default function ModalEdit({ show, onHide, position, mode, onSave, showAl
             ) : null}
           </Row>
         </Form>
+          </Tab>
+          {hasSavedPosition ? (
+            <Tab eventKey="movements" title="Historial de movimientos">
+              <PositionMovementsTimeline
+                positionId={formData.id}
+                active={activeTab === "movements"}
+              />
+            </Tab>
+          ) : null}
+        </Tabs>
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={onHide} disabled={isSaving}>

@@ -311,7 +311,9 @@ export async function exportBinsToExcel({
 }
 
 // Bin Movements
-export async function getBinMovements(binId) {
-  const response = await httpClient.get(`/api/bins/${binId}/movements/`);
+export async function getBinMovements(binId, page = 1, pageSize = 20) {
+  const response = await httpClient.get(
+    `/api/bins/${binId}/movements/?page=${page}&page_size=${pageSize}`,
+  );
   return response.data;
 }

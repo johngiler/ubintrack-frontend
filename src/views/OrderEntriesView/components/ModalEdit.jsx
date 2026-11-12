@@ -1,9 +1,10 @@
 "use client";
 
 import { FileText, Save, X } from "lucide-react";
-import { Modal, Button, Form, Row, Col, Badge, Alert } from "@/components/ui/bootstrap";
+import { Modal, Button, Form, Row, Col, Badge, Alert, Tabs, Tab } from "@/components/ui/bootstrap";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 import EntryProductLines from "./EntryProductLines";
+import EntryMovementsTimeline from "./EntryMovementsTimeline";
 import { useState, useEffect } from "react";
 import { getProducts } from "@/services/inventoryService";
 import { regenerateEntryPdf } from "@/services/orderService";
@@ -23,6 +24,7 @@ const ModalEdit = ({
   conditionLabels,
   inTypeLabels,
   showAlert,
+  initialTab = "details",
 }) => {
   const isViewMode = modalMode === "view";
   const isCreateMode = modalMode === "create";
@@ -38,6 +40,11 @@ const ModalEdit = ({
   const [imagePreview, setImagePreview] = useState(null);
   const [isRegeneratingPdf, setIsRegeneratingPdf] = useState(false);
   const [pdfAlert, setPdfAlert] = useState({ show: false, variant: "", message: "" });
+  const [activeTab, setActiveTab] = useState(initialTab || "details");
+
+  useEffect(() => {
+    if (showModal) setActiveTab(initialTab || "details");
+  }, [showModal, initialTab]);
 
   const [validationErrors, setValidationErrors] = useState({
     client: null,
@@ -385,6 +392,8 @@ const ModalEdit = ({
         </div>
       </Modal.Header>
       <Modal.Body>
+        <Tabs activeKey={activeTab} onSelect={setActiveTab} id="entry-tabs">
+          <Tab eventKey="details" title="Detalles">
         {selectedEntry && (
           <Form onSubmit={(e) => e.preventDefault()}>
             <Modal.Section title="Datos generales" className="!p-3.5">
@@ -922,6 +931,16 @@ const ModalEdit = ({
             {pdfAlert.message}
           </Alert>
         )}
+          </Tab>
+          {selectedEntry?.id ? (
+            <Tab eventKey="movements" title="Historial de movimientos">
+              <EntryMovementsTimeline
+                entryId={selectedEntry.id}
+                active={activeTab === "movements"}
+              />
+            </Tab>
+          ) : null}
+        </Tabs>
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={handleCloseModal}>

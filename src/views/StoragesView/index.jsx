@@ -139,7 +139,7 @@ export default function StoragesView() {
                     title="Limpiar filtros"
                     className="shrink-0 whitespace-nowrap"
                   >
-                    Limpiar filtros
+                    Limpiar
                   </Button>
                 )}
                 <div className="ml-auto shrink-0 pl-2">

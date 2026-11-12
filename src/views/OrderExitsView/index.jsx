@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
   ChevronDown,
@@ -8,6 +9,7 @@ import {
   Download,
   Eye,
   FileText,
+  Filter,
   FilterX,
   History,
   PackageMinus,
@@ -20,6 +22,9 @@ import { useAuth } from "@/context/AuthContext";
 import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 import Link from "next/link";
 import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import ViewHistoryButton from "@/components/activity/ViewHistoryButton";
+import { useViewHistory } from "@/hooks/useViewHistory";
 import {
   Card,
   Col,
@@ -31,6 +36,7 @@ import {
   Table,
   Modal,
 } from "@/components/ui/bootstrap";
+import Select from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import {
@@ -65,7 +71,7 @@ import ModalQRValidation from "./components/ModalQRValidation";
 import ModalImport from "./components/ModalImport";
 import ModalReplaceBin from "./components/ModalReplaceBin";
 import ExitExpandedProducts from "./components/ExitExpandedProducts";
-import { canCRUD } from "@/services/httpClient";
+import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 
 const statusVariants = {
   pendiente: "warning",
@@ -89,6 +95,13 @@ const outTypeLabels = {
 const Exits = () => {
   const navigate = useWmsNavigate();
   const [searchParams, setSearchParams] = useWmsSearchParams();
+  const {
+    historyOpen,
+    historyType,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
   const user = useAuth().user;
   const perms = canCRUD(user, "order", "exit");
   const isClientUser = !!user?.client && !user?.is_superuser;
@@ -103,6 +116,7 @@ const Exits = () => {
     () => searchParams.get("exit_code") || ""
   );
   const [filters, setFilters] = useState({ status: "", exit_date: "" });
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [completingExitId, setCompletingExitId] = useState(null);
@@ -724,7 +738,23 @@ const Exits = () => {
     }
   };
 
-  const hasFilters = Boolean(searchTerm || filters.status || filters.exit_date);
+  const activeFilterCount = [filters.status, filters.exit_date].filter(Boolean).length;
+  const hasFilters = Boolean(searchTerm) || activeFilterCount > 0;
+
+  const statusOptions = Object.entries(statusLabels).map(([value, label]) => ({ value, label }));
+
+  const exitDateOptions = Array.from({ length: 14 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+    const value = date.toISOString().split("T")[0];
+    const dayName = date.toLocaleDateString("es-PA", { weekday: "long" });
+    const dayNum = date.getDate();
+    const monthName = date.toLocaleDateString("es-PA", { month: "long" });
+    const capitalizedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+    const dayLabel = `${capitalizedDay}, ${dayNum} de ${monthName}`;
+    const label = i === 0 ? `Hoy - ${dayLabel}` : i === 1 ? `Mañana - ${dayLabel}` : dayLabel;
+    return { value, label };
+  });
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -778,107 +808,103 @@ const Exits = () => {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="justify-content-between border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 !py-3">
-              <div className="flex w-full flex-wrap items-center gap-2">
-                <WmsSearchBar
-                      id="search-exit"
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        if (searchParams.toString()) {
-                          setSearchParams({});
-                        }
-                      }}
-                  onClear={() => {
-                          setSearchTerm("");
-                          setSearchParams({});
-                        }}
-                  placeholder="Buscar por código, cliente, bin o sku…"
-                  className="!w-[300px] !min-w-[300px] !max-w-[300px] shrink-0"
-                />
-                      <Form.Select
-                        id="filter-status"
-                        name="filter-status"
+              <div className="flex w-full flex-col gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2">
+                  <WmsSearchBar
+                    id="search-exit"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      if (searchParams.toString()) {
+                        setSearchParams({});
+                      }
+                    }}
+                    onClear={() => {
+                      setSearchTerm("");
+                      setSearchParams({});
+                    }}
+                    placeholder="Buscar por código, cliente, bin o sku…"
+                    className="!w-[300px] !min-w-[220px] !max-w-full shrink-0"
+                  />
+                  <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button
+                        variant="outline"
                         size="sm"
-                        value={filters.status}
-                  onChange={(e) => handleFilterChange("status", e.target.value)}
-                        aria-label="Filtrar por estado"
-                  className="!w-[150px] shrink-0"
-                  style={{ minWidth: "150px" }}
+                        icon={FilterX}
+                        onClick={clearFilters}
+                        title="Limpiar filtros"
+                        className="whitespace-nowrap"
                       >
-                  <option value="">Estado</option>
-                        {Object.entries(statusLabels).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </Form.Select>
-                      <Form.Select
-                        id="filter-exit-date"
-                        name="filter-exit-date"
-                        size="sm"
-                        value={filters.exit_date}
-                  onChange={(e) => handleFilterChange("exit_date", e.target.value)}
-                        aria-label="Filtrar por fecha de salida"
-                  className="!w-[200px] shrink-0"
-                        style={{ minWidth: "200px" }}
-                      >
-                  <option value="">Fecha de salida</option>
-                        {(() => {
-                          const options = [];
-                          const today = new Date();
-                          for (let i = 0; i < 14; i++) {
-                            const date = new Date(today);
-                            date.setDate(today.getDate() + i);
-                            const dateValue = date.toISOString().split("T")[0];
-                            const dayName = date.toLocaleDateString("es-PA", {
-                              weekday: "long",
-                            });
-                            const dayNum = date.getDate();
-                            const monthName = date.toLocaleDateString("es-PA", {
-                              month: "long",
-                            });
-                            const capitalizedDay =
-                        dayName.charAt(0).toUpperCase() + dayName.slice(1);
-                            const label =
-                              i === 0
-                                ? `Hoy - ${capitalizedDay}, ${dayNum} de ${monthName}`
-                                : i === 1
-                                ? `Mañana - ${capitalizedDay}, ${dayNum} de ${monthName}`
-                                : `${capitalizedDay}, ${dayNum} de ${monthName}`;
-                            options.push(
-                              <option key={dateValue} value={dateValue}>
-                                {label}
-                        </option>,
-                            );
-                          }
-                          return options;
-                        })()}
-                      </Form.Select>
-                {hasFilters && (
-                        <Button
-                    variant="outline"
-                          size="sm"
-                    icon={FilterX}
-                    onClick={clearFilters}
-                    title="Limpiar filtros"
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                          Limpiar filtros
-                        </Button>
+                        Limpiar
+                      </Button>
                     )}
-                <div className="ml-auto shrink-0 pl-2">
-                  {perms.add && (
                     <Button
-                      variant="primary"
+                      variant={filtersOpen || activeFilterCount > 0 ? "secondary" : "outline"}
                       size="sm"
-                      icon={Plus}
+                      icon={Filter}
+                      onClick={() => setFiltersOpen((open) => !open)}
+                      title={filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
                       className="whitespace-nowrap"
-                      onClick={handleNewExit}
+                      aria-expanded={filtersOpen}
                     >
-                      Nueva orden de salida
+                      Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                     </Button>
-                  )}
+                    <ViewHistoryButton onClick={openHistory} />
+                    {perms.add && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={Plus}
+                        className="whitespace-nowrap"
+                        onClick={handleNewExit}
+                      >
+                        Nueva orden de salida
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {filtersOpen ? (
+                    <motion.div
+                      key="exits-filters"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      {/* p-1: el anillo de focus de react-select no debe quedar recortado por overflow-hidden */}
+                      <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] p-1 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Estado</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por estado"
+                            placeholder="Todos"
+                            options={statusOptions}
+                            value={filters.status}
+                            onChange={(e) => handleFilterChange("status", e.target.value || "")}
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Fecha de salida</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por fecha de salida"
+                            placeholder="Todas"
+                            options={exitDateOptions}
+                            value={filters.exit_date}
+                            onChange={(e) => handleFilterChange("exit_date", e.target.value || "")}
+                          />
+                        </Form.Group>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </div>
             </Card.Header>
             <Card.Body className="p-0">
@@ -1155,6 +1181,27 @@ const Exits = () => {
         handleProcessAllBins={handleProcessAllBins}
         processingGroupId={processingGroupId}
         initialTab={initialTab}
+      />
+
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="exit"
+        title="Historial de movimientos de salidas"
+        initialAction={historyType}
+        initialBatchId={historyBatch}
+        onOpenItem={async (item) => {
+          if (!item?.resource_id) return;
+          try {
+            const exit = await getExit(item.resource_id);
+            handleShowModal(exit, "view", "movements");
+          } catch (err) {
+            showAlert(
+              "danger",
+              getApiErrorMessage(err, "No se pudo abrir la salida."),
+            );
+          }
+        }}
       />
 
       <ModalConfirm

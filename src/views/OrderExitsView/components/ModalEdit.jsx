@@ -899,7 +899,10 @@ const ModalEdit = ({
                 </Tab>
                 <Tab eventKey="movements" title="Historial de Movimientos">
                   <div className="mt-3">
-                    <ExitMovementsTimeline exitId={selectedExit.id} />
+                    <ExitMovementsTimeline
+                      exitId={selectedExit.id}
+                      active={activeTab === "movements"}
+                    />
                   </div>
                 </Tab>
               </Tabs>

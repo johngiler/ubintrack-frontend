@@ -56,4 +56,22 @@ export const swrKeys = {
     clientId ? ["client-billing", clientId, start || "", end || ""] : null,
   clientBillingHistory: (clientId) =>
     clientId ? ["client-billing-history", clientId] : null,
+
+  activityInfinite: (section, page, pageSize, filters) =>
+    section
+      ? ["activity", "infinite", section, page, pageSize, stableFilters(filters)]
+      : null,
+  activityActors: (section) => (section ? ["activity", "actors", section] : null),
+  activityBatch: (batchId) => (batchId ? ["activity", "batch", batchId] : null),
+  activityBatchItems: (batchId, page, pageSize) =>
+    batchId ? ["activity", "batch-items", batchId, page, pageSize] : null,
+
+  binMovements: (binId, page, pageSize) =>
+    binId ? ["bin-movements", binId, page, pageSize] : null,
+  exitMovements: (exitId, page, pageSize) =>
+    exitId ? ["exit-movements", exitId, page, pageSize] : null,
+  entryMovements: (entryId, page, pageSize) =>
+    entryId ? ["entry-movements", entryId, page, pageSize] : null,
+  positionMovements: (positionId, page, pageSize) =>
+    positionId ? ["position-movements", positionId, page, pageSize] : null,
 };

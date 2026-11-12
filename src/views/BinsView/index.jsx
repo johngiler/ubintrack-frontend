@@ -42,6 +42,7 @@ import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import {
   getBins,
+  getBin,
   getBinIds,
   createBin,
   updateBin,
@@ -71,6 +72,8 @@ import ModalBulkRegenerate from "./components/ModalBulkRegenerate";
 import ModalBulkActive from "./components/ModalBulkActive";
 import ModalQRValidation from "./components/ModalQRValidation";
 import BinExpandedProducts from "./components/BinExpandedProducts";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import { useViewHistory } from "@/hooks/useViewHistory";
 import { formatDate } from "@/lib/format";
 import { statusBadgeVariant, statusLabels } from "./binLabels";
 
@@ -97,6 +100,13 @@ const BinsView = () => {
   const perms = canCRUD(user, "inventory", "bin");
   const [searchParams, setSearchParams] = useWmsSearchParams();
   const navigate = useWmsNavigate();
+  const {
+    historyOpen,
+    historyType,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -646,6 +656,16 @@ const BinsView = () => {
                     >
                       Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={History}
+                      onClick={openHistory}
+                      title="Historial de movimientos"
+                      className="whitespace-nowrap"
+                    >
+                      Historial
+                    </Button>
                     {perms.add && !user?.client && (
                       <Button
                         variant="primary"
@@ -1083,6 +1103,24 @@ const BinsView = () => {
         statusLabels={statusLabels}
         errorResponse={errorResponse}
         initialTab={initialTab}
+      />
+
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="bin"
+        title="Historial de movimientos de bins"
+        initialAction={historyType}
+        initialBatchId={historyBatch}
+        onOpenItem={async (item) => {
+          if (!item?.resource_id) return;
+          try {
+            const bin = await getBin(item.resource_id);
+            handleShowModal(bin, "view", "movements");
+          } catch (err) {
+            showAlert("danger", getApiErrorMessage(err, "No se pudo abrir el bin."));
+          }
+        }}
       />
 
       <ModalConfirm

@@ -21,6 +21,13 @@ export async function getEntries(page = 1, filters = {}, search = "") {
   return response.data;
 }
 
+export async function getEntryMovements(entryId, page = 1, pageSize = 20) {
+  const response = await httpClient.get(
+    `/api/entries/${entryId}/movements/?page=${page}&page_size=${pageSize}`,
+  );
+  return response.data;
+}
+
 export async function getEntry(id) {
   const response = await httpClient.get(`/api/entries/${id}/`);
   return response.data;
@@ -145,8 +152,10 @@ export async function getExit(id) {
   return response.data;
 }
 
-export async function getExitMovements(exitId) {
-  const response = await httpClient.get(`/api/exits/${exitId}/movements/`);
+export async function getExitMovements(exitId, page = 1, pageSize = 20) {
+  const response = await httpClient.get(
+    `/api/exits/${exitId}/movements/?page=${page}&page_size=${pageSize}`,
+  );
   return response.data;
 }
 

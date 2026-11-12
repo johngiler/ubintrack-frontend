@@ -15,6 +15,7 @@ import {
   Printer,
   RefreshCw,
   SlidersHorizontal,
+  History,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -42,6 +43,7 @@ import { useAsyncProcessTracker } from "@/hooks/useAsyncProcessTracker";
 import PositionsViewSkeleton from "./PositionsViewSkeleton";
 import {
   getPositions,
+  getPosition,
   getPositionHalls,
   getPositionIds,
   getCavas,
@@ -51,6 +53,8 @@ import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { aisleDisplayName, isSectionBlock } from "../CavasView/cavaPlan";
 import { cavaTitleOf, statusBadgeVariant, statusLabels } from "./positionLabels";
 import ModalEdit from "./components/ModalEdit";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import { useViewHistory } from "@/hooks/useViewHistory";
 import ModalConfirm from "./components/ModalConfirm";
 import ModalBulkFlags from "./components/ModalBulkFlags";
 import ModalBulkPrint from "./components/ModalBulkPrint";
@@ -84,15 +88,26 @@ export default function PositionsView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "storage", "position");
   const [searchParams, setSearchParams] = useWmsSearchParams();
+  const {
+    historyOpen,
+    historyType,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [modalMode, setModalMode] = useState("view");
+  const [initialTab, setInitialTab] = useState("details");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get("search") || "");
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filters, setFilters] = useState(() => ({
+    ...EMPTY_FILTERS,
+    cava_id: searchParams.get("cava_id") || "",
+  }));
   const [expandedPositions, setExpandedPositions] = useState({});
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleteIds, setBulkDeleteIds] = useState(null);
@@ -105,6 +120,12 @@ export default function PositionsView() {
     const initialSearch = searchParams.get("search") || "";
     if (initialSearch) {
       setSearchTerm(initialSearch);
+    }
+    const cavaId = searchParams.get("cava_id") || "";
+    if (cavaId) {
+      setFilters((prev) =>
+        prev.cava_id === cavaId ? prev : { ...prev, cava_id: cavaId, hall: "" },
+      );
     }
   }, [searchParams]);
 
@@ -292,7 +313,8 @@ export default function PositionsView() {
     }
   };
 
-  const handleShowModal = (position, mode) => {
+  const handleShowModal = (position, mode, tab = "details") => {
+    setInitialTab(tab);
     setSelectedPosition(position);
     setModalMode(mode);
     setShowModal(true);
@@ -383,6 +405,16 @@ export default function PositionsView() {
                       aria-expanded={filtersOpen}
                     >
                       Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={History}
+                      onClick={openHistory}
+                      title="Historial de movimientos"
+                      className="whitespace-nowrap"
+                    >
+                      Historial
                     </Button>
                     {perms.add && (
                       <Button
@@ -699,6 +731,16 @@ export default function PositionsView() {
                               <div className="flex items-center gap-1">
                                 <IconButton
                                   size="sm"
+                                  className="text-amber-600 hover:bg-amber-50"
+                                  onClick={() =>
+                                    handleShowModal(position, "view", "movements")
+                                  }
+                                  title="Ver historial"
+                                >
+                                  <History className="h-4 w-4" />
+                                </IconButton>
+                                <IconButton
+                                  size="sm"
                                   className="text-sky-600 hover:bg-sky-50"
                                   onClick={() => handleShowModal(position, "view")}
                                   title="Ver posición"
@@ -816,10 +858,32 @@ export default function PositionsView() {
         </Col>
       </Row>
 
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="position"
+        title="Historial de movimientos de posiciones"
+        initialAction={historyType}
+        initialBatchId={historyBatch}
+        onOpenItem={async (item) => {
+          if (!item?.resource_id) return;
+          try {
+            const pos = await getPosition(item.resource_id);
+            handleShowModal(pos, "view", "movements");
+          } catch (err) {
+            showAlertMessage(
+              "danger",
+              getApiErrorMessage(err, "No se pudo abrir la posición."),
+            );
+          }
+        }}
+      />
+
       <ModalEdit
         show={showModal}
         onHide={handleCloseModal}
         position={selectedPosition}
+        initialTab={initialTab}
         mode={modalMode}
         onSave={loadPositions}
         showAlert={showAlertMessage}

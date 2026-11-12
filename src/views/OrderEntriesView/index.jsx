@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect } from "react";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
   ChevronDown,
@@ -10,7 +10,9 @@ import {
   ExternalLink,
   Eye,
   FileText,
+  Filter,
   FilterX,
+  History,
   PackageOpen,
   Pencil,
   Plus,
@@ -32,6 +34,7 @@ import {
 } from "@/components/ui/bootstrap";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
 import EntriesViewSkeleton from "./EntriesViewSkeleton";
 
 import {
@@ -59,7 +62,9 @@ import EntryExpandedProducts from "./components/EntryExpandedProducts";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
 import ModalComplete from "./components/ModalComplete";
-import { canCRUD } from "@/services/httpClient";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import { useViewHistory } from "@/hooks/useViewHistory";
+import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { exportEntryOrdersToExcel } from "@/services/orderService";
 import { formatDate } from "@/lib/format";
 
@@ -98,16 +103,25 @@ const Entries = () => {
   const perms = canCRUD(user, "order", "entry");
   const [searchParams, setSearchParams] = useWmsSearchParams();
   const navigate = useWmsNavigate();
+  const {
+    historyOpen,
+    historyType,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [modalMode, setModalMode] = useState("view");
+  const [initialTab, setInitialTab] = useState("details");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState(
     () => searchParams.get("entry_code") || ""
   );
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState({});
@@ -178,7 +192,7 @@ const Entries = () => {
     }
   }, [listError]);
 
-  const handleShowModal = (entry, mode) => {
+  const handleShowModal = (entry, mode, tab = "details") => {
     if (mode === "create") {
       setSelectedEntry({
         status: "pendiente",
@@ -202,6 +216,7 @@ const Entries = () => {
       setSelectedEntry(entry);
     }
     setModalMode(mode);
+    setInitialTab(tab);
     setShowModal(true);
   };
 
@@ -469,7 +484,8 @@ const Entries = () => {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
+              <div className="flex w-full flex-col gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2">
                 <WmsSearchBar
                   id="search-entry"
                   value={searchTerm}
@@ -484,42 +500,9 @@ const Entries = () => {
                     setSearchParams({});
                   }}
                   placeholder="Buscar por código, cliente, bin o sku…"
-                  className="!w-[300px] !min-w-[300px] !max-w-[300px] shrink-0"
+                  className="!w-[280px] !min-w-[220px] !max-w-full shrink-0"
                 />
-                <Form.Select
-                  id="filter-status"
-                  name="filter-status"
-                  size="sm"
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange("status", e.target.value)}
-                  aria-label="Filtrar por estado"
-                  className="!w-[150px] shrink-0"
-                  style={{ minWidth: "150px" }}
-                >
-                  <option value="">Estado</option>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Select
-                  id="filter-condition"
-                  name="filter-condition"
-                  size="sm"
-                  value={filters.condition}
-                  onChange={(e) => handleFilterChange("condition", e.target.value)}
-                  aria-label="Filtrar por condición"
-                  className="!w-[140px] shrink-0"
-                  style={{ minWidth: "140px" }}
-                >
-                  <option value="">Condición</option>
-                  {Object.entries(conditionLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Form.Select>
+                <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
                 {hasFilters && (
                   <Button
                     variant="outline"
@@ -527,12 +510,32 @@ const Entries = () => {
                     icon={FilterX}
                     onClick={clearFilters}
                     title="Limpiar filtros"
-                    className="shrink-0 whitespace-nowrap"
+                    className="whitespace-nowrap"
                   >
-                    Limpiar filtros
+                    Limpiar
                   </Button>
                 )}
-                <div className="ml-auto shrink-0 pl-2">
+                <Button
+                  variant={filtersOpen || hasFilters ? "secondary" : "outline"}
+                  size="sm"
+                  icon={Filter}
+                  onClick={() => setFiltersOpen((o) => !o)}
+                  title={filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
+                  className="whitespace-nowrap"
+                  aria-expanded={filtersOpen}
+                >
+                  Filtros{hasFilters ? ` (${Object.values(filters).filter(Boolean).length})` : ""}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={History}
+                  onClick={openHistory}
+                  title="Historial de movimientos"
+                  className="whitespace-nowrap"
+                >
+                  Historial
+                </Button>
                   {perms.add && (
                     <Button
                       variant="primary"
@@ -545,6 +548,52 @@ const Entries = () => {
                     </Button>
                   )}
                 </div>
+              </div>
+              <AnimatePresence initial={false}>
+                {filtersOpen ? (
+                  <motion.div
+                    key="entry-filters"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] p-1 pt-3 sm:grid-cols-2">
+                      <Form.Group className="mb-0">
+                        <Form.Label className="text-xs">Estado</Form.Label>
+                        <Select
+                          size="sm"
+                          isClearable
+                          options={Object.entries(statusLabels).map(([value, label]) => ({
+                            value,
+                            label,
+                          }))}
+                          value={filters.status}
+                          onChange={(e) =>
+                            handleFilterChange("status", e.target.value || "")
+                          }
+                        />
+                      </Form.Group>
+                      <Form.Group className="mb-0">
+                        <Form.Label className="text-xs">Condición</Form.Label>
+                        <Select
+                          size="sm"
+                          isClearable
+                          options={Object.entries(conditionLabels).map(([value, label]) => ({
+                            value,
+                            label,
+                          }))}
+                          value={filters.condition}
+                          onChange={(e) =>
+                            handleFilterChange("condition", e.target.value || "")
+                          }
+                        />
+                      </Form.Group>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
               </div>
             </Card.Header>
             <Card.Body className="p-0">
@@ -656,6 +705,16 @@ const Entries = () => {
                                     <Check className="h-4 w-4" />
                                   </IconButton>
                                 )}
+                              <IconButton
+                                size="sm"
+                                className="text-amber-600 hover:bg-amber-50"
+                                onClick={() =>
+                                  handleShowModal(entry, "view", "movements")
+                                }
+                                title="Ver historial"
+                              >
+                                <History className="h-4 w-4" />
+                              </IconButton>
                               <IconButton
                                 size="sm"
                                 className="text-sky-600 hover:bg-sky-50"
@@ -771,6 +830,28 @@ const Entries = () => {
         conditionLabels={conditionLabels}
         inTypeLabels={inTypeLabels}
         showAlert={showAlert}
+        initialTab={initialTab}
+      />
+
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="entry"
+        title="Historial de movimientos de entradas"
+        initialAction={historyType}
+        initialBatchId={historyBatch}
+        onOpenItem={async (item) => {
+          if (!item?.resource_id) return;
+          try {
+            const entry = await getEntry(item.resource_id);
+            handleShowModal(entry, "view", "movements");
+          } catch (err) {
+            showAlert(
+              "danger",
+              getApiErrorMessage(err, "No se pudo abrir la entrada."),
+            );
+          }
+        }}
       />
 
       <ModalConfirm

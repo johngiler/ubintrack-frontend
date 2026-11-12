@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
 import { ArrowRight, Merge } from "lucide-react";
 import Link from "next/link";
+import useSWRInfinite from "swr/infinite";
 
 import {
   ExitMovementIcon,
@@ -15,36 +15,31 @@ import {
   TimelineUser,
 } from "@/components/timeline/TimelineIcons";
 import { Badge } from "@/components/ui/bootstrap";
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import WmsFeedSkeleton from "@/components/wms/WmsFeedSkeleton";
-import VisibleSliceList from "@/components/ui/VisibleSliceList";
 import { formatDateTime } from "@/lib/format";
+import { swrInfiniteDefaults } from "@/lib/swr/infiniteDefaults";
+import { swrKeys } from "@/lib/swr/keys";
 import { getExitMovements } from "@/services/orderService";
 
+const PAGE_SIZE = 20;
 
-const ExitMovementsTimeline = ({ exitId }) => {
-  const [movements, setMovements] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+const ExitMovementsTimeline = ({ exitId, active }) => {
+  const enabled = Boolean(active && exitId);
+  const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite(
+    (pageIndex, previousPageData) => {
+      if (!enabled) return null;
+      if (previousPageData && !previousPageData.next) return null;
+      return swrKeys.exitMovements(exitId, pageIndex + 1, PAGE_SIZE);
+    },
+    ([, , page, pageSize]) => getExitMovements(exitId, page, pageSize),
+    swrInfiniteDefaults,
+  );
 
-  useEffect(() => {
-    if (exitId) {
-      loadMovements();
-    }
-  }, [exitId]);
-
-  const loadMovements = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getExitMovements(exitId);
-      setMovements(data.movements || []);
-    } catch (err) {
-      console.error("Error al cargar movimientos:", err);
-      setError("Error al cargar el historial de movimientos");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const pages = data || [];
+  const movements = pages.flatMap((p) => p.results || p.movements || []);
+  const total = pages[0]?.count ?? pages[0]?.total ?? 0;
+  const hasMore = Boolean(pages.length && pages[pages.length - 1]?.next);
 
   const getMovementTypeLabel = (movementType) => {
     const labelMap = {
@@ -154,6 +149,8 @@ const ExitMovementsTimeline = ({ exitId }) => {
     );
   };
 
+  if (!enabled) return null;
+
   if (isLoading) {
     return <WmsFeedSkeleton rows={5} className="py-2" />;
   }
@@ -161,7 +158,7 @@ const ExitMovementsTimeline = ({ exitId }) => {
   if (error) {
     return (
       <div className="alert alert-danger" role="alert">
-        {error}
+        No se pudo cargar el historial.
       </div>
     );
   }
@@ -176,9 +173,8 @@ const ExitMovementsTimeline = ({ exitId }) => {
   }
 
   return (
-    <VisibleSliceList items={movements} itemLabel="movimientos" className="wms-movements-timeline">
-      {(visibleMovements) =>
-        visibleMovements.map((movement) => (
+    <div className="wms-movements-timeline space-y-3">
+      {movements.map((movement) => (
         <div key={movement.id} className="timeline-item">
           <div className="timeline-icon">
             <ExitMovementIcon movementType={movement.movement_type} />
@@ -475,9 +471,16 @@ const ExitMovementsTimeline = ({ exitId }) => {
             )}
           </div>
         </div>
-      ))
-      }
-    </VisibleSliceList>
+      ))}
+      <LoadMoreFooter
+        hasMore={hasMore}
+        loading={isValidating && !isLoading}
+        onLoadMore={() => setSize(size + 1)}
+        loadedCount={movements.length}
+        totalCount={total}
+        itemLabel="movimientos"
+      />
+    </div>
   );
 };
 

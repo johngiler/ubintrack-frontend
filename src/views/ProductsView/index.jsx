@@ -1,8 +1,12 @@
 "use client";
 
-import { Fragment, useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback, useMemo } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import useSWR from "swr";
-import { ChevronDown, ChevronUp, Download, Eye, FilterX, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Eye, Filter, FilterX, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import ViewHistoryButton from "@/components/activity/ViewHistoryButton";
+import { useViewHistory } from "@/hooks/useViewHistory";
 import { useAuth } from "@/context/AuthContext";
 import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
@@ -16,6 +20,7 @@ import {
   Form,
   Table,
 } from "@/components/ui/bootstrap";
+import Select from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
@@ -42,6 +47,13 @@ export default function ProductsView() {
   const authUser = useAuth().user;
   const perms = canCRUD(authUser, "inventory", "product");
   const [searchParams, setSearchParams] = useWmsSearchParams();
+  const {
+    historyOpen,
+    historyType,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
@@ -51,6 +63,7 @@ export default function ProductsView() {
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get("search") || "");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [expandedInventory, setExpandedInventory] = useState({});
 
@@ -154,11 +167,26 @@ export default function ProductsView() {
     }
   };
 
-  const hasFilters =
-    Boolean(debouncedSearchTerm) ||
-    Boolean(filters.category) ||
-    Boolean(filters.rotation_type) ||
-    Boolean(filters.condition);
+  const activeFilterCount = [
+    filters.category,
+    filters.rotation_type,
+    filters.condition,
+  ].filter(Boolean).length;
+
+  const hasFilters = Boolean(debouncedSearchTerm) || activeFilterCount > 0;
+
+  const rotationOptions = useMemo(
+    () => Object.entries(rotationTypeLabels).map(([value, label]) => ({ value, label })),
+    [],
+  );
+  const conditionOptions = useMemo(
+    () => Object.entries(conditionLabels).map(([value, label]) => ({ value, label })),
+    [],
+  );
+  const categoryOptions = useMemo(
+    () => categories.map((category) => ({ value: String(category.id), label: category.name })),
+    [categories],
+  );
 
   return (
     <Fragment>
@@ -194,91 +222,107 @@ export default function ProductsView() {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
-                <WmsSearchBar
-                  id="search-product"
-                  value={searchTerm}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  onClear={() => handleSearchChange("")}
-                  placeholder="Buscar por nombre, SKU o cliente…"
-                  className="!w-[280px] !min-w-[280px] !max-w-[280px] shrink-0"
-                />
-                <Form.Select
-                  id="filter-rotation"
-                  name="filter-rotation"
-                  size="sm"
-                  value={filters.rotation_type}
-                  onChange={(e) => handleFilterChange("rotation_type", e.target.value)}
-                  aria-label="Filtrar por rotación"
-                  className="!w-[130px] shrink-0"
-                  style={{ minWidth: "130px" }}
-                >
-                  <option value="">Rotación</option>
-                  {Object.entries(rotationTypeLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Select
-                  id="filter-condition"
-                  name="filter-condition"
-                  size="sm"
-                  value={filters.condition}
-                  onChange={(e) => handleFilterChange("condition", e.target.value)}
-                  aria-label="Filtrar por condición"
-                  className="!w-[140px] shrink-0"
-                  style={{ minWidth: "140px" }}
-                >
-                  <option value="">Condición</option>
-                  {Object.entries(conditionLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Select
-                  id="filter-category"
-                  name="filter-category"
-                  size="sm"
-                  value={filters.category}
-                  onChange={(e) => handleFilterChange("category", e.target.value)}
-                  aria-label="Filtrar por categoría"
-                  className="!w-[160px] shrink-0"
-                  style={{ minWidth: "160px" }}
-                >
-                  <option value="">Categoría</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </Form.Select>
-                {hasFilters && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={FilterX}
-                    onClick={clearFilters}
-                    title="Limpiar filtros"
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                    Limpiar filtros
-                  </Button>
-                )}
-                <div className="ml-auto shrink-0 pl-2">
-                  {perms.add && (
+              <div className="flex w-full flex-col gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2">
+                  <WmsSearchBar
+                    id="search-product"
+                    value={searchTerm}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onClear={() => handleSearchChange("")}
+                    placeholder="Buscar por nombre, SKU o cliente…"
+                    className="!w-[280px] !min-w-[220px] !max-w-full shrink-0"
+                  />
+                  <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={FilterX}
+                        onClick={clearFilters}
+                        title="Limpiar filtros"
+                        className="whitespace-nowrap"
+                      >
+                        Limpiar
+                      </Button>
+                    )}
                     <Button
-                      variant="primary"
+                      variant={filtersOpen || activeFilterCount > 0 ? "secondary" : "outline"}
                       size="sm"
-                      icon={Plus}
+                      icon={Filter}
+                      onClick={() => setFiltersOpen((open) => !open)}
+                      title={filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
                       className="whitespace-nowrap"
-                      onClick={handleNewProduct}
+                      aria-expanded={filtersOpen}
                     >
-                      Nuevo producto
+                      Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                     </Button>
-                  )}
+                    <ViewHistoryButton onClick={openHistory} />
+                    {perms.add && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={Plus}
+                        className="whitespace-nowrap"
+                        onClick={handleNewProduct}
+                      >
+                        Nuevo producto
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {filtersOpen ? (
+                    <motion.div
+                      key="products-filters"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      {/* p-1: el anillo de focus de react-select no debe quedar recortado por overflow-hidden */}
+                      <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] p-1 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Rotación</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por rotación"
+                            placeholder="Todas"
+                            options={rotationOptions}
+                            value={filters.rotation_type}
+                            onChange={(e) => handleFilterChange("rotation_type", e.target.value || "")}
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Condición</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por condición"
+                            placeholder="Todas"
+                            options={conditionOptions}
+                            value={filters.condition}
+                            onChange={(e) => handleFilterChange("condition", e.target.value || "")}
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Categoría</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por categoría"
+                            placeholder="Todas"
+                            options={categoryOptions}
+                            value={filters.category}
+                            onChange={(e) => handleFilterChange("category", e.target.value || "")}
+                          />
+                        </Form.Group>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </div>
             </Card.Header>
 
@@ -481,6 +525,15 @@ export default function ProductsView() {
         product={selectedProduct}
         onDelete={loadProducts}
         showAlert={showAlertMessage}
+      />
+
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="product"
+        title="Historial de movimientos de productos"
+        initialAction={historyType}
+        initialBatchId={historyBatch}
       />
     </Fragment>
   );

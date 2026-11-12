@@ -3,6 +3,10 @@
 import { Fragment, useState, useEffect, useCallback } from "react";
 import useSWR from "swr";
 import { Building, Eye, FilterX, Pencil, Plus, Trash2 } from "lucide-react";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import ViewHistoryButton from "@/components/activity/ViewHistoryButton";
+import { useViewHistory } from "@/hooks/useViewHistory";
+import { useWmsSearchParams } from "@/hooks/useWmsRouter";
 import { useAuth } from "@/context/AuthContext";
 import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
@@ -45,6 +49,14 @@ function formatCount(value) {
 
 export default function CavasView() {
   const user = useAuth().user;
+  const [searchParams, setSearchParams] = useWmsSearchParams();
+  const {
+    historyOpen,
+    historyType,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
   const perms = canCRUD(user, "storage", "cava");
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -166,7 +178,8 @@ export default function CavasView() {
                     Limpiar filtros
                   </Button>
                 )}
-                <div className="ml-auto shrink-0 pl-2">
+                <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2 pl-2">
+                  <ViewHistoryButton onClick={openHistory} />
                   {perms.add && (
                     <Button
                       variant="primary"
@@ -378,6 +391,15 @@ export default function CavasView() {
         cava={selectedCava}
         onDelete={refreshCavas}
         showAlert={showAlertMessage}
+      />
+
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="cava"
+        title="Historial de movimientos de cavas"
+        initialAction={historyType}
+        initialBatchId={historyBatch}
       />
     </Fragment>
   );

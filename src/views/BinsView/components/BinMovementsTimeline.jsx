@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import useSWRInfinite from "swr/infinite";
 
 import {
   BinMovementIcon,
@@ -17,36 +17,31 @@ import {
   TimelineUser,
 } from "@/components/timeline/TimelineIcons";
 import { Badge } from "@/components/ui/bootstrap";
+import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import WmsFeedSkeleton from "@/components/wms/WmsFeedSkeleton";
-import VisibleSliceList from "@/components/ui/VisibleSliceList";
 import { formatDateTime } from "@/lib/format";
+import { swrInfiniteDefaults } from "@/lib/swr/infiniteDefaults";
+import { swrKeys } from "@/lib/swr/keys";
 import { getBinMovements } from "@/services/inventoryService";
 
+const PAGE_SIZE = 20;
 
-const BinMovementsTimeline = ({ binId }) => {
-  const [movements, setMovements] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+const BinMovementsTimeline = ({ binId, active }) => {
+  const enabled = Boolean(active && binId);
+  const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite(
+    (pageIndex, previousPageData) => {
+      if (!enabled) return null;
+      if (previousPageData && !previousPageData.next) return null;
+      return swrKeys.binMovements(binId, pageIndex + 1, PAGE_SIZE);
+    },
+    ([, , page, pageSize]) => getBinMovements(binId, page, pageSize),
+    swrInfiniteDefaults,
+  );
 
-  useEffect(() => {
-    if (binId) {
-      loadMovements();
-    }
-  }, [binId]);
-
-  const loadMovements = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getBinMovements(binId);
-      setMovements(data.movements || []);
-    } catch (err) {
-      console.error("Error al cargar movimientos:", err);
-      setError("Error al cargar el historial de movimientos");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const pages = data || [];
+  const movements = pages.flatMap((p) => p.results || p.movements || []);
+  const total = pages[0]?.count ?? pages[0]?.total ?? 0;
+  const hasMore = Boolean(pages.length && pages[pages.length - 1]?.next);
 
   const getMovementTypeLabel = (movementType, newStatus) => {
     if (movementType === "created") return "Bin Creado";
@@ -124,6 +119,25 @@ const BinMovementsTimeline = ({ binId }) => {
     </div>
   );
 
+  const PositionLink = ({ positionCode }) => {
+    if (!positionCode) return <span className="text-muted">-</span>;
+    return (
+      <Link
+        href={`/storage/positions?search=${positionCode}`}
+        className="text-decoration-none link-badge"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Badge bg="info">
+          <TimelineMapPin className={`${inlineIconClass} me-1`} />
+          {positionCode}
+          <TimelineExternalLink className={`${inlineIconClass} ms-1`} />
+        </Badge>
+      </Link>
+    );
+  };
+
+  if (!enabled) return null;
+
   if (isLoading) {
     return <WmsFeedSkeleton rows={5} className="py-2" />;
   }
@@ -131,7 +145,7 @@ const BinMovementsTimeline = ({ binId }) => {
   if (error) {
     return (
       <div className="alert alert-danger" role="alert">
-        {error}
+        No se pudo cargar el historial.
       </div>
     );
   }
@@ -146,9 +160,8 @@ const BinMovementsTimeline = ({ binId }) => {
   }
 
   return (
-    <VisibleSliceList items={movements} itemLabel="movimientos" className="wms-movements-timeline">
-      {(visibleMovements) =>
-        visibleMovements.map((movement) => (
+    <div className="wms-movements-timeline space-y-3">
+      {movements.map((movement) => (
         <div key={movement.id} className="timeline-item">
           <div className="timeline-icon">
             <BinMovementIcon
@@ -448,11 +461,12 @@ const BinMovementsTimeline = ({ binId }) => {
                     </InfoField>
                   )}
 
-                  {movement.position && (
+                  {(movement.position?.code || movement.position_code) && (
                     <InfoField label="Posición Restaurada">
                       <PositionLink
-                        positionCode={movement.position?.code}
-                        positionId={movement.position?.id}
+                        positionCode={
+                          movement.position?.code || movement.position_code
+                        }
                       />
                     </InfoField>
                   )}
@@ -610,9 +624,16 @@ const BinMovementsTimeline = ({ binId }) => {
               )}
           </div>
         </div>
-      ))
-      }
-    </VisibleSliceList>
+      ))}
+      <LoadMoreFooter
+        hasMore={hasMore}
+        loading={isValidating && !isLoading}
+        onLoadMore={() => setSize(size + 1)}
+        loadedCount={movements.length}
+        totalCount={total}
+        itemLabel="movimientos"
+      />
+    </div>
   );
 };
 

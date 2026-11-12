@@ -1,17 +1,22 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ChevronDown,
   ChevronUp,
   DollarSign,
   Eye,
+  Filter,
   FilterX,
   Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import ViewHistoryButton from "@/components/activity/ViewHistoryButton";
+import { useViewHistory } from "@/hooks/useViewHistory";
+import { useWmsSearchParams } from "@/hooks/useWmsRouter";
 import { useAuth } from "@/context/AuthContext";
 import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
@@ -25,6 +30,7 @@ import {
   Form,
   Table,
 } from "@/components/ui/bootstrap";
+import Select from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
@@ -46,7 +52,14 @@ const EMPTY_FILTERS = {
 
 export default function TariffsView() {
   const user = useAuth().user;
-  const searchParams = useSearchParams();
+  const [searchParams, setSearchParams] = useWmsSearchParams();
+  const {
+    historyOpen,
+    historyType,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
   const perms = canCRUD(user, "finance", "tariff");
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,6 +70,7 @@ export default function TariffsView() {
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [expandedTariffId, setExpandedTariffId] = useState(null);
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
@@ -124,8 +138,16 @@ export default function TariffsView() {
     setExpandedTariffId((prev) => (prev === tariffId ? null : tariffId));
   };
 
-  const hasFilters =
-    Boolean(debouncedSearchTerm) || Boolean(filters.has_picking_tariff);
+  const activeFilterCount = [
+    filters.has_picking_tariff,
+  ].filter(Boolean).length;
+
+  const hasFilters = Boolean(debouncedSearchTerm) || activeFilterCount > 0;
+
+  const pickingOptions = [
+    { value: "true", label: "Con tarifa picking" },
+    { value: "false", label: "Sin tarifa picking" },
+  ];
 
   return (
     <Fragment>
@@ -149,54 +171,83 @@ export default function TariffsView() {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
-                <WmsSearchBar
-                  id="search-tariff"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onClear={() => setSearchTerm("")}
-                  placeholder="Buscar por nombre…"
-                  className="!w-[240px] !min-w-[240px] !max-w-[240px] shrink-0"
-                />
-                <Form.Select
-                  id="filter-tariff-picking"
-                  name="filter-tariff-picking"
-                  size="sm"
-                  value={filters.has_picking_tariff}
-                  onChange={(e) => handleFilterChange("has_picking_tariff", e.target.value)}
-                  aria-label="Filtrar por picking"
-                  className="!w-[170px] shrink-0"
-                  style={{ minWidth: "170px" }}
-                >
-                  <option value="">Todos (picking)</option>
-                  <option value="true">Con tarifa picking</option>
-                  <option value="false">Sin tarifa picking</option>
-                </Form.Select>
-                {hasFilters && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={FilterX}
-                    onClick={clearFilters}
-                    title="Limpiar filtros"
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                    Limpiar filtros
-                  </Button>
-                )}
-                <div className="ml-auto shrink-0 pl-2">
-                  {perms.add && (
+              <div className="flex w-full flex-col gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2">
+                  <WmsSearchBar
+                    id="search-tariff"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onClear={() => setSearchTerm("")}
+                    placeholder="Buscar por nombre…"
+                    className="!w-[280px] !min-w-[220px] !max-w-full shrink-0"
+                  />
+                  <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={FilterX}
+                        onClick={clearFilters}
+                        title="Limpiar filtros"
+                        className="whitespace-nowrap"
+                      >
+                        Limpiar
+                      </Button>
+                    )}
                     <Button
-                      variant="primary"
+                      variant={filtersOpen || activeFilterCount > 0 ? "secondary" : "outline"}
                       size="sm"
-                      icon={Plus}
+                      icon={Filter}
+                      onClick={() => setFiltersOpen((open) => !open)}
+                      title={filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
                       className="whitespace-nowrap"
-                      onClick={handleNewTariff}
+                      aria-expanded={filtersOpen}
                     >
-                      Nueva tarifa
+                      Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                     </Button>
-                  )}
+                    <ViewHistoryButton onClick={openHistory} />
+                    {perms.add && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={Plus}
+                        className="whitespace-nowrap"
+                        onClick={handleNewTariff}
+                      >
+                        Nueva tarifa
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {filtersOpen ? (
+                    <motion.div
+                      key="tariffs-filters"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      {/* p-1: el anillo de focus de react-select no debe quedar recortado por overflow-hidden */}
+                      <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] p-1 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Picking</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por picking"
+                            placeholder="Todos"
+                            options={pickingOptions}
+                            value={filters.has_picking_tariff}
+                            onChange={(e) => handleFilterChange("has_picking_tariff", e.target.value || "")}
+                          />
+                        </Form.Group>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </div>
             </Card.Header>
 
@@ -394,6 +445,15 @@ export default function TariffsView() {
         tariff={selectedTariff}
         onDelete={loadTariffs}
         showAlert={showAlertMessage}
+      />
+
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="tariff"
+        title="Historial de movimientos de tarifas"
+        initialAction={historyType}
+        initialBatchId={historyBatch}
       />
     </Fragment>
   );

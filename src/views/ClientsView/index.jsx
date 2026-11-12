@@ -1,8 +1,13 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import useSWR from "swr";
-import { Download, Eye, FilterX, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Download, Eye, Filter, FilterX, Pencil, Plus, Trash2, Users } from "lucide-react";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import ViewHistoryButton from "@/components/activity/ViewHistoryButton";
+import { useViewHistory } from "@/hooks/useViewHistory";
+import { useWmsSearchParams } from "@/hooks/useWmsRouter";
 import { useAuth } from "@/context/AuthContext";
 import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 
@@ -16,6 +21,7 @@ import {
   Form,
   Table,
 } from "@/components/ui/bootstrap";
+import Select from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
@@ -38,6 +44,14 @@ const EMPTY_FILTERS = {
 
 export default function ClientsView() {
   const user = useAuth().user;
+  const [searchParams, setSearchParams] = useWmsSearchParams();
+  const {
+    historyOpen,
+    historyType,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
   const perms = canCRUD(user, "core", "client");
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -48,6 +62,7 @@ export default function ClientsView() {
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
@@ -128,8 +143,21 @@ export default function ClientsView() {
     }
   };
 
-  const hasFilters =
-    Boolean(debouncedSearchTerm) || Boolean(filters.is_active) || Boolean(filters.tariff);
+  const activeFilterCount = [
+    filters.tariff,
+    filters.is_active,
+  ].filter(Boolean).length;
+
+  const hasFilters = Boolean(debouncedSearchTerm) || activeFilterCount > 0;
+
+  const tariffOptions = [
+    { value: "none", label: "Sin tarifa" },
+    ...tariffs.map((tariff) => ({ value: String(tariff.id), label: tariff.name })),
+  ];
+  const statusOptions = [
+    { value: "true", label: "Activo" },
+    { value: "false", label: "Inactivo" },
+  ];
 
   return (
     <Fragment>
@@ -165,72 +193,95 @@ export default function ClientsView() {
         <Col xl={12}>
           <Card className="custom-card">
             <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-              <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
-                <WmsSearchBar
-                  id="search-client"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onClear={() => setSearchTerm("")}
-                  placeholder="Buscar cliente"
-                  className="!w-[220px] !min-w-[220px] !max-w-[220px] shrink-0"
-                />
-                <Form.Select
-                  id="filter-client-tariff"
-                  name="filter-client-tariff"
-                  size="sm"
-                  value={filters.tariff}
-                  onChange={(e) => handleFilterChange("tariff", e.target.value)}
-                  aria-label="Filtrar por tarifa"
-                  className="!w-[150px] shrink-0"
-                  style={{ minWidth: "150px" }}
-                >
-                  <option value="">Todas las tarifas</option>
-                  <option value="none">Sin tarifa</option>
-                  {tariffs.map((tariff) => (
-                    <option key={tariff.id} value={tariff.id}>
-                      {tariff.name}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Select
-                  id="filter-client-status"
-                  name="filter-client-status"
-                  size="sm"
-                  value={filters.is_active}
-                  onChange={(e) => handleFilterChange("is_active", e.target.value)}
-                  aria-label="Filtrar por estado"
-                  className="!w-[140px] shrink-0"
-                  style={{ minWidth: "140px" }}
-                >
-                  <option value="">Todos los estados</option>
-                  <option value="true">Activo</option>
-                  <option value="false">Inactivo</option>
-                </Form.Select>
-                {hasFilters && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={FilterX}
-                    onClick={clearFilters}
-                    title="Limpiar filtros"
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                    Limpiar filtros
-                  </Button>
-                )}
-                <div className="ml-auto shrink-0 pl-2">
-                  {perms.add && (
+              <div className="flex w-full flex-col gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2">
+                  <WmsSearchBar
+                    id="search-client"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onClear={() => setSearchTerm("")}
+                    placeholder="Buscar cliente"
+                    className="!w-[280px] !min-w-[220px] !max-w-full shrink-0"
+                  />
+                  <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={FilterX}
+                        onClick={clearFilters}
+                        title="Limpiar filtros"
+                        className="whitespace-nowrap"
+                      >
+                        Limpiar
+                      </Button>
+                    )}
                     <Button
-                      variant="primary"
+                      variant={filtersOpen || activeFilterCount > 0 ? "secondary" : "outline"}
                       size="sm"
-                      icon={Plus}
+                      icon={Filter}
+                      onClick={() => setFiltersOpen((open) => !open)}
+                      title={filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
                       className="whitespace-nowrap"
-                      onClick={handleNewClient}
+                      aria-expanded={filtersOpen}
                     >
-                      Nuevo cliente
+                      Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                     </Button>
-                  )}
+                    <ViewHistoryButton onClick={openHistory} />
+                    {perms.add && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={Plus}
+                        className="whitespace-nowrap"
+                        onClick={handleNewClient}
+                      >
+                        Nuevo cliente
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {filtersOpen ? (
+                    <motion.div
+                      key="clients-filters"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      {/* p-1: el anillo de focus de react-select no debe quedar recortado por overflow-hidden */}
+                      <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] p-1 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Tarifa</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por tarifa"
+                            placeholder="Todas"
+                            options={tariffOptions}
+                            value={filters.tariff}
+                            onChange={(e) => handleFilterChange("tariff", e.target.value || "")}
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="text-xs">Estado</Form.Label>
+                          <Select
+                            size="sm"
+                            isClearable
+                            aria-label="Filtrar por estado"
+                            placeholder="Todos"
+                            options={statusOptions}
+                            value={filters.is_active}
+                            onChange={(e) => handleFilterChange("is_active", e.target.value || "")}
+                          />
+                        </Form.Group>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </div>
             </Card.Header>
 
@@ -414,6 +465,15 @@ export default function ClientsView() {
         client={selectedClient}
         onDelete={loadClients}
         showAlert={showAlertMessage}
+      />
+
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="client"
+        title="Historial de movimientos de clientes"
+        initialAction={historyType}
+        initialBatchId={historyBatch}
       />
     </Fragment>
   );

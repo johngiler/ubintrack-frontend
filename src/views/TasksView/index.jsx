@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowDown,
   ArrowUp,
@@ -8,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
+  Filter,
   FilterX,
   ListTodo,
   Pencil,
@@ -22,9 +24,11 @@ import {
   Alert,
   Button,
   Card,
+  Form,
   Pagination,
   Table,
 } from "@/components/ui/bootstrap";
+import Select from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/Button";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
@@ -59,9 +63,6 @@ const EMPTY_FILTERS = {
   priority: "",
 };
 
-const filterSelectClass =
-  "h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700";
-
 export default function TasksView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "task", "task");
@@ -74,6 +75,7 @@ export default function TasksView() {
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [expandedLogs, setExpandedLogs] = useState({});
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 400);
@@ -148,11 +150,21 @@ export default function TasksView() {
     setFilters(EMPTY_FILTERS);
   };
 
-  const hasFilters =
-    Boolean(debouncedSearchTerm) ||
-    Boolean(filters.task_type) ||
-    Boolean(filters.status) ||
-    Boolean(filters.priority);
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const activeFilterCount = [
+    filters.task_type,
+    filters.status,
+    filters.priority,
+  ].filter(Boolean).length;
+
+  const hasFilters = Boolean(debouncedSearchTerm) || activeFilterCount > 0;
+
+  const typeOptions = Object.entries(TASK_TYPE_LABELS).map(([value, label]) => ({ value, label }));
+  const statusOptions = Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({ value, label }));
+  const priorityOptions = Object.entries(TASK_PRIORITY_LABELS).map(([value, label]) => ({ value, label }));
 
   return (
     <Fragment>
@@ -174,70 +186,106 @@ export default function TasksView() {
 
       <Card>
         <Card.Header className="border-b border-[var(--border-subtle)] bg-[var(--surface-hover)]/20 px-4 py-3">
-          <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
-            <WmsSearchBar
-              id="search-task"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onClear={() => setSearchTerm("")}
-              placeholder="Buscar por código u observaciones"
-              className="min-w-[220px] flex-1"
-            />
-            <select
-              className={filterSelectClass}
-              value={filters.task_type}
-              aria-label="Filtrar por tipo"
-              onChange={(e) => setFilters((prev) => ({ ...prev, task_type: e.target.value }))}
-            >
-              <option value="">Todos los tipos</option>
-              {Object.entries(TASK_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              className={filterSelectClass}
-              value={filters.status}
-              aria-label="Filtrar por estado"
-              onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-            >
-              <option value="">Todos los estados</option>
-              {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              className={filterSelectClass}
-              value={filters.priority}
-              aria-label="Filtrar por prioridad"
-              onChange={(e) => setFilters((prev) => ({ ...prev, priority: e.target.value }))}
-            >
-              <option value="">Todas las prioridades</option>
-              {Object.entries(TASK_PRIORITY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            {hasFilters ? (
-              <Button variant="outline" size="sm" icon={FilterX} onClick={clearFilters}>
-                Limpiar
-              </Button>
-            ) : null}
-            {perms.add ? (
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Plus}
-                className="ml-auto shrink-0"
-                onClick={() => handleShowModal({ ...EMPTY_TASK }, "edit")}
-              >
-                Nueva tarea
-              </Button>
-            ) : null}
+          <div className="flex w-full flex-col gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <WmsSearchBar
+                id="search-task"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onClear={() => setSearchTerm("")}
+                placeholder="Buscar por código u observaciones"
+                className="!w-[280px] !min-w-[220px] !max-w-full shrink-0"
+              />
+              <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                {activeFilterCount > 0 ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={FilterX}
+                    onClick={clearFilters}
+                    title="Limpiar filtros"
+                    className="whitespace-nowrap"
+                  >
+                    Limpiar
+                  </Button>
+                ) : null}
+                <Button
+                  variant={filtersOpen || activeFilterCount > 0 ? "secondary" : "outline"}
+                  size="sm"
+                  icon={Filter}
+                  onClick={() => setFiltersOpen((open) => !open)}
+                  title={filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
+                  className="whitespace-nowrap"
+                  aria-expanded={filtersOpen}
+                >
+                  Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                </Button>
+                {perms.add ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={Plus}
+                    className="whitespace-nowrap"
+                    onClick={() => handleShowModal({ ...EMPTY_TASK }, "edit")}
+                  >
+                    Nueva tarea
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {filtersOpen ? (
+                <motion.div
+                  key="tasks-filters"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="overflow-hidden"
+                >
+                  {/* p-1: el anillo de focus de react-select no debe quedar recortado por overflow-hidden */}
+                  <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] p-1 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <Form.Group className="mb-0">
+                      <Form.Label className="text-xs">Tipo</Form.Label>
+                      <Select
+                        size="sm"
+                        isClearable
+                        aria-label="Filtrar por tipo"
+                        placeholder="Todos"
+                        options={typeOptions}
+                        value={filters.task_type}
+                        onChange={(e) => handleFilterChange("task_type", e.target.value || "")}
+                      />
+                    </Form.Group>
+                    <Form.Group className="mb-0">
+                      <Form.Label className="text-xs">Estado</Form.Label>
+                      <Select
+                        size="sm"
+                        isClearable
+                        aria-label="Filtrar por estado"
+                        placeholder="Todos"
+                        options={statusOptions}
+                        value={filters.status}
+                        onChange={(e) => handleFilterChange("status", e.target.value || "")}
+                      />
+                    </Form.Group>
+                    <Form.Group className="mb-0">
+                      <Form.Label className="text-xs">Prioridad</Form.Label>
+                      <Select
+                        size="sm"
+                        isClearable
+                        aria-label="Filtrar por prioridad"
+                        placeholder="Todas"
+                        options={priorityOptions}
+                        value={filters.priority}
+                        onChange={(e) => handleFilterChange("priority", e.target.value || "")}
+                      />
+                    </Form.Group>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </div>
         </Card.Header>
 

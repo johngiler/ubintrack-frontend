@@ -175,6 +175,13 @@ export async function getCellPositions({
   return response.data;
 }
 
+export async function getPositionMovements(positionId, page = 1, pageSize = 20) {
+  const response = await httpClient.get(
+    `/api/positions/${positionId}/movements/?page=${page}&page_size=${pageSize}`,
+  );
+  return response.data;
+}
+
 export async function getPosition(id) {
   const response = await httpClient.get(`/api/positions/${id}/`);
   return response.data;
