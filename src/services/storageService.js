@@ -245,10 +245,17 @@ export async function bulkDeletePositions(ids) {
   return response.data;
 }
 
-export async function bulkPrintPositions(ids) {
+export async function bulkPrintPositions(
+  ids,
+  { perLabel = 1, samePositionCopies = false } = {},
+) {
   const response = await httpClient.post(
     "/api/positions/bulk-print/",
-    { ids },
+    {
+      ids,
+      per_label: perLabel,
+      same_position_copies: Boolean(samePositionCopies),
+    },
     { timeout: 60000 },
   );
   return response.data;
