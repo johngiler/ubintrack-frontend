@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2, ImageIcon, Save } from "lucide-react";
 
 import { Alert, Button, Card, Col, Form, Row } from "@/components/ui/bootstrap";
+import Select from "@/components/ui/Select";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -26,6 +27,8 @@ const GRADIENT_MODE_OPTIONS = [
   { value: SIDEBAR_LOGO_GRADIENT_MODES.BOTH, label: "Ambos modos" },
 ];
 
+const PRINTER_LANGUAGE_OPTIONS = [{ value: "zpl", label: "ZPL" }];
+
 const EMPTY_FORM = {
   name: "",
   legal_name: "",
@@ -38,7 +41,41 @@ const EMPTY_FORM = {
   app_tagline: "",
   invoice_prefix: "",
   sidebar_logo_gradient_mode: SIDEBAR_LOGO_GRADIENT_MODES.NONE,
+  printer_ip: "",
+  printer_port: 9100,
+  label_width_in: "4.00",
+  label_height_in: "2.00",
+  printer_dpi: 203,
+  printer_language: "zpl",
 };
+
+function formFromWorkspace(data) {
+  return {
+    name: data.name || "",
+    legal_name: data.legal_name || "",
+    rif: data.rif || "",
+    primary_color: data.primary_color || "",
+    secondary_color: data.secondary_color || "",
+    support_email: data.support_email || "",
+    phone: data.phone || "",
+    app_title: data.app_title || "",
+    app_tagline: data.app_tagline || "",
+    invoice_prefix: data.invoice_prefix || "",
+    sidebar_logo_gradient_mode: normalizeSidebarLogoGradientMode(data),
+    printer_ip: data.printer_ip || "",
+    printer_port: data.printer_port ?? 9100,
+    label_width_in:
+      data.label_width_in != null && data.label_width_in !== ""
+        ? String(data.label_width_in)
+        : "4.00",
+    label_height_in:
+      data.label_height_in != null && data.label_height_in !== ""
+        ? String(data.label_height_in)
+        : "2.00",
+    printer_dpi: data.printer_dpi ?? 203,
+    printer_language: data.printer_language || "zpl",
+  };
+}
 
 function ReadOnlyField({ label, value, hint }) {
   return (
@@ -125,19 +162,7 @@ export default function OwnerSettingsView() {
         const data = await getOwnerSettings();
         if (!active) return;
         setSlug(data.slug || "");
-        setForm({
-          name: data.name || "",
-          legal_name: data.legal_name || "",
-          rif: data.rif || "",
-          primary_color: data.primary_color || "",
-          secondary_color: data.secondary_color || "",
-          support_email: data.support_email || "",
-          phone: data.phone || "",
-          app_title: data.app_title || "",
-          app_tagline: data.app_tagline || "",
-          invoice_prefix: data.invoice_prefix || "",
-          sidebar_logo_gradient_mode: normalizeSidebarLogoGradientMode(data),
-        });
+        setForm(formFromWorkspace(data));
         setMediaUrls({
           logo_url: data.logo_url || null,
           logo_mark_url: data.logo_mark_url || null,
@@ -163,6 +188,16 @@ export default function OwnerSettingsView() {
     setSuccess(null);
   };
 
+  const buildSavePayload = () => {
+    const base = { ...form };
+    base.printer_port = Number(form.printer_port) || 9100;
+    base.printer_dpi = Number(form.printer_dpi) || 203;
+    base.label_width_in = form.label_width_in || "4.00";
+    base.label_height_in = form.label_height_in || "2.00";
+    base.printer_language = form.printer_language || "zpl";
+    return base;
+  };
+
   const handleFileChange = (field) => (event) => {
     const file = event.target.files?.[0] || null;
     setFiles((prev) => ({ ...prev, [field]: file }));
@@ -177,11 +212,12 @@ export default function OwnerSettingsView() {
 
     try {
       const hasFiles = Boolean(files.logo || files.logo_mark || files.favicon);
+      const formPayload = buildSavePayload();
       let payload;
 
       if (hasFiles) {
         payload = new FormData();
-        Object.entries(form).forEach(([key, value]) => {
+        Object.entries(formPayload).forEach(([key, value]) => {
           if (typeof value === "boolean") {
             payload.append(key, value ? "true" : "false");
           } else {
@@ -192,23 +228,11 @@ export default function OwnerSettingsView() {
         if (files.logo_mark) payload.append("logo_mark", files.logo_mark);
         if (files.favicon) payload.append("favicon", files.favicon);
       } else {
-        payload = { ...form };
+        payload = formPayload;
       }
 
       const updated = await updateOwnerSettings(payload);
-      setForm({
-        name: updated.name || "",
-        legal_name: updated.legal_name || "",
-        rif: updated.rif || "",
-        primary_color: updated.primary_color || "",
-        secondary_color: updated.secondary_color || "",
-        support_email: updated.support_email || "",
-        phone: updated.phone || "",
-        app_title: updated.app_title || "",
-        app_tagline: updated.app_tagline || "",
-        invoice_prefix: updated.invoice_prefix || "",
-        sidebar_logo_gradient_mode: normalizeSidebarLogoGradientMode(updated),
-      });
+      setForm(formFromWorkspace(updated));
       setMediaUrls({
         logo_url: updated.logo_url || null,
         logo_mark_url: updated.logo_mark_url || null,
@@ -480,6 +504,106 @@ export default function OwnerSettingsView() {
                           onChange={handleChange}
                           placeholder="Ej. ACME"
                         />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            <Col xl={12}>
+              <Card className="mb-4">
+                <Card.Header>
+                  <h2 className="mb-0 text-base font-semibold text-[var(--foreground)]">Impresora</h2>
+                </Card.Header>
+                <Card.Body>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label htmlFor="printer_ip">IP o host</Form.Label>
+                        <Form.Control
+                          id="printer_ip"
+                          name="printer_ip"
+                          value={form.printer_ip}
+                          onChange={handleChange}
+                          placeholder="192.168.1.50"
+                          autoComplete="off"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label htmlFor="printer_port">Puerto</Form.Label>
+                        <Form.Control
+                          id="printer_port"
+                          name="printer_port"
+                          type="number"
+                          min={1}
+                          max={65535}
+                          value={form.printer_port}
+                          onChange={handleChange}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label htmlFor="label_width_in">Ancho (pulgadas)</Form.Label>
+                        <Form.Control
+                          id="label_width_in"
+                          name="label_width_in"
+                          type="number"
+                          min={0.5}
+                          max={12}
+                          step={0.01}
+                          value={form.label_width_in}
+                          onChange={handleChange}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label htmlFor="label_height_in">Alto (pulgadas)</Form.Label>
+                        <Form.Control
+                          id="label_height_in"
+                          name="label_height_in"
+                          type="number"
+                          min={0.5}
+                          max={12}
+                          step={0.01}
+                          value={form.label_height_in}
+                          onChange={handleChange}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label htmlFor="printer_dpi">DPI</Form.Label>
+                        <Form.Control
+                          id="printer_dpi"
+                          name="printer_dpi"
+                          type="number"
+                          min={72}
+                          max={600}
+                          value={form.printer_dpi}
+                          onChange={handleChange}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-0">
+                        <Form.Label htmlFor="printer_language">Lenguaje</Form.Label>
+                        <Select
+                          inputId="printer_language"
+                          name="printer_language"
+                          options={PRINTER_LANGUAGE_OPTIONS}
+                          value={form.printer_language || "zpl"}
+                          onChange={handleChange}
+                          isClearable={false}
+                          isSearchable={false}
+                        />
+                        <Form.Text className="text-[var(--foreground-muted)]">
+                          Si cambias medida o DPI, regenera las etiquetas en posiciones y bins.
+                        </Form.Text>
                       </Form.Group>
                     </Col>
                   </Row>

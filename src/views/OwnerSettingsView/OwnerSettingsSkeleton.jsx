@@ -26,6 +26,7 @@ export default function OwnerSettingsSkeleton() {
       <SettingsCard titleWidth={120} fields={4} />
       <SettingsCard titleWidth={160} fields={4} />
       <SettingsCard titleWidth={180} fields={4} />
+      <SettingsCard titleWidth={100} fields={6} />
       <div className="flex justify-end">
         <Skeleton className="h-10 w-36 rounded-xl" />
       </div>
