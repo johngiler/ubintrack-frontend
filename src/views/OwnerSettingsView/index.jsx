@@ -602,7 +602,8 @@ export default function OwnerSettingsView() {
                           isSearchable={false}
                         />
                         <Form.Text className="text-[var(--foreground-muted)]">
-                          Si cambias medida o DPI, regenera las etiquetas en posiciones y bins.
+                          IP, puerto y lenguaje son obligatorios para imprimir. Si cambias
+                          medida o DPI, regenera las etiquetas en posiciones y bins.
                         </Form.Text>
                       </Form.Group>
                     </Col>
