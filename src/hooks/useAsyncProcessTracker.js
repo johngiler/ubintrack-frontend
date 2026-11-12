@@ -173,11 +173,20 @@ export function useAsyncProcessTracker(scope, { onSettled } = {}) {
     }
   }, [jobs, watchJob]);
 
+  const hasKind = useCallback(
+    (kind) => {
+      if (!kind) return false;
+      return jobs.some((job) => job.kind === kind);
+    },
+    [jobs],
+  );
+
   return {
     jobs,
     start,
     finish,
     clear,
+    hasKind,
     isBusy: jobs.length > 0,
   };
 }

@@ -559,6 +559,7 @@ export default function PositionsView() {
                         onClick={() => setShowBulkRegenerateModal(true)}
                         title="Regenerar QR seleccionados"
                         className="shrink-0 whitespace-nowrap"
+                        disabled={asyncProcess.hasKind("position_regenerate_tags")}
                       >
                         Regenerar etiquetas
                       </Button>
@@ -575,6 +576,7 @@ export default function PositionsView() {
                         onClick={() => setShowBulkPrintModal(true)}
                         title="Imprimir etiquetas seleccionadas"
                         className="shrink-0 whitespace-nowrap"
+                        disabled={asyncProcess.hasKind("position_print")}
                       >
                         Imprimir
                       </Button>
@@ -587,6 +589,7 @@ export default function PositionsView() {
                         onClick={openBulkDelete}
                         title="Eliminar posiciones seleccionadas"
                         className="shrink-0 whitespace-nowrap"
+                        disabled={asyncProcess.hasKind("position_delete")}
                       >
                         Eliminar
                       </Button>

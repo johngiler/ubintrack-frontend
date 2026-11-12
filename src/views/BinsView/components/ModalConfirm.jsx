@@ -94,7 +94,10 @@ export default function ModalConfirm({
           variant="danger"
           icon={Trash2}
           onClick={handleDelete}
-          disabled={isDeleting}
+          disabled={
+            isDeleting ||
+            (isBulk && trackAsyncJob?.hasKind?.("bin_delete"))
+          }
           loading={isDeleting}
         >
           {isDeleting ? "Eliminando…" : "Eliminar"}

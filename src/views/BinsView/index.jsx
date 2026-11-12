@@ -764,6 +764,7 @@ const BinsView = () => {
                         onClick={() => setShowBulkRegenerateModal(true)}
                         title="Regenerar etiquetas seleccionadas"
                         className="shrink-0 whitespace-nowrap"
+                        disabled={asyncProcess.hasKind("bin_regenerate_tags")}
                       >
                         Regenerar etiquetas
                       </Button>
@@ -779,6 +780,7 @@ const BinsView = () => {
                         onClick={() => setShowBulkPrintModal(true)}
                         title="Imprimir etiquetas seleccionadas"
                         className="shrink-0 whitespace-nowrap"
+                        disabled={asyncProcess.hasKind("bin_print")}
                       >
                         Imprimir
                       </Button>
@@ -791,6 +793,7 @@ const BinsView = () => {
                         onClick={openBulkDelete}
                         title="Eliminar bins seleccionados"
                         className="shrink-0 whitespace-nowrap"
+                        disabled={asyncProcess.hasKind("bin_delete")}
                       >
                         Eliminar
                       </Button>

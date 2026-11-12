@@ -163,7 +163,11 @@ export default function ModalBulkPrint({
           variant="primary"
           icon={Printer}
           onClick={handlePrint}
-          disabled={isPrinting || !selectedCount}
+          disabled={
+            isPrinting ||
+            !selectedCount ||
+            trackAsyncJob?.hasKind?.("position_print")
+          }
           loading={isPrinting}
         >
           {isPrinting ? "Imprimiendo…" : "Imprimir"}

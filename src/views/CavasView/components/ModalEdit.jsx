@@ -572,7 +572,7 @@ export default function ModalEdit({
   };
 
   const handleGenerate = () => {
-    if (isGenerating) return;
+    if (isGenerating || trackAsyncJob?.hasKind?.("cava_generation")) return;
     const alreadyGenerated = Boolean(
       formData.positions_has_been_generated || cava?.positions_has_been_generated,
     );
@@ -592,7 +592,9 @@ export default function ModalEdit({
   const nameMissing = showValidation && isBlank(formData.name);
   const storageMissing = showValidation && !formData.storage_id;
   const conditionMissing = showValidation && !formData.condition;
-  const busy = isSaving || isGenerating;
+  const generationBlocked =
+    Boolean(trackAsyncJob?.hasKind?.("cava_generation")) || isGenerating;
+  const busy = isSaving || generationBlocked;
 
   return (
     <Modal show={show} onHide={onHide} size="xl" className="max-w-[min(96vw,1480px)]">

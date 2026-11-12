@@ -66,7 +66,9 @@ export default function ModalBulkRegenerate({
           variant="primary"
           icon={RefreshCw}
           onClick={handleConfirm}
-          disabled={isWorking}
+          disabled={
+            isWorking || trackAsyncJob?.hasKind?.("bin_regenerate_tags")
+          }
           loading={isWorking}
         >
           {isWorking ? "Regenerando…" : "Regenerar"}
