@@ -536,6 +536,7 @@ const ModalEdit = ({
     setBackendErrors(null);
     try {
       const response = await regenerateBinTag(selectedEntry.id);
+      // Fallback de media/ZPL; no fusionar el bin completo (pisa producto/posición del form).
       const refreshed = await getBin(selectedEntry.id).catch(() => null);
       const nextTag = bustMediaUrl(
         response?.tag_image || refreshed?.tag_image || "",
@@ -547,7 +548,6 @@ const ModalEdit = ({
       }
       setSelectedEntry((prev) => ({
         ...prev,
-        ...(refreshed || {}),
         tag_image: nextTag || prev.tag_image,
         zpl_code: nextZpl || prev.zpl_code,
       }));
