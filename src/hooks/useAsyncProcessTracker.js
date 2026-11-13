@@ -24,14 +24,48 @@ function generationIsOpen(status) {
   return status === "pending" || status === "running";
 }
 
-async function waitForCavaGeneration(cavaId, { isCurrent = () => true, intervalMs = 2000 } = {}) {
-  while (isCurrent()) {
-    await sleep(intervalMs);
-    if (!isCurrent()) return null;
-    const current = await getCavaGeneration(cavaId);
-    if (!generationIsOpen(current?.status)) return current;
-  }
-  return null;
+async function waitForCavaGeneration(cavaId, { isCurrent = () => true, intervalMs = 15000 } = {}) {
+  const { subscribeCavaGeneration } = await import("@/lib/bulkJobEvents");
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let unsub = () => {};
+
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      unsub();
+      resolve(value);
+    };
+
+    unsub = subscribeCavaGeneration((payload) => {
+      if (!isCurrent()) {
+        finish(null);
+        return;
+      }
+      const payloadCavaId = payload.cava_id ?? payload.cava;
+      if (Number(payloadCavaId) !== Number(cavaId)) return;
+      if (generationIsOpen(payload?.status)) return;
+      finish(payload);
+    });
+
+    void (async () => {
+      while (!settled && isCurrent()) {
+        await sleep(intervalMs);
+        if (settled || !isCurrent()) break;
+        try {
+          const current = await getCavaGeneration(cavaId);
+          if (!generationIsOpen(current?.status)) {
+            finish(current);
+            return;
+          }
+        } catch {
+          /* retry */
+        }
+      }
+      if (!settled) finish(null);
+    })();
+  });
 }
 
 /**

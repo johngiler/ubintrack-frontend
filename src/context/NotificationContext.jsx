@@ -17,6 +17,7 @@ import { useNotificationsInfinite } from "@/hooks/useNotificationsInfinite";
 import { usePresenceActivity } from "@/hooks/usePresenceActivity";
 import { swrKeys } from "@/lib/swr";
 import { wsNotificationsUrl } from "@/lib/wsUrl";
+import { emitBulkJob, emitCavaGeneration } from "@/lib/bulkJobEvents";
 import {
   fetchNotificationUnreadCount,
   markAllNotificationsRead,
@@ -126,6 +127,14 @@ export function NotificationProvider({ children }) {
             if (typeof buildId === "string" && buildId.trim()) {
               notifyRemoteBuild?.(buildId);
             }
+            return;
+          }
+          if (data?.type === "bulk_job" && data.payload) {
+            emitBulkJob(data.payload);
+            return;
+          }
+          if (data?.type === "cava_generation" && data.payload) {
+            emitCavaGeneration(data.payload);
             return;
           }
           if (data?.type === "presence" && Array.isArray(data.payload?.users)) {

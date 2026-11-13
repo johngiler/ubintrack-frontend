@@ -90,9 +90,11 @@ function boolFilter(value) {
   return value === "true" || value === true;
 }
 
-/** Impresión solo si hay imagen y ZPL. */
+/** Impresión solo si hay imagen y ZPL (has_zpl; el listado ya no manda zpl_code). */
 function canPrintBin(bin) {
-  return Boolean(bin?.tag_image && String(bin?.zpl_code || "").trim());
+  const hasZpl =
+    bin?.has_zpl === true || Boolean(String(bin?.zpl_code || "").trim());
+  return Boolean(bin?.tag_image && hasZpl);
 }
 
 const BinsView = () => {
@@ -196,7 +198,10 @@ const BinsView = () => {
     }
   }, [listError]);
 
-  const handleShowModal = (entry, mode, tab = "details") => {
+  const handleShowModal = async (entry, mode, tab = "details") => {
+    setModalMode(mode);
+    setInitialTab(tab);
+    setShowModal(true);
     if (mode === "create") {
       setSelectedEntry({
         status: "en_recibo",
@@ -209,12 +214,17 @@ const BinsView = () => {
           },
         ],
       });
-    } else {
-      setSelectedEntry(entry);
+      return;
     }
-    setModalMode(mode);
-    setInitialTab(tab);
-    setShowModal(true);
+    setSelectedEntry(entry);
+    if (entry?.id) {
+      try {
+        const detail = await getBin(entry.id);
+        if (detail) setSelectedEntry(detail);
+      } catch {
+        /* conservar fila del listado */
+      }
+    }
   };
 
   const handleCloseModal = () => {

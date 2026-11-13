@@ -77,11 +77,12 @@ function boolFilter(value) {
   return value === "true" || value === true;
 }
 
-/** Impresión solo si hay imagen QR y ZPL. */
+/** Impresión solo si hay imagen QR y ZPL (has_zpl; el listado ya no manda zpl_code). */
 function canPrintPosition(position) {
-  return Boolean(
-    position?.qr_code_image && String(position?.zpl_code || "").trim(),
-  );
+  const hasZpl =
+    position?.has_zpl === true ||
+    Boolean(String(position?.zpl_code || "").trim());
+  return Boolean(position?.qr_code_image && hasZpl);
 }
 
 export default function PositionsView() {

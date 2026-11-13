@@ -28,7 +28,7 @@ import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import ClientsViewSkeleton from "./ClientsViewSkeleton";
-import { getClients, exportClientsToExcel } from "@/services/coreService";
+import { getClient, getClients, exportClientsToExcel } from "@/services/coreService";
 import { getTariffs } from "@/services/financeService";
 import { canCRUD } from "@/services/httpClient";
 import { formatDate } from "@/lib/format";
@@ -105,10 +105,20 @@ export default function ClientsView() {
     setFilters(EMPTY_FILTERS);
   };
 
-  const handleShowModal = (client, mode) => {
-    setSelectedClient(client);
+  const handleShowModal = async (client, mode) => {
     setModalMode(mode);
     setShowModal(true);
+    if (client?.id) {
+      setSelectedClient(client);
+      try {
+        const detail = await getClient(client.id);
+        setSelectedClient(detail || client);
+      } catch {
+        setSelectedClient(client);
+      }
+    } else {
+      setSelectedClient(client);
+    }
   };
 
   const handleCloseModal = () => {

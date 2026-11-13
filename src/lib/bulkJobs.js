@@ -1,3 +1,4 @@
+import { subscribeBulkJob } from "@/lib/bulkJobEvents";
 import httpClient from "@/services/httpClient";
 
 export const ASYNC_DETAIL = "En proceso. Puedes continuar mientras se procesa.";
@@ -17,14 +18,52 @@ export async function getBulkJob(id) {
   return response.data;
 }
 
-export async function waitForBulkJob(id, { isCurrent = () => true, intervalMs = 2000 } = {}) {
-  while (isCurrent()) {
-    await sleep(intervalMs);
-    if (!isCurrent()) return null;
-    const current = await getBulkJob(id);
-    if (!isBulkJobOpen(current)) return current;
-  }
-  return null;
+/**
+ * Espera cierre del job: evento WS `bulk_job` primero;
+ * fallback HTTP cada intervalMs por si se pierde el mensaje.
+ */
+export async function waitForBulkJob(
+  id,
+  { isCurrent = () => true, intervalMs = 15000 } = {},
+) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let unsub = () => {};
+
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      unsub();
+      resolve(value);
+    };
+
+    unsub = subscribeBulkJob((payload) => {
+      if (!isCurrent()) {
+        finish(null);
+        return;
+      }
+      if (String(payload.id) !== String(id)) return;
+      if (isBulkJobOpen(payload)) return;
+      finish(payload);
+    });
+
+    void (async () => {
+      while (!settled && isCurrent()) {
+        await sleep(intervalMs);
+        if (settled || !isCurrent()) break;
+        try {
+          const current = await getBulkJob(id);
+          if (!isBulkJobOpen(current)) {
+            finish(current);
+            return;
+          }
+        } catch {
+          /* reintento en el siguiente intervalo */
+        }
+      }
+      if (!settled) finish(null);
+    })();
+  });
 }
 
 /**

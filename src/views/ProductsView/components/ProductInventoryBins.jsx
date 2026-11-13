@@ -1,16 +1,35 @@
 "use client";
 
 import { Archive } from "lucide-react";
+import useSWR from "swr";
 
 import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 import { useWmsNavigate } from "@/hooks/useWmsRouter";
+import { getProduct } from "@/services/inventoryService";
 
 export default function ProductInventoryBins({ product }) {
   const navigate = useWmsNavigate();
-  const bins = product.inventory_bins || [];
+  const { data: detail, isLoading } = useSWR(
+    product?.id ? ["product-inventory", product.id] : null,
+    () => getProduct(product.id),
+    { revalidateOnFocus: false },
+  );
+  const bins = detail?.inventory_bins || product.inventory_bins || [];
   const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
     useVisibleSlice(bins, 12, 12);
+
+  if (isLoading && !detail) {
+    return (
+      <tr>
+        <td colSpan={7} className="!bg-slate-50/80 p-0">
+          <div className="border-t border-[var(--border-subtle)] px-4 py-6 text-center text-sm text-slate-500">
+            Cargando bins…
+          </div>
+        </td>
+      </tr>
+    );
+  }
 
   if (!bins.length) return null;
 

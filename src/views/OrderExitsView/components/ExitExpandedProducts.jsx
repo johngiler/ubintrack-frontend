@@ -9,6 +9,7 @@ import {
   RefreshCw,
   ScanLine,
 } from "lucide-react";
+import useSWR from "swr";
 
 import { Button } from "@/components/ui/bootstrap";
 import { Badge } from "@/components/ui/Badge";
@@ -16,6 +17,7 @@ import { IconButton } from "@/components/ui/Button";
 import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 import { formatDate } from "@/lib/format";
+import { getExit } from "@/services/orderService";
 
 
 const BIN_STATUS_VARIANT = {
@@ -399,9 +401,26 @@ export default function ExitExpandedProducts({
   processingGroupId,
   processingBinId,
 }) {
-  const groups = exit.exit_product_groups || [];
+  // Listado trae grupos livianos; al expandir pedimos detail con conflictos/alternativas.
+  const { data: detail, isLoading } = useSWR(
+    exit?.id ? ["exit-expanded", exit.id] : null,
+    () => getExit(exit.id),
+    { revalidateOnFocus: false },
+  );
+  const richExit = detail
+    ? { ...exit, ...detail, exit_product_groups: detail.exit_product_groups }
+    : exit;
+  const groups = richExit.exit_product_groups || [];
   const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
     useVisibleSlice(groups, 12, 12);
+
+  if (isLoading && !detail) {
+    return (
+      <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700/60 dark:bg-slate-900/30 dark:text-slate-400">
+        Cargando productos…
+      </div>
+    );
+  }
 
   if (!groups.length) {
     return (
@@ -417,7 +436,7 @@ export default function ExitExpandedProducts({
         {visibleItems.map((group) => (
           <ProductGroupCard
             key={group.id}
-            exit={exit}
+            exit={richExit}
             group={group}
             isAdmin={isAdmin}
             isClientUser={isClientUser}

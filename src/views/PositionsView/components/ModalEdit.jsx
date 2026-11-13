@@ -44,9 +44,10 @@ function isBlank(value) {
 }
 
 function canPrintPosition(position) {
-  return Boolean(
-    position?.qr_code_image && String(position?.zpl_code || "").trim(),
-  );
+  const hasZpl =
+    position?.has_zpl === true ||
+    Boolean(String(position?.zpl_code || "").trim());
+  return Boolean(position?.qr_code_image && hasZpl);
 }
 
 export default function ModalEdit({
@@ -152,17 +153,21 @@ export default function ModalEdit({
       const nextQr = bustMediaUrl(
         response?.qr_code_image || refreshed?.qr_code_image || "",
       );
-      const nextZpl = response?.zpl_code || refreshed?.zpl_code || "";
       setFormData((prev) => ({
         ...prev,
         ...(refreshed
           ? {
               ...refreshed,
               cava_id: refreshed.cava?.id ?? refreshed.cava_id ?? prev.cava_id,
+              zpl_code: undefined,
             }
           : {}),
         qr_code_image: nextQr || prev.qr_code_image,
-        zpl_code: nextZpl || prev.zpl_code,
+        has_zpl:
+          response?.has_zpl === true ||
+          refreshed?.has_zpl === true ||
+          Boolean(nextQr) ||
+          prev.has_zpl,
       }));
       await onSave?.();
     } catch (error) {
