@@ -201,6 +201,7 @@ const BinsView = () => {
       setSelectedEntry({
         status: "en_recibo",
         is_active: true,
+        label_include_observation: false,
         bin_products: [
           {
             product: null,
@@ -259,6 +260,7 @@ const BinsView = () => {
         lpn: entryData.lpn || "",
         barcode: entryData.barcode || "",
         observation: entryData.observation || "",
+        label_include_observation: Boolean(entryData.label_include_observation),
       };
 
       if (entryData.id) {

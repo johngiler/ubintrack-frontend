@@ -805,6 +805,18 @@ const ModalEdit = ({
                     disabled={isViewMode}
                     placeholder="Observación"
                   />
+                  <Form.Check
+                    type="checkbox"
+                    id="label_include_observation"
+                    name="label_include_observation"
+                    className="mt-2"
+                    checked={Boolean(selectedEntry?.label_include_observation)}
+                    onChange={(e) =>
+                      handleChange("label_include_observation", e.target.checked)
+                    }
+                    disabled={isViewMode}
+                    label="Incluir en etiqueta"
+                  />
                 </Form.Group>
               </Col>
 
