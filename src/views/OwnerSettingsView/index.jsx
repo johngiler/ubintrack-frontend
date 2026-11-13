@@ -602,8 +602,9 @@ export default function OwnerSettingsView() {
                           isSearchable={false}
                         />
                         <Form.Text className="text-[var(--foreground-muted)]">
-                          IP, puerto y lenguaje son obligatorios para imprimir. Si cambias
-                          medida o DPI, regenera las etiquetas en posiciones y bins.
+                          IP, puerto y lenguaje son obligatorios para imprimir. La medida
+                          define cuántas posiciones caben por hoja (paso 2&quot;: p. ej. 4×2
+                          → 2, 6×4 → 6). Si cambias medida o DPI, regenera etiquetas.
                         </Form.Text>
                       </Form.Group>
                     </Col>

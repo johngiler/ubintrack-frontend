@@ -4,12 +4,29 @@ import { useEffect, useMemo, useState } from "react";
 import { Printer, X } from "lucide-react";
 
 import { Modal, Button, Alert, Form } from "@/components/ui/bootstrap";
+import { useWorkspace } from "@/context/WorkspaceContext";
 import { bulkPrintPositions } from "@/services/storageService";
 import { getApiErrorMessage } from "@/services/httpClient";
 import { followBulkJob, isBulkJobOpen } from "@/lib/bulkJobs";
 
 const MIN_PER_LABEL = 1;
-const MAX_PER_LABEL = 4;
+const CELL_INCHES = 2;
+
+/** Misma fórmula que el backend: floor(dim/2), mín. 1. */
+export function maxPositionsPerLabelFromWorkspace(workspace) {
+  const width = Number(workspace?.label_width_in);
+  const height = Number(workspace?.label_height_in);
+  const fromApi = Number(workspace?.max_positions_per_label);
+  if (Number.isFinite(fromApi) && fromApi >= 1) {
+    return Math.floor(fromApi);
+  }
+  const cols = Math.max(1, Math.floor((Number.isFinite(width) ? width : 4) / CELL_INCHES));
+  const rows = Math.max(
+    1,
+    Math.floor((Number.isFinite(height) ? height : 2) / CELL_INCHES),
+  );
+  return cols * rows;
+}
 
 export default function ModalBulkPrint({
   show,
@@ -19,29 +36,33 @@ export default function ModalBulkPrint({
   showAlert,
   trackAsyncJob,
 }) {
+  const { workspace } = useWorkspace();
+  const maxPerLabel = useMemo(
+    () => maxPositionsPerLabelFromWorkspace(workspace),
+    [workspace],
+  );
+
   const [isPrinting, setIsPrinting] = useState(false);
   const [formError, setFormError] = useState("");
-  const [perLabel, setPerLabel] = useState(1);
+  const [perLabel, setPerLabel] = useState(maxPerLabel);
   const [samePositionCopies, setSamePositionCopies] = useState(false);
 
   useEffect(() => {
     if (!show) return;
     setFormError("");
-    setPerLabel(1);
+    setPerLabel(maxPerLabel);
     setSamePositionCopies(false);
     setIsPrinting(false);
-  }, [show]);
+  }, [show, maxPerLabel]);
 
   const selectedCount = positionIds.length;
   const safePerLabel = Math.min(
-    MAX_PER_LABEL,
+    maxPerLabel,
     Math.max(MIN_PER_LABEL, Number(perLabel) || 1),
   );
   const sheetCount = useMemo(() => {
     if (!selectedCount) return 0;
-    // Copias: una etiqueta física por posición (N QR iguales en cada una).
     if (samePositionCopies) return selectedCount;
-    // Distintas: empaquetar N por etiqueta; la última puede quedar corta.
     return Math.ceil(selectedCount / safePerLabel);
   }, [selectedCount, safePerLabel, samePositionCopies]);
 
@@ -51,13 +72,16 @@ export default function ModalBulkPrint({
     return selectedCount;
   }, [selectedCount, safePerLabel, samePositionCopies]);
 
+  const widthLabel = workspace?.label_width_in ?? "4";
+  const heightLabel = workspace?.label_height_in ?? "2";
+
   function handlePerLabelChange(value) {
     const n = Number.parseInt(value, 10);
     if (!Number.isFinite(n)) {
       setPerLabel("");
       return;
     }
-    setPerLabel(Math.min(MAX_PER_LABEL, Math.max(MIN_PER_LABEL, n)));
+    setPerLabel(Math.min(maxPerLabel, Math.max(MIN_PER_LABEL, n)));
   }
 
   async function handlePrint() {
@@ -119,7 +143,7 @@ export default function ModalBulkPrint({
             <Form.Control
               type="number"
               min={MIN_PER_LABEL}
-              max={MAX_PER_LABEL}
+              max={maxPerLabel}
               step={1}
               value={perLabel}
               onChange={(e) => handlePerLabelChange(e.target.value)}
@@ -128,6 +152,9 @@ export default function ModalBulkPrint({
               aria-label="Cantidad de posiciones por etiqueta"
             />
             <span>por etiqueta</span>
+            <span className="text-xs text-[var(--foreground-muted)]">
+              (máx. {maxPerLabel})
+            </span>
           </div>
         </Form.Group>
 
@@ -149,8 +176,9 @@ export default function ModalBulkPrint({
             </>
           ) : (
             <>
-              {sheetCount} etiqueta{sheetCount === 1 ? "" : "s"} con posiciones
-              distintas; la última puede tener menos de {safePerLabel} QR.
+              {sheetCount} etiqueta{sheetCount === 1 ? "" : "s"} · medida{" "}
+              {widthLabel}×{heightLabel}&quot; → máx. {maxPerLabel} por hoja; si
+              faltan, las celdas libres quedan en blanco.
             </>
           )}
         </p>
