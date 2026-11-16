@@ -35,24 +35,24 @@ function historyQuery(extra = {}) {
   return q ? `?${q}` : "";
 }
 
-/** Campanita → historial general de la vista, filtrado por evento/autor/lote. */
+function historyTypeFromNotification(item) {
+  const action = String(item?.activity_action || "").trim();
+  if (action) return action;
+
+  const event = item?.event;
+  if (event === "created" || event === "create") return "create";
+  if (event === "updated" || event === "update") return "update";
+  if (event === "deleted" || event === "delete") return "delete";
+  if (event === "status" || event === "status_changed") return "status";
+  if (event === "generate" || event === "generated") return "generate";
+  if (typeof event === "string" && event.startsWith("bulk_")) return event;
+  return "";
+}
+
+/** Campanita → historial general de la vista, filtrado por acción/autor/lote. */
 export function notificationHref(item) {
   const artifact = item?.artifact;
-  const event = item?.event;
-  const historyType =
-    event === "created" || event === "create"
-      ? "create"
-      : event === "updated" || event === "update"
-        ? "update"
-        : event === "deleted" || event === "delete"
-          ? "delete"
-          : event === "status" || event === "status_changed"
-            ? "status"
-            : event === "generate" || event === "generated"
-              ? "generate"
-              : typeof event === "string" && event.startsWith("bulk_")
-                ? event
-                : "";
+  const historyType = historyTypeFromNotification(item);
   const historyActor =
     item?.actor_id != null && item.actor_id !== ""
       ? String(item.actor_id)
