@@ -2,15 +2,18 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import { motion } from "motion/react";
+import { GitCommitHorizontal, List } from "lucide-react";
 
 import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import { useVisibleSlice } from "@/hooks/useVisibleSlice";
+import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { getTaskLogs } from "@/services/taskService";
 
 const KIND_FILTERS = [
-  { value: "all", label: "Todos" },
-  { value: "workflow", label: "Solo movimientos" },
+  { value: "workflow", label: "Movimientos", icon: GitCommitHorizontal },
+  { value: "all", label: "Todos", icon: List },
 ];
 
 function logTone(kind = "", message = "") {
@@ -29,7 +32,7 @@ function logTone(kind = "", message = "") {
 }
 
 export default function TaskLogsPanel({ taskId, logs: logsProp }) {
-  const [kindFilter, setKindFilter] = useState("all");
+  const [kindFilter, setKindFilter] = useState("workflow");
 
   const { data, isLoading } = useSWR(
     taskId && !logsProp
@@ -71,21 +74,37 @@ export default function TaskLogsPanel({ taskId, logs: logsProp }) {
             {logs.length} {logs.length === 1 ? "evento" : "eventos"} · más reciente primero
           </p>
         </div>
-        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+        <div
+          role="tablist"
+          aria-label="Filtro de historial"
+          className="inline-flex rounded-full border border-slate-200/90 bg-slate-100/80 p-1 shadow-inner"
+        >
           {KIND_FILTERS.map((opt) => {
             const active = kindFilter === opt.value;
+            const Icon = opt.icon;
             return (
               <button
                 key={opt.value}
                 type="button"
-                className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                role="tab"
+                aria-selected={active}
+                className={cn(
+                  "relative inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                   active
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
+                    ? "text-sky-800"
+                    : "text-slate-500 hover:text-slate-700",
+                )}
                 onClick={() => setKindFilter(opt.value)}
               >
-                {opt.label}
+                {active ? (
+                  <motion.span
+                    layoutId="task-log-kind-pill"
+                    className="absolute inset-0 rounded-full bg-white shadow-sm ring-1 ring-slate-200/80"
+                    transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                  />
+                ) : null}
+                <Icon className="relative h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="relative">{opt.label}</span>
               </button>
             );
           })}
