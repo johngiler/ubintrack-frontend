@@ -15,11 +15,13 @@ import { createTask, updateTask } from "@/services/taskService";
 import TaskLogsPanel from "./TaskLogsPanel";
 
 import {
+  DEFAULT_TASK_TYPE,
   EMPTY_TASK,
   TASK_PRIORITY_OPTIONS,
   TASK_STATUS_OPTIONS,
   TASK_TYPE_HINTS,
   TASK_TYPE_OPTIONS,
+  normalizeTaskType,
 } from "../taskLabels";
 
 function toOption(item, labelKeys = ["name", "full_name", "code", "email"]) {
@@ -62,6 +64,7 @@ export default function ModalEdit({
     setFormData({
       ...EMPTY_TASK,
       ...task,
+      task_type: normalizeTaskType(task.task_type),
       assigned_to_ids: (task.assigned_to || []).map((u) => u.id),
       client_id: task.client?.id ?? task.client_id ?? null,
       cavas: cavaList,
@@ -72,9 +75,9 @@ export default function ModalEdit({
     });
   }, [task, show]);
 
-  const typeHint = TASK_TYPE_HINTS[formData.task_type] || "";
-  const isInventarioGeneral = formData.task_type === "inventario_general";
-  const showProduct = formData.task_type !== "inventario_inicial";
+  const typeHint =
+    TASK_TYPE_HINTS[normalizeTaskType(formData.task_type)] ||
+    TASK_TYPE_HINTS[DEFAULT_TASK_TYPE];
 
   const applyAssignees = (list) => {
     const next = list || [];
@@ -193,7 +196,7 @@ export default function ModalEdit({
       const assignedIds = formData.assigned_to_ids || [];
       const payload = {
         title: formData.title || "",
-        task_type: formData.task_type,
+        task_type: normalizeTaskType(formData.task_type),
         status:
           assignedIds.length > 0 && formData.status === "pendiente"
             ? "asignada"
@@ -205,12 +208,9 @@ export default function ModalEdit({
         assigned_to_ids: assignedIds,
         client_id: formData.client_id || null,
         cava_ids: formData.cava_ids || [],
-        product_ids: showProduct ? formData.product_ids || [] : [],
+        product_ids: formData.product_ids || [],
         is_active: formData.is_active !== false,
       };
-      if (isInventarioGeneral) {
-        payload.include_empty_positions = true;
-      }
       if (formData.id) {
         await updateTask(formData.id, payload);
       } else {
@@ -253,7 +253,7 @@ export default function ModalEdit({
                   <Form.Control
                     value={formData.title || ""}
                     disabled={readOnly}
-                    placeholder="Ej. Conteo cíclico cámara 9"
+                    placeholder="Ej. Control de inventario cámara 9"
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, title: e.target.value }))
                     }
@@ -284,20 +284,12 @@ export default function ModalEdit({
                   </Form.Label>
                   <Select
                     options={TASK_TYPE_OPTIONS}
-                    value={formData.task_type}
+                    value={normalizeTaskType(formData.task_type)}
                     isDisabled={readOnly || !isNew}
                     onChange={(e) => {
-                      const value = e?.target?.value || "conteo_ciclico";
                       setFormData((prev) => ({
                         ...prev,
-                        task_type: value,
-                        require_approval:
-                          value === "inventario_general"
-                            ? true
-                            : prev.require_approval,
-                        ...(value === "inventario_inicial"
-                          ? { products: [], product_ids: [] }
-                          : null),
+                        task_type: normalizeTaskType(e?.target?.value),
                       }));
                     }}
                   />
@@ -437,43 +429,41 @@ export default function ModalEdit({
                   </p>
                 </Form.Group>
               </Col>
-              {showProduct ? (
-                <Col md={6}>
-                  <Form.Group className="mb-0">
-                    <Form.Label className="!text-xs !font-medium !text-slate-600">
-                      Productos
-                    </Form.Label>
-                    <AsyncSelect
-                      key={`products-${formData.client_id || "all"}`}
-                      isMulti
-                      cacheOptions
-                      defaultOptions
-                      loadOptions={loadProducts}
-                      value={productsValue}
-                      isDisabled={readOnly}
-                      isClearable
-                      placeholder="Todos los productos"
-                      onChange={(opts) => {
-                        const list = opts || [];
-                        setFormData((prev) => ({
-                          ...prev,
-                          products: list,
-                          product_ids: list.map((o) => o.value),
-                        }));
-                      }}
-                    />
-                    <p className="mb-0 mt-1 text-xs text-slate-500">
-                      Vacío = todos. Varios acotan el conteo.
-                    </p>
-                  </Form.Group>
-                </Col>
-              ) : null}
+              <Col md={6}>
+                <Form.Group className="mb-0">
+                  <Form.Label className="!text-xs !font-medium !text-slate-600">
+                    Productos
+                  </Form.Label>
+                  <AsyncSelect
+                    key={`products-${formData.client_id || "all"}`}
+                    isMulti
+                    cacheOptions
+                    defaultOptions
+                    loadOptions={loadProducts}
+                    value={productsValue}
+                    isDisabled={readOnly}
+                    isClearable
+                    placeholder="Todos los productos"
+                    onChange={(opts) => {
+                      const list = opts || [];
+                      setFormData((prev) => ({
+                        ...prev,
+                        products: list,
+                        product_ids: list.map((o) => o.value),
+                      }));
+                    }}
+                  />
+                  <p className="mb-0 mt-1 text-xs text-slate-500">
+                    Vacío = todos. Varios acotan el conteo.
+                  </p>
+                </Form.Group>
+              </Col>
               <Col md={12}>
                 <Form.Check
                   type="checkbox"
                   id="require-approval"
                   label="Requiere aprobación"
-                  disabled={readOnly || isInventarioGeneral}
+                  disabled={readOnly}
                   checked={Boolean(formData.require_approval)}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -482,11 +472,6 @@ export default function ModalEdit({
                     }))
                   }
                 />
-                {isInventarioGeneral ? (
-                  <p className="mb-0 mt-1 text-xs text-slate-500">
-                    En inventario general la aprobación queda activa.
-                  </p>
-                ) : null}
               </Col>
             </Row>
           </Modal.Section>

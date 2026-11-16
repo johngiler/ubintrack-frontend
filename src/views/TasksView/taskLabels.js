@@ -1,16 +1,28 @@
 export const TASK_TYPE_LABELS = {
-  inventario_inicial: "Inventario inicial",
-  conteo_ciclico: "Conteo cíclico",
-  inventario_general: "Inventario general",
+  control_inventario: "Control de inventario",
+  // Legados (por si llega algún registro sin migrar en cliente).
+  inventario_inicial: "Control de inventario",
+  conteo_ciclico: "Control de inventario",
+  inventario_general: "Control de inventario",
 };
 
+export const DEFAULT_TASK_TYPE = "control_inventario";
+
+export function normalizeTaskType(value) {
+  if (
+    !value ||
+    value === "inventario_inicial" ||
+    value === "conteo_ciclico" ||
+    value === "inventario_general"
+  ) {
+    return DEFAULT_TASK_TYPE;
+  }
+  return value === DEFAULT_TASK_TYPE ? value : DEFAULT_TASK_TYPE;
+}
+
 export const TASK_TYPE_HINTS = {
-  inventario_inicial:
-    "Verificar BINs por cámara/pasillo frente a la carga; registrar presencia, producto, cajas, vencimiento, lote y LPN.",
-  conteo_ciclico:
-    "Conteo parcial asignable por producto, pasillo, cámara o cliente; con evidencia y PDF por cliente.",
-  inventario_general:
-    "Barrido del alcance; cobertura, diferencias, reconteo y aprobación.",
+  control_inventario:
+    "Recorrer el alcance (cámaras, pasillos, productos) y verificar/contar en piso.",
 };
 
 export const TASK_STATUS_LABELS = {
@@ -45,7 +57,7 @@ export const TASK_PRIORITY_VARIANTS = {
 
 export const EMPTY_TASK = {
   title: "",
-  task_type: "conteo_ciclico",
+  task_type: DEFAULT_TASK_TYPE,
   status: "pendiente",
   priority: "medium",
   observations: "",
@@ -65,9 +77,9 @@ export const EMPTY_TASK = {
   completed_at: null,
 };
 
-export const TASK_TYPE_OPTIONS = Object.entries(TASK_TYPE_LABELS).map(
-  ([value, label]) => ({ value, label }),
-);
+export const TASK_TYPE_OPTIONS = [
+  { value: DEFAULT_TASK_TYPE, label: TASK_TYPE_LABELS[DEFAULT_TASK_TYPE] },
+];
 
 export const TASK_STATUS_OPTIONS = Object.entries(TASK_STATUS_LABELS).map(
   ([value, label]) => ({ value, label }),
