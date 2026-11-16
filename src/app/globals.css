@@ -621,3 +621,9 @@ input[type="time"]::-webkit-calendar-picker-indicator,
   cursor: pointer;
   opacity: 1;
 }
+
+/* WebView / PWA: scroll yes, pinch-zoom of the page no. */
+html.app-no-zoom,
+html.app-no-zoom body {
+  touch-action: pan-x pan-y;
+}

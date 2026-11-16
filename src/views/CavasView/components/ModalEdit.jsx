@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import useSWR, { mutate as globalMutate } from "swr";
 import { ChevronDown, ChevronUp, DoorOpen, GripVertical, LayoutGrid, Plus, Save, Trash2, X } from "lucide-react";
 
 import { Modal, Button, Form, Alert } from "@/components/ui/bootstrap";
 import AsyncProcessBanner from "@/components/wms/AsyncProcessBanner";
 import NumberInput from "@/components/ui/NumberInput";
 import Select from "@/components/ui/Select";
+import { swrKeys } from "@/lib/swr";
 import { getApiErrorMessage } from "@/services/httpClient";
 import {
   createCava,
   generateCavaPositions,
+  getCava,
   getCavaGeneration,
+  getCavaOccupancy,
   getPositionNomenclature,
   getStorages,
   updateCava,
@@ -297,7 +301,6 @@ export default function ModalEdit({
   const [storages, setStorages] = useState([]);
   const [isLoadingStorages, setIsLoadingStorages] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
-  const [occupancyRevision, setOccupancyRevision] = useState(0);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
   const [confirmReduce, setConfirmReduce] = useState(null);
   const [dragKey, setDragKey] = useState(null);
@@ -305,6 +308,29 @@ export default function ModalEdit({
   const masterUndoRef = useRef(null);
   /** Si el usuario editó el código a mano, no lo reescribimos al cambiar el nombre. */
   const codeManualRef = useRef(false);
+  /** Evita que un revalidate de SWR pise ediciones locales del formulario. */
+  const seededForRef = useRef(null);
+  /** Form ya hidratado con el detalle (evita flash de lienzo vacío). */
+  const [planReady, setPlanReady] = useState(false);
+
+  const {
+    data: cavaDetail,
+    error: cavaDetailError,
+    mutate: mutateCavaDetail,
+  } = useSWR(show && cava?.id ? swrKeys.cava(cava.id) : null, () => getCava(cava.id));
+
+  const { data: occupancyBootstrap, error: occupancyBootstrapError } = useSWR(
+    show && cava?.id ? swrKeys.cavaOccupancy(cava.id) : null,
+    () => getCavaOccupancy(cava.id),
+  );
+
+  // Loading hasta detalle en form + ocupación en cache (sin paso intermedio vacío).
+  const isLoadingPlan = Boolean(
+    show &&
+      cava?.id &&
+      !cavaDetailError &&
+      (!planReady || (occupancyBootstrap === undefined && !occupancyBootstrapError)),
+  );
 
   const readOnly = mode === "view";
   const watchToken = useRef(0);
@@ -347,10 +373,25 @@ export default function ModalEdit({
 
   useEffect(() => {
     masterUndoRef.current = null;
-    if (cava) {
-      const blocks = blocksFromApi(cava.blocks);
-      const derived = aisleTokenFromName(cava.name || "");
-      const raw = String(cava.code || "").trim();
+    if (!show) {
+      seededForRef.current = null;
+      setPlanReady(false);
+      setShowValidation(false);
+      setConfirmGenerate(false);
+      setConfirmReduce(null);
+      setDragKey(null);
+      return;
+    }
+
+    function applyCava(detail) {
+      if (!detail) {
+        codeManualRef.current = false;
+        setFormData(EMPTY_CAVA);
+        return;
+      }
+      const blocks = blocksFromApi(detail.blocks);
+      const derived = aisleTokenFromName(detail.name || "");
+      const raw = String(detail.code || "").trim();
       // Legacy numérico («Anden»+«1» → A1); token alfabético se respeta.
       let code = raw;
       if (!raw || /^\d+$/.test(raw)) {
@@ -359,26 +400,38 @@ export default function ModalEdit({
       codeManualRef.current = Boolean(raw && !/^\d+$/.test(raw) && raw !== derived);
       setFormData({
         ...EMPTY_CAVA,
-        ...cava,
+        ...detail,
         code,
-        storage_id: cava.storage?.id ?? cava.storage_id ?? "",
-        temp_min: cava.temp_min ?? "",
-        temp_max: cava.temp_max ?? "",
-        is_active: cava.is_active !== false,
+        storage_id: detail.storage?.id ?? detail.storage_id ?? "",
+        temp_min: detail.temp_min ?? "",
+        temp_max: detail.temp_max ?? "",
+        is_active: detail.is_active !== false,
         blocks,
-        plan_layout: hydratePlanLayout(cava.plan_layout, blocks),
+        plan_layout: hydratePlanLayout(detail.plan_layout, blocks),
       });
-    } else {
-      codeManualRef.current = false;
-      setFormData(EMPTY_CAVA);
     }
-    if (!show) {
-      setShowValidation(false);
-      setConfirmGenerate(false);
-      setConfirmReduce(null);
-      setDragKey(null);
+
+    if (!cava?.id) {
+      if (seededForRef.current !== "new") {
+        seededForRef.current = "new";
+        applyCava(null);
+        setPlanReady(true);
+      }
+      return;
     }
-  }, [cava, show]);
+
+    if (!cavaDetail) {
+      setPlanReady(false);
+      return;
+    }
+    if (seededForRef.current === cava.id) {
+      setPlanReady(true);
+      return;
+    }
+    seededForRef.current = cava.id;
+    applyCava(cavaDetail);
+    setPlanReady(true);
+  }, [show, cava?.id, cavaDetail]);
 
   const storageOptions = useMemo(
     () => storages.map((storage) => ({ value: String(storage.id), label: storage.name })),
@@ -458,6 +511,11 @@ export default function ModalEdit({
       plan_layout: hydratePlanLayout(saved.plan_layout, blocks),
       positions_has_been_generated: saved.positions_has_been_generated,
     }));
+    if (saved?.id) {
+      seededForRef.current = saved.id;
+      await mutateCavaDetail(saved, { revalidate: false });
+      await globalMutate(swrKeys.cavaOccupancy(saved.id));
+    }
     await onSave();
     return saved;
   };
@@ -533,8 +591,17 @@ export default function ModalEdit({
     setNoticeVariant(failed ? "danger" : "success");
     setNotice(job?.detail || (failed ? "No se pudieron crear las posiciones." : "Posiciones creadas."));
     if (!failed) {
-      setOccupancyRevision((value) => value + 1);
       setFormData((current) => ({ ...current, positions_has_been_generated: true }));
+      if (cava?.id) {
+        await globalMutate(swrKeys.cavaOccupancy(cava.id));
+        await mutateCavaDetail(
+          (current) =>
+            current
+              ? { ...current, positions_has_been_generated: true }
+              : current,
+          { revalidate: true },
+        );
+      }
     }
     await onSave();
   };
@@ -628,14 +695,20 @@ export default function ModalEdit({
   const conditionMissing = showValidation && !formData.condition;
   const generationBlocked =
     Boolean(trackAsyncJob?.hasKind?.("cava_generation")) || isGenerating;
-  const busy = isSaving || generationBlocked;
+  const busy = isSaving || generationBlocked || isLoadingPlan;
 
   return (
-    <Modal show={show} onHide={onHide} size="xl" className="max-w-[min(96vw,1480px)]">
+    <Modal
+      show={show}
+      onHide={onHide}
+      size="xl"
+      layerClassName="max-lg:items-stretch max-lg:p-0"
+      className="max-w-[min(96vw,1480px)] max-lg:max-h-[100dvh] max-lg:max-w-[100vw] max-lg:rounded-none"
+    >
       <Modal.Header closeButton>
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className="max-lg:px-3 max-lg:py-3">
         {formError ? <Alert variant="danger" className="mb-3">{formError}</Alert> : null}
         {isGenerating ? (
           <AsyncProcessBanner message={notice || GEN_ASYNC_MESSAGE} />
@@ -645,8 +718,8 @@ export default function ModalEdit({
           </Alert>
         ) : null}
         <Form onSubmit={(event) => event.preventDefault()}>
-          <div className="grid grid-cols-12 items-end gap-x-3 gap-y-3">
-            <Form.Group className="col-span-8 mb-0">
+          <div className="grid grid-cols-1 items-end gap-x-3 gap-y-3 sm:grid-cols-12">
+            <Form.Group className="mb-0 sm:col-span-8">
               <Form.Label className={LABEL_CLASS}>Nombre <span className="text-red-500">*</span></Form.Label>
               <Form.Control
                 className={FIELD_CLASS}
@@ -665,7 +738,7 @@ export default function ModalEdit({
                 }}
               />
             </Form.Group>
-            <Form.Group className="col-span-4 mb-0">
+            <Form.Group className="mb-0 sm:col-span-4">
               <Form.Label className={LABEL_CLASS}>Código</Form.Label>
               <Form.Control
                 className={FIELD_CLASS}
@@ -678,7 +751,7 @@ export default function ModalEdit({
                 }}
               />
             </Form.Group>
-            <Form.Group className="col-span-4 mb-0">
+            <Form.Group className="mb-0 sm:col-span-4">
               <Form.Label className={LABEL_CLASS}>Almacén <span className="text-red-500">*</span></Form.Label>
               <Select
                 inputId="cava-storage"
@@ -691,7 +764,7 @@ export default function ModalEdit({
                 onChange={(event) => setFormData({ ...formData, storage_id: event.target.value || "" })}
               />
             </Form.Group>
-            <Form.Group className="col-span-4 mb-0">
+            <Form.Group className="mb-0 sm:col-span-4">
               <Form.Label className={LABEL_CLASS}>Condición <span className="text-red-500">*</span></Form.Label>
               <Select
                 inputId="cava-condition"
@@ -704,7 +777,7 @@ export default function ModalEdit({
                 onChange={(event) => setFormData({ ...formData, condition: event.target.value || "" })}
               />
             </Form.Group>
-            <Form.Group className="col-span-2 mb-0">
+            <Form.Group className="mb-0 sm:col-span-2">
               <Form.Label className={LABEL_CLASS}>Mínima (°C)</Form.Label>
               <NumberInput
                 className={`${FIELD_CLASS} h-10 px-3 text-sm`}
@@ -716,7 +789,7 @@ export default function ModalEdit({
                 onChange={(next) => setFormData({ ...formData, temp_min: next === "" ? "" : next })}
               />
             </Form.Group>
-            <Form.Group className="col-span-2 mb-0">
+            <Form.Group className="mb-0 sm:col-span-2">
               <Form.Label className={LABEL_CLASS}>Máxima (°C)</Form.Label>
               <NumberInput
                 className={`${FIELD_CLASS} h-10 px-3 text-sm`}
@@ -733,7 +806,7 @@ export default function ModalEdit({
           <section className="mt-6 border-t border-slate-200 pt-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-slate-800">Distribución</p>
-              {!readOnly ? (
+              {!readOnly && !isLoadingPlan ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
                     variant="outline"
@@ -807,6 +880,20 @@ export default function ModalEdit({
                 </div>
               ) : null}
             </div>
+            {isLoadingPlan ? (
+              <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-md border border-dashed border-slate-200 bg-slate-50/70 py-16">
+                <div
+                  className="h-10 w-10 animate-spin rounded-full border-[3px] border-sky-600 border-t-transparent"
+                  aria-hidden
+                />
+                <p className="text-sm text-slate-500">Cargando distribución y mapa…</p>
+              </div>
+            ) : cavaDetailError && cava?.id ? (
+              <Alert variant="danger" className="mb-0">
+                No se pudo cargar la distribución.
+              </Alert>
+            ) : (
+              <>
             <div className="mb-3 flex flex-wrap items-center gap-4" role="radiogroup" aria-label="Orientación">
               {MASTER_ORIENTATION_OPTIONS.map((option) => {
                 const active =
@@ -1411,29 +1498,32 @@ export default function ModalEdit({
             ) : (
               <p className="text-sm text-slate-400">Agregue racks, secciones o piso para armar la distribución.</p>
             )}
+              </>
+            )}
           </section>
 
-          <div className="mt-4">
-            <CavaPlan
-              cavaId={formData.id}
-              name={formData.name}
-              code={formData.code}
-              blocks={formData.blocks}
-              nomenclature={nomenclature}
-              planLayout={formData.plan_layout}
-              readOnly={readOnly}
-              occupancyRevision={occupancyRevision}
-              onShowFloorPositionsChange={(checked) =>
-                setFormData((current) => ({
-                  ...current,
-                  plan_layout: {
-                    ...normalizePlanLayout(current.plan_layout),
-                    show_floor_positions: checked,
-                  },
-                }))
-              }
-            />
-          </div>
+          {!isLoadingPlan ? (
+            <div className="mt-4">
+              <CavaPlan
+                cavaId={formData.id}
+                name={formData.name}
+                code={formData.code}
+                blocks={formData.blocks}
+                nomenclature={nomenclature}
+                planLayout={formData.plan_layout}
+                readOnly={readOnly}
+                onShowFloorPositionsChange={(checked) =>
+                  setFormData((current) => ({
+                    ...current,
+                    plan_layout: {
+                      ...normalizePlanLayout(current.plan_layout),
+                      show_floor_positions: checked,
+                    },
+                  }))
+                }
+              />
+            </div>
+          ) : null}
           <div className="mt-4 border-t border-slate-200 pt-4">
             <Form.Check
               type="switch"

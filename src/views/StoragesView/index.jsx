@@ -128,7 +128,7 @@ export default function StoragesView() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onClear={() => setSearchTerm("")}
                   placeholder="Buscar bodega"
-                  className="!w-[220px] !min-w-[220px] !max-w-[220px] shrink-0"
+                  className="w-full min-w-0 max-w-full sm:!w-[220px] sm:!min-w-[220px] sm:!max-w-[220px] shrink-0"
                 />
                 {hasFilters && (
                   <Button

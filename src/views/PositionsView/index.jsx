@@ -147,7 +147,7 @@ export default function PositionsView() {
     () => getPositionHalls({ cavaId: filters.cava_id || undefined }),
   );
   const { data: cavaDetail } = useSWR(
-    filters.cava_id ? ["cava", filters.cava_id, "hall-labels"] : null,
+    filters.cava_id ? swrKeys.cava(filters.cava_id) : null,
     () => getCava(filters.cava_id),
   );
   const hallOptions = useMemo(() => {
@@ -382,7 +382,7 @@ export default function PositionsView() {
                       setSearchParams({});
                     }}
                     placeholder="Buscar por posición, bin o cliente…"
-                    className="!w-[280px] !min-w-[220px] !max-w-full shrink-0"
+                    className="w-full min-w-0 max-w-full sm:!w-[280px] sm:!min-w-[220px] sm:!max-w-full shrink-0"
                   />
                   <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
                     {activeFilterCount > 0 && (

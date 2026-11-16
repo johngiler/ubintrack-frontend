@@ -46,6 +46,12 @@ export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
       <div className="flex min-w-0 items-center gap-3">
         <SidebarToggle collapsed={sidebarCollapsed} onClick={onMenuClick} />
 
+        <div className="min-w-0 md:hidden">
+          <p className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--foreground)]">
+            {orgName}
+          </p>
+        </div>
+
         <div className="hidden min-w-0 items-center gap-3 md:flex">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold uppercase tracking-wide text-[var(--foreground)]">
@@ -62,9 +68,15 @@ export function AdminHeader({ onMenuClick, sidebarCollapsed = false }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="hidden items-center gap-2 sm:flex">
-          <ThemeToggle />
-          {!user?.client ? <OnlineUsersDropdown /> : null}
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline-flex">
+            <ThemeToggle />
+          </span>
+          {!user?.client ? (
+            <span className="hidden sm:inline-flex">
+              <OnlineUsersDropdown />
+            </span>
+          ) : null}
           {!user?.client ? <NotificationDropdown /> : null}
         </div>
 

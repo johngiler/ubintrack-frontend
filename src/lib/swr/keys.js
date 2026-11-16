@@ -45,6 +45,11 @@ export const swrKeys = {
 
   storages: (page, search) => ["storages", page, search || ""],
   cavas: (page, search) => ["cavas", page, search || ""],
+  /** Detalle con blocks + plan_layout (lista liviana no los trae). */
+  cava: (id) => (id != null && id !== "" ? ["cavas", "detail", String(id)] : null),
+  cavaOccupancy: (id) =>
+    id != null && id !== "" ? ["cavas", "occupancy", String(id)] : null,
+  cavaPositionTotals: (search) => ["cavas", "position-totals", search || ""],
   positions: (page, search, filters) => ["positions", page, search || "", stableFilters(filters)],
 
   tasks: (page, search, filters) => ["tasks", page, search || "", stableFilters(filters)],

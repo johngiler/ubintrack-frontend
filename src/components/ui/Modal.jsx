@@ -39,8 +39,8 @@ export function Modal({ show, onHide, children, size = "lg", className, centered
           <div
             className={cn(
               "fixed inset-0 z-50 flex justify-center p-4",
-              layerClassName,
               centered !== false ? "items-center" : "items-end sm:items-center",
+              layerClassName,
             )}
           >
             <motion.button
@@ -114,7 +114,7 @@ Modal.Footer = function ModalFooter({ children, className }) {
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-hover)]/40 px-5 py-3",
+        "flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-hover)]/40 px-5 py-3 max-lg:pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
         className,
       )}
     >

@@ -27,13 +27,13 @@ export function WmsPageHeader({ title, description, icon: Icon, breadcrumbs = []
         </nav>
       ) : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           {Icon ? (
             <div className="brand-icon-box flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
               <Icon className="h-5 w-5" strokeWidth={2} />
             </div>
           ) : null}
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">{title}</h1>
             {description ? (
               <p className="mt-1 text-sm text-[var(--foreground-muted)]">{description}</p>

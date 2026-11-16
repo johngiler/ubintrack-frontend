@@ -92,7 +92,7 @@ export function WmsShell({ children }) {
   const routeAllowed = canAccessRoute(pathname, user);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--background)]">
+    <div className="flex h-screen overflow-hidden bg-[var(--background)] max-lg:pt-[env(safe-area-inset-top,0px)]">
       <AdminSidebar
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
@@ -103,7 +103,7 @@ export function WmsShell({ children }) {
         <WmsBackgroundVortex />
         <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <AdminHeader onMenuClick={handleMenuClick} sidebarCollapsed={sidebarCollapsed} />
-          <main className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6">
+          <main className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 max-lg:pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
             {routeAllowed ? children : <WmsAccessDenied pathname={pathname} user={user} />}
           </main>
           <AppUpdateBanner />

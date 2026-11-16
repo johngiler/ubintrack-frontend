@@ -220,7 +220,7 @@ export default function TasksView() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onClear={() => setSearchTerm("")}
                 placeholder="Buscar por código, título u observaciones"
-                className="!w-[300px] !min-w-[220px] !max-w-full shrink-0"
+                className="w-full min-w-0 max-w-full sm:!w-[300px] sm:!min-w-[220px] sm:!max-w-full shrink-0"
               />
               <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
                 {activeFilterCount > 0 ? (

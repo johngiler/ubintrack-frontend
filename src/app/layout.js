@@ -3,6 +3,8 @@ import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
 import { Providers } from "@/components/layout/Providers";
 import { ThemeScript } from "@/components/layout/ThemeScript";
+import LockAppZoom from "@/components/pwa/LockAppZoom";
+import RegisterServiceWorker from "@/components/pwa/RegisterServiceWorker";
 import { tenantSlugFromHostname, workspaceSlugRequestHeaders } from "@/lib/tenant";
 
 import "./globals.css";
@@ -19,6 +21,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport = {
+  themeColor: "#0f172a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+};
+
 export async function generateMetadata() {
   const headerList = await headers();
   const host = (headerList.get("x-forwarded-host") || headerList.get("host") || "").split(",")[0].trim();
@@ -30,6 +41,20 @@ export async function generateMetadata() {
       template: `${owner} | %s`,
     },
     description: "Sistema de gestión de almacén multi-tenant.",
+    applicationName: "Ubintrack",
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      title: "Ubintrack",
+      statusBarStyle: "black-translucent",
+    },
+    icons: {
+      icon: [
+        { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+        { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+      apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    },
   };
 }
 
@@ -60,7 +85,11 @@ export default async function RootLayout({ children }) {
         <ThemeScript />
       </head>
       <body className="flex min-h-full flex-col bg-[var(--background)] text-[var(--foreground)] antialiased font-sans transition-colors duration-300">
-        <Providers initialTenantSlug={slug} initialWorkspace={workspace}>{children}</Providers>
+        <Providers initialTenantSlug={slug} initialWorkspace={workspace}>
+          {children}
+        </Providers>
+        <LockAppZoom />
+        <RegisterServiceWorker />
       </body>
     </html>
   );

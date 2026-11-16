@@ -1,10 +1,12 @@
 "use client";
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
 import { Check, Download, Expand } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 
 import { Button, Form } from "@/components/ui/bootstrap";
+import { swrKeys } from "@/lib/swr";
 import { getCavaOccupancy } from "@/services/storageService";
 import {
   aisleDisplayName,
@@ -1162,7 +1164,6 @@ export default function CavaPlan({
   nomenclature,
   planLayout = null,
   readOnly = false,
-  occupancyRevision = 0,
   showTitle = true,
   onShowFloorPositionsChange = null,
 }) {
@@ -1185,8 +1186,21 @@ export default function CavaPlan({
   const [downloading, setDownloading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [kpiSelected, setKpiSelected] = useState(null);
-  const [occupancy, setOccupancy] = useState({});
-  const [occupancyTick, setOccupancyTick] = useState(0);
+  const {
+    data: occupancyRows,
+    isLoading: occupancyLoading,
+    mutate: mutateOccupancy,
+  } = useSWR(cavaId ? swrKeys.cavaOccupancy(cavaId) : null, () => getCavaOccupancy(cavaId));
+  const occupancy = useMemo(() => {
+    const map = {};
+    (occupancyRows || []).forEach((row) => {
+      const key = slotKey(row.hall, row.rack, row.place);
+      if (!map[key]) map[key] = [];
+      map[key].push(row);
+    });
+    Object.values(map).forEach((list) => list.sort((a, b) => a.level - b.level));
+    return map;
+  }, [occupancyRows]);
   const [measuredTrackW, setMeasuredTrackW] = useState(0);
   const [measuredTrackH, setMeasuredTrackH] = useState(0);
   /** Cuerpo de hilera (sin contador): { node, vertical }. */
@@ -1289,32 +1303,6 @@ export default function CavaPlan({
       observer.disconnect();
     };
   }, [blocks, layout, sections.length, occupancy]);
-
-  useEffect(() => {
-    if (!cavaId) {
-      setOccupancy({});
-      return undefined;
-    }
-    let cancelled = false;
-    getCavaOccupancy(cavaId)
-      .then((rows) => {
-        if (cancelled) return;
-        const map = {};
-        (rows || []).forEach((row) => {
-          const key = slotKey(row.hall, row.rack, row.place);
-          if (!map[key]) map[key] = [];
-          map[key].push(row);
-        });
-        Object.values(map).forEach((list) => list.sort((a, b) => a.level - b.level));
-        setOccupancy(map);
-      })
-      .catch(() => {
-        if (!cancelled) setOccupancy({});
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [cavaId, occupancyRevision, occupancyTick]);
 
   const selectedBlock = selected ? (blocks || []).find((block) => block.key === selected.blockKey) : null;
   const selectedIsFloor = isFloorBlock(selectedBlock);
@@ -2135,7 +2123,9 @@ export default function CavaPlan({
             readOnly={readOnly}
             anchorEl={selected.anchorEl}
             onClose={() => setSelected(null)}
-            onChanged={() => setOccupancyTick((value) => value + 1)}
+            onChanged={() => {
+              void mutateOccupancy();
+            }}
           />
         ) : null}
         {kpiSelected && kpiMenuData ? (
@@ -2151,33 +2141,49 @@ export default function CavaPlan({
             showPush={kpiShowPush}
             isPush={kpiIsPush}
             readOnly={readOnly}
-            onChanged={() => setOccupancyTick((value) => value + 1)}
+            onChanged={() => {
+              void mutateOccupancy();
+            }}
           />
         ) : null}
       </AnimatePresence>
       <div
-        className="flex w-full max-w-full justify-center overflow-x-auto"
+        className="relative w-full max-lg:max-h-[min(55dvh,640px)] max-lg:overflow-auto max-lg:overscroll-contain max-lg:rounded-md max-lg:border max-lg:border-slate-200/80 max-lg:bg-slate-50/40 lg:flex lg:max-w-full lg:justify-center lg:overflow-x-auto"
         style={{ padding: DOOR_OVERHANG }}
+        onScroll={() => {
+          if (selected) setSelected(null);
+          if (kpiSelected) setKpiSelected(null);
+        }}
       >
-        {/* Master H: min-width. Master V: min-height. El otro eje = fit del contenido. */}
-        <div
-          className="relative box-border w-max max-w-full border-2 border-slate-700 bg-white"
-          style={{ padding: FRAME_PAD, ...planFrameMinStyle(masterAxis) }}
-        >
-          <DoorMarks doors={layout.doors} />
-          <div
-            className="relative flex min-h-0 w-full min-w-0 flex-col items-stretch justify-start"
-            style={{ gap: CROSS_ORIENTATION_GAP }}
-          >
-            {sections.length ? (
-              sections.map((section, sectionIndex) => renderSection(section, sectionIndex))
-            ) : (
-              <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-slate-400">
-                Agregue racks para ver el plano.
-              </p>
-            )}
+        {/* Desktop: igual que antes. Mobile: scroll H+V sin aplastar el lienzo. */}
+        {occupancyLoading && !occupancyRows ? (
+          <div className="flex min-h-[240px] w-full flex-col items-center justify-center gap-2 py-10">
+            <div
+              className="h-9 w-9 animate-spin rounded-full border-[3px] border-sky-600 border-t-transparent"
+              aria-hidden
+            />
+            <p className="text-xs text-slate-500">Cargando mapa de calor…</p>
           </div>
-        </div>
+        ) : (
+          <div
+            className="relative box-border w-max border-2 border-slate-700 bg-white lg:max-w-full"
+            style={{ padding: FRAME_PAD, ...planFrameMinStyle(masterAxis) }}
+          >
+            <DoorMarks doors={layout.doors} />
+            <div
+              className="relative flex min-h-0 w-full min-w-0 flex-col items-stretch justify-start max-lg:w-max"
+              style={{ gap: CROSS_ORIENTATION_GAP }}
+            >
+              {sections.length ? (
+                sections.map((section, sectionIndex) => renderSection(section, sectionIndex))
+              ) : (
+                <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-slate-400">
+                  Agregue racks para ver el plano.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
