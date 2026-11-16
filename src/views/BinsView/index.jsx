@@ -105,6 +105,7 @@ const BinsView = () => {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -1126,6 +1127,7 @@ const BinsView = () => {
         section="bin"
         title="Historial de movimientos de bins"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
         onOpenItem={async (item) => {
           if (!item?.resource_id) return;

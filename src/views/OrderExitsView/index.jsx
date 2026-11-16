@@ -98,6 +98,7 @@ const Exits = () => {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -1189,6 +1190,7 @@ const Exits = () => {
         section="exit"
         title="Historial de movimientos de salidas"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
         onOpenItem={async (item) => {
           if (!item?.resource_id) return;

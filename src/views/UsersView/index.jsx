@@ -47,6 +47,7 @@ export default function UsersView() {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -435,6 +436,7 @@ export default function UsersView() {
         section="user"
         title="Historial de movimientos de usuarios"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
       />
     </Fragment>

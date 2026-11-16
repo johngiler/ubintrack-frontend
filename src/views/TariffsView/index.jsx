@@ -56,6 +56,7 @@ export default function TariffsView() {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -453,6 +454,7 @@ export default function TariffsView() {
         section="tariff"
         title="Historial de movimientos de tarifas"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
       />
     </Fragment>

@@ -10,14 +10,20 @@ import {
 export function useViewHistory(searchParams, setSearchParams) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyType, setHistoryType] = useState("");
+  const [historyActor, setHistoryActor] = useState("");
   const [historyBatch, setHistoryBatch] = useState(null);
 
   useEffect(() => {
-    const { open, historyType: type, historyBatch: batch } =
-      readOpenHistoryParams(searchParams);
+    const {
+      open,
+      historyType: type,
+      historyActor: actor,
+      historyBatch: batch,
+    } = readOpenHistoryParams(searchParams);
     if (!open) return;
     setHistoryOpen(true);
     setHistoryType(type || "");
+    setHistoryActor(actor || "");
     setHistoryBatch(batch);
     clearOpenHistoryParams(searchParams, setSearchParams);
   }, [searchParams, setSearchParams]);
@@ -26,10 +32,18 @@ export function useViewHistory(searchParams, setSearchParams) {
     historyOpen,
     setHistoryOpen,
     historyType,
+    historyActor,
     historyBatch,
-    openHistory: () => setHistoryOpen(true),
+    openHistory: () => {
+      setHistoryType("");
+      setHistoryActor("");
+      setHistoryBatch(null);
+      setHistoryOpen(true);
+    },
     closeHistory: () => {
       setHistoryOpen(false);
+      setHistoryType("");
+      setHistoryActor("");
       setHistoryBatch(null);
     },
   };

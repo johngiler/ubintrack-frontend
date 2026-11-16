@@ -50,6 +50,7 @@ export default function ProductsView() {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -533,6 +534,7 @@ export default function ProductsView() {
         section="product"
         title="Historial de movimientos de productos"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
       />
     </Fragment>

@@ -48,6 +48,7 @@ export default function ClientsView() {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -483,6 +484,7 @@ export default function ClientsView() {
         section="client"
         title="Historial de movimientos de clientes"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
       />
     </Fragment>

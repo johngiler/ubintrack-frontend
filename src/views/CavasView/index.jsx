@@ -53,6 +53,7 @@ export default function CavasView() {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -399,6 +400,7 @@ export default function CavasView() {
         section="cava"
         title="Historial de movimientos de cavas"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
       />
     </Fragment>

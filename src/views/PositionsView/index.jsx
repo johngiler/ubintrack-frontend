@@ -92,6 +92,7 @@ export default function PositionsView() {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -868,6 +869,7 @@ export default function PositionsView() {
         section="position"
         title="Historial de movimientos de posiciones"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
         onOpenItem={async (item) => {
           if (!item?.resource_id) return;

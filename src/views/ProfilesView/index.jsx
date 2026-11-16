@@ -46,6 +46,7 @@ export default function ProfilesView() {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -433,6 +434,7 @@ export default function ProfilesView() {
         section="profile"
         title="Historial de movimientos de perfiles"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
       />
     </Fragment>

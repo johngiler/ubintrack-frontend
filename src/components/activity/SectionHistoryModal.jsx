@@ -46,10 +46,11 @@ export default function SectionHistoryModal({
   title,
   initialBatchId = null,
   initialAction = "",
+  initialActor = "",
   onOpenItem,
 }) {
   const [action, setAction] = useState(initialAction || "");
-  const [actor, setActor] = useState("");
+  const [actor, setActor] = useState(initialActor || "");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [batchId, setBatchId] = useState(null);
@@ -57,8 +58,9 @@ export default function SectionHistoryModal({
   useEffect(() => {
     if (!open) return;
     setAction(initialAction || "");
-    if (initialBatchId) setBatchId(initialBatchId);
-  }, [open, initialAction, initialBatchId]);
+    setActor(initialActor || "");
+    setBatchId(initialBatchId || null);
+  }, [open, initialAction, initialActor, initialBatchId]);
 
   const filters = useMemo(
     () => ({ action, actor, dateFrom, dateTo }),

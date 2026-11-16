@@ -106,6 +106,7 @@ const Entries = () => {
   const {
     historyOpen,
     historyType,
+    historyActor,
     historyBatch,
     openHistory,
     closeHistory,
@@ -839,6 +840,7 @@ const Entries = () => {
         section="entry"
         title="Historial de movimientos de entradas"
         initialAction={historyType}
+        initialActor={historyActor}
         initialBatchId={historyBatch}
         onOpenItem={async (item) => {
           if (!item?.resource_id) return;

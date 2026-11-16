@@ -29,12 +29,13 @@ function historyQuery(extra = {}) {
   const params = new URLSearchParams();
   params.set("openHistory", "1");
   if (extra.historyType) params.set("historyType", extra.historyType);
+  if (extra.historyActor) params.set("historyActor", String(extra.historyActor));
   if (extra.historyBatch != null) params.set("historyBatch", String(extra.historyBatch));
   const q = params.toString();
   return q ? `?${q}` : "";
 }
 
-/** Campanita → historial general de la vista (detalle fino = ítem). */
+/** Campanita → historial general de la vista, filtrado por evento/autor/lote. */
 export function notificationHref(item) {
   const artifact = item?.artifact;
   const event = item?.event;
@@ -52,13 +53,17 @@ export function notificationHref(item) {
               : typeof event === "string" && event.startsWith("bulk_")
                 ? event
                 : "";
+  const historyActor =
+    item?.actor_id != null && item.actor_id !== ""
+      ? String(item.actor_id)
+      : "";
   const historyBatch =
     item?.batch_id ??
     item?.history_batch ??
     item?.activity_batch_id ??
     item?.payload?.batch_id ??
     null;
-  const q = historyQuery({ historyType, historyBatch });
+  const q = historyQuery({ historyType, historyActor, historyBatch });
 
   switch (artifact) {
     case "entry":
@@ -71,6 +76,8 @@ export function notificationHref(item) {
       return `/storage/positions${q}`;
     case "cava":
       return `/storage/cavas${q}`;
+    case "task":
+      return `/tasks/tasks${q}`;
     default: {
       const target = item?.target;
       if (target === "cavas_list") return `/storage/cavas${q}`;
@@ -79,6 +86,9 @@ export function notificationHref(item) {
       if (target === "bins_list") return `/inventory/bins${q}`;
       if (target === "positions_list" || target === "position_detail") {
         return `/storage/positions${q}`;
+      }
+      if (target === "tasks_list" || target === "task_detail") {
+        return `/tasks/tasks${q}`;
       }
       return "/dashboard";
     }

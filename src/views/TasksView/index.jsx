@@ -9,6 +9,7 @@ import {
   Eye,
   Filter,
   FilterX,
+  History,
   ListTodo,
   Pencil,
   Play,
@@ -17,6 +18,10 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
+import { useWmsSearchParams } from "@/hooks/useWmsRouter";
+import { useViewHistory } from "@/hooks/useViewHistory";
+import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import ViewHistoryButton from "@/components/activity/ViewHistoryButton";
 
 import {
   Alert,
@@ -34,7 +39,7 @@ import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import TasksViewSkeleton from "./TasksViewSkeleton";
 import { formatDateTime } from "@/lib/format";
-import { getTasks, patchTask } from "@/services/taskService";
+import { getTask, getTasks, patchTask } from "@/services/taskService";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
@@ -89,12 +94,22 @@ function scopeSummary(task) {
 export default function TasksView() {
   const user = useAuth().user;
   const perms = canCRUD(user, "task", "task");
+  const [searchParams, setSearchParams] = useWmsSearchParams();
+  const {
+    historyOpen,
+    historyType,
+    historyActor,
+    historyBatch,
+    openHistory,
+    closeHistory,
+  } = useViewHistory(searchParams, setSearchParams);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [modalMode, setModalMode] = useState("view");
+  const [modalInitialTab, setModalInitialTab] = useState("details");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -140,15 +155,17 @@ export default function TasksView() {
     setFilters(EMPTY_FILTERS);
   };
 
-  const handleShowModal = (task, mode) => {
+  const handleShowModal = (task, mode, initialTab = "details") => {
     setSelectedTask(task);
     setModalMode(mode);
+    setModalInitialTab(initialTab);
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedTask(null);
+    setModalInitialTab("details");
   };
 
   const handleAfterSave = async () => {
@@ -228,6 +245,7 @@ export default function TasksView() {
                 >
                   Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
                 </Button>
+                <ViewHistoryButton onClick={openHistory} />
                 {perms.add ? (
                   <Button
                     variant="primary"
@@ -417,6 +435,19 @@ export default function TasksView() {
                                 <IconButton
                                   variant="ghost"
                                   size="sm"
+                                  className="text-amber-600"
+                                  title="Ver historial"
+                                  onClick={() =>
+                                    handleShowModal(task, "view", "history")
+                                  }
+                                >
+                                  <History className="h-4 w-4" />
+                                </IconButton>
+                              ) : null}
+                              {perms.view ? (
+                                <IconButton
+                                  variant="ghost"
+                                  size="sm"
                                   title="Ver"
                                   onClick={() => handleShowModal(task, "view")}
                                 >
@@ -523,6 +554,7 @@ export default function TasksView() {
         onHide={handleCloseModal}
         task={selectedTask}
         mode={modalMode}
+        initialTab={modalInitialTab}
         onSave={handleAfterSave}
       />
 
@@ -538,6 +570,25 @@ export default function TasksView() {
           showAlertMessage("success", "Tarea eliminada");
         }}
         showAlert={showAlertMessage}
+      />
+
+      <SectionHistoryModal
+        open={historyOpen}
+        onClose={closeHistory}
+        section="task"
+        title="Historial de movimientos de tareas"
+        initialAction={historyType}
+        initialActor={historyActor}
+        initialBatchId={historyBatch}
+        onOpenItem={async (item) => {
+          if (!item?.resource_id) return;
+          try {
+            const task = await getTask(item.resource_id);
+            handleShowModal(task, "view", "history");
+          } catch {
+            showAlertMessage("danger", "No se pudo abrir la tarea.");
+          }
+        }}
       />
     </Fragment>
   );
