@@ -347,7 +347,7 @@ export default function TasksView() {
           ) : (
             <div className="overflow-x-auto">
               <Table hover className="mb-0 min-w-[1100px]">
-                <Table.Header>
+                <Table.Head>
                   <Table.Row>
                     <Table.HeaderCell>Tarea</Table.HeaderCell>
                     <Table.HeaderCell>Tipo</Table.HeaderCell>
@@ -358,7 +358,7 @@ export default function TasksView() {
                     <Table.HeaderCell>Asignados</Table.HeaderCell>
                     <Table.HeaderCell className="text-end">Acciones</Table.HeaderCell>
                   </Table.Row>
-                </Table.Header>
+                </Table.Head>
                 <Table.Body>
                   {tasks.map((task) => {
                     const isExpanded = Boolean(expandedLogs[task.id]);
