@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Printer, RefreshCw, Save, X } from "lucide-react";
 
-import { Modal, Button, Form, Row, Col, Alert, Tabs, Tab } from "@/components/ui/bootstrap";
+import { Modal, Button, Form, Row, Col, Alert } from "@/components/ui/bootstrap";
+import ModalTabList from "@/components/ui/ModalTabList";
 import { IconButton } from "@/components/ui/Button";
 import Select from "@/components/ui/Select";
 import {
@@ -256,6 +257,16 @@ export default function ModalEdit({
       <Modal.Header closeButton>
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
+      {hasSavedPosition ? (
+        <ModalTabList
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { key: "details", title: "Detalles" },
+            { key: "movements", title: "Historial de movimientos" },
+          ]}
+        />
+      ) : null}
       <Modal.Body>
         {formError ? (
           <Alert
@@ -267,8 +278,12 @@ export default function ModalEdit({
             {formError}
           </Alert>
         ) : null}
-        <Tabs activeKey={activeTab} onSelect={setActiveTab} id="position-tabs">
-          <Tab eventKey="details" title="Detalles">
+        {hasSavedPosition && activeTab === "movements" ? (
+          <PositionMovementsTimeline
+            positionId={formData.id}
+            active={activeTab === "movements"}
+          />
+        ) : (
         <Form onSubmit={(e) => e.preventDefault()}>
           <Row className="gap-y-3">
             {readOnly && formData.code && (
@@ -534,16 +549,7 @@ export default function ModalEdit({
             ) : null}
           </Row>
         </Form>
-          </Tab>
-          {hasSavedPosition ? (
-            <Tab eventKey="movements" title="Historial de movimientos">
-              <PositionMovementsTimeline
-                positionId={formData.id}
-                active={activeTab === "movements"}
-              />
-            </Tab>
-          ) : null}
-        </Tabs>
+        )}
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={onHide} disabled={isSaving}>

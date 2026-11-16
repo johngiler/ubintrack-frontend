@@ -88,3 +88,19 @@ export const TASK_STATUS_OPTIONS = Object.entries(TASK_STATUS_LABELS).map(
 export const TASK_PRIORITY_OPTIONS = Object.entries(TASK_PRIORITY_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
+
+export const TASK_LINE_STATUS_LABELS = {
+  pendiente: "Pendiente",
+  contado: "Completo",
+  diferencia: "Incompleto",
+  no_existe: "No existe bin",
+  omitido: "Omitido",
+};
+
+export const TASK_LINE_STATUS_VARIANTS = {
+  pendiente: "warning",
+  contado: "success",
+  diferencia: "danger",
+  no_existe: "secondary",
+  omitido: "secondary",
+};

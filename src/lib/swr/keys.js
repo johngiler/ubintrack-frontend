@@ -72,6 +72,8 @@ export const swrKeys = {
 
   binMovements: (binId, page, pageSize) =>
     binId ? ["bin-movements", binId, page, pageSize] : null,
+  binAudits: (binId, page, pageSize) =>
+    binId ? ["bin-audits", binId, page, pageSize] : null,
   exitMovements: (exitId, page, pageSize) =>
     exitId ? ["exit-movements", exitId, page, pageSize] : null,
   entryMovements: (entryId, page, pageSize) =>

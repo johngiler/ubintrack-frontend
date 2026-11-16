@@ -8,12 +8,12 @@ import {
   Form,
   Row,
   Col,
-  Tabs,
-  Tab,
   Badge,
   Alert,
 } from "@/components/ui/bootstrap";
 import { IconButton } from "@/components/ui/Button";
+import ModalTabList from "@/components/ui/ModalTabList";
+import BinAuditsTimeline from "./BinAuditsTimeline";
 import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 import VisibleSliceList from "@/components/ui/VisibleSliceList";
@@ -67,12 +67,25 @@ const ModalEdit = ({
     products: {},
   });
 
+  const auditsCount = Number(selectedEntry?.audits_count || 0);
+  const hasAudits = auditsCount > 0;
+
   // Actualizar la pestaña activa cuando cambie initialTab o se abra el modal
   useEffect(() => {
     if (showModal) {
-      setActiveTab(initialTab);
+      const next =
+        initialTab === "audits" && !(Number(selectedEntry?.audits_count || 0) > 0)
+          ? "details"
+          : initialTab;
+      setActiveTab(next);
     }
-  }, [showModal, initialTab]);
+  }, [showModal, initialTab, selectedEntry?.audits_count]);
+
+  useEffect(() => {
+    if (activeTab === "audits" && !hasAudits) {
+      setActiveTab("details");
+    }
+  }, [activeTab, hasAudits]);
 
   useEffect(() => {
     if (showModal) {
@@ -969,6 +982,17 @@ const ModalEdit = ({
           )}
         </div>
       </Modal.Header>
+      {isViewMode && selectedEntry?.id ? (
+        <ModalTabList
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { key: "details", title: "Detalles" },
+            { key: "movements", title: "Historial de Movimientos" },
+            ...(hasAudits ? [{ key: "audits", title: "Auditorías" }] : []),
+          ]}
+        />
+      ) : null}
       <Modal.Body>
         {backendErrors ? (
           <Alert
@@ -982,19 +1006,19 @@ const ModalEdit = ({
         ) : null}
 
         {isViewMode && selectedEntry?.id ? (
-          <Tabs activeKey={activeTab} onSelect={setActiveTab} id="bin-tabs">
-            <Tab eventKey="details" title="Detalles">
-              <div className="pt-1">{binDetailsForm}</div>
-            </Tab>
-            <Tab eventKey="movements" title="Historial de Movimientos">
-              <div className="pt-3">
-                <BinMovementsTimeline
-                  binId={selectedEntry.id}
-                  active={activeTab === "movements"}
-                />
-              </div>
-            </Tab>
-          </Tabs>
+          activeTab === "movements" ? (
+            <BinMovementsTimeline
+              binId={selectedEntry.id}
+              active={activeTab === "movements"}
+            />
+          ) : activeTab === "audits" && hasAudits ? (
+            <BinAuditsTimeline
+              binId={selectedEntry.id}
+              active={activeTab === "audits"}
+            />
+          ) : (
+            binDetailsForm
+          )
         ) : (
           binDetailsForm
         )}

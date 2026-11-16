@@ -317,3 +317,10 @@ export async function getBinMovements(binId, page = 1, pageSize = 20) {
   );
   return response.data;
 }
+
+export async function getBinAudits(binId, page = 1, pageSize = 20) {
+  const response = await httpClient.get(
+    `/api/bins/${binId}/audits/?page=${page}&page_size=${pageSize}`,
+  );
+  return response.data;
+}

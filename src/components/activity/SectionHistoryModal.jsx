@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { useActivityInfinite } from "@/hooks/useActivityInfinite";
 import { swrKeys } from "@/lib/swr/keys";
 import { withoutActorPrefix } from "@/lib/actorDisplay";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatDocumentCode } from "@/lib/format";
 import { fetchActivityActors } from "@/services/activityService";
 
 const ACTION_OPTIONS = [
@@ -88,8 +88,12 @@ export default function SectionHistoryModal({
     const rows = actorsData?.results || [];
     const opts = [{ value: "", label: "Todos" }];
     if (actorsData?.has_system) opts.push({ value: "system", label: "Sistema" });
+    const seen = new Set();
     rows.forEach((row) => {
-      opts.push({ value: String(row.id), label: row.display });
+      const id = String(row.id);
+      if (seen.has(id)) return;
+      seen.add(id);
+      opts.push({ value: id, label: row.display });
     });
     return opts;
   }, [actorsData]);
@@ -206,7 +210,7 @@ export default function SectionHistoryModal({
                           {isBulk
                             ? ` · ${item.affected_count} ítems`
                             : item.resource_code
-                              ? ` · ${item.resource_code}`
+                              ? ` · ${formatDocumentCode(item.resource_code)}`
                               : ""}
                         </p>
                       </div>

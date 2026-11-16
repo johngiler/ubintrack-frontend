@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Save, X } from "lucide-react";
+import { FileText, Save, X } from "lucide-react";
 
-import { Modal, Button, Form, Row, Col, Alert, Tabs, Tab } from "@/components/ui/bootstrap";
+import { Modal, Button, Form, Row, Col, Alert } from "@/components/ui/bootstrap";
+import ModalTabList from "@/components/ui/ModalTabList";
 import Select from "@/components/ui/Select";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 import { getApiErrorMessage } from "@/services/httpClient";
@@ -12,6 +13,7 @@ import { getUsers, getClients } from "@/services/coreService";
 import { getCavas, getPositionHalls } from "@/services/storageService";
 import { getProducts } from "@/services/inventoryService";
 import { createTask, updateTask } from "@/services/taskService";
+import { formatDocumentCode } from "@/lib/format";
 import TaskLogsPanel from "./TaskLogsPanel";
 
 import {
@@ -241,7 +243,10 @@ export default function ModalEdit({
                     <Form.Label className="!text-xs !font-medium !text-slate-600">
                       Código
                     </Form.Label>
-                    <Form.Control value={formData.code || "—"} disabled />
+                    <Form.Control
+                      value={formatDocumentCode(formData.code) || "—"}
+                      disabled
+                    />
                   </Form.Group>
                 </Col>
               ) : null}
@@ -498,6 +503,16 @@ export default function ModalEdit({
       <Modal.Header closeButton>
         <Modal.Title>{modalTitle}</Modal.Title>
       </Modal.Header>
+      {formData.id ? (
+        <ModalTabList
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { key: "details", title: "Detalles" },
+            { key: "history", title: "Historial" },
+          ]}
+        />
+      ) : null}
       <Modal.Body>
         {formError ? (
           <Alert variant="danger" className="mb-3">
@@ -506,18 +521,11 @@ export default function ModalEdit({
         ) : null}
 
         {formData.id ? (
-          <Tabs activeKey={activeTab} onSelect={setActiveTab}>
-            <Tab eventKey="details" title="Detalles">
-              <div className="pt-1">{detailsForm}</div>
-            </Tab>
-            <Tab eventKey="history" title="Historial">
-              <div className="pt-3">
-                {activeTab === "history" ? (
-                  <TaskLogsPanel taskId={formData.id} />
-                ) : null}
-              </div>
-            </Tab>
-          </Tabs>
+          activeTab === "history" ? (
+            <TaskLogsPanel taskId={formData.id} />
+          ) : (
+            detailsForm
+          )
         ) : (
           detailsForm
         )}
@@ -526,6 +534,21 @@ export default function ModalEdit({
         <Button variant="secondary" icon={X} onClick={onHide} disabled={isSaving}>
           {readOnly ? "Cerrar" : "Cancelar"}
         </Button>
+        {formData.status === "completada" && formData.pdf_document ? (
+          <Button
+            variant="outline"
+            icon={FileText}
+            onClick={() =>
+              window.open(
+                formData.pdf_document,
+                "_blank",
+                "noopener,noreferrer",
+              )
+            }
+          >
+            Ver informe
+          </Button>
+        ) : null}
         {!readOnly ? (
           <Button
             variant="primary"

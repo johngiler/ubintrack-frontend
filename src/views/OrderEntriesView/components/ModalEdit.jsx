@@ -1,7 +1,8 @@
 "use client";
 
 import { FileText, Save, X } from "lucide-react";
-import { Modal, Button, Form, Row, Col, Badge, Alert, Tabs, Tab } from "@/components/ui/bootstrap";
+import { Modal, Button, Form, Row, Col, Badge, Alert } from "@/components/ui/bootstrap";
+import ModalTabList from "@/components/ui/ModalTabList";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 import EntryProductLines from "./EntryProductLines";
 import EntryMovementsTimeline from "./EntryMovementsTimeline";
@@ -391,9 +392,24 @@ const ModalEdit = ({
           )}
         </div>
       </Modal.Header>
+      {selectedEntry?.id ? (
+        <ModalTabList
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { key: "details", title: "Detalles" },
+            { key: "movements", title: "Historial de movimientos" },
+          ]}
+        />
+      ) : null}
       <Modal.Body>
-        <Tabs activeKey={activeTab} onSelect={setActiveTab} id="entry-tabs">
-          <Tab eventKey="details" title="Detalles">
+        {selectedEntry?.id && activeTab === "movements" ? (
+          <EntryMovementsTimeline
+            entryId={selectedEntry.id}
+            active={activeTab === "movements"}
+          />
+        ) : (
+        <>
         {selectedEntry && (
           <Form onSubmit={(e) => e.preventDefault()}>
             <Modal.Section title="Datos generales" className="!p-3.5">
@@ -931,16 +947,8 @@ const ModalEdit = ({
             {pdfAlert.message}
           </Alert>
         )}
-          </Tab>
-          {selectedEntry?.id ? (
-            <Tab eventKey="movements" title="Historial de movimientos">
-              <EntryMovementsTimeline
-                entryId={selectedEntry.id}
-                active={activeTab === "movements"}
-              />
-            </Tab>
-          ) : null}
-        </Tabs>
+        </>
+        )}
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={handleCloseModal}>

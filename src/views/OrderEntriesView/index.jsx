@@ -66,7 +66,7 @@ import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
 import { useViewHistory } from "@/hooks/useViewHistory";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { exportEntryOrdersToExcel } from "@/services/orderService";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDocumentCode } from "@/lib/format";
 
 const statusVariants = {
   pendiente: "warning",
@@ -647,7 +647,7 @@ const Entries = () => {
                               ) : (
                                 <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                               )}
-                              {entry.code}
+                              {formatDocumentCode(entry.code)}
                             </button>
                           </Table.Cell>
                           <Table.Cell>

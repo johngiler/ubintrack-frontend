@@ -233,7 +233,13 @@ export function Tab({ children }) {
 }
 Tab.isTab = true;
 
-export function Tabs({ activeKey, onSelect, children, className, defaultActiveKey }) {
+export function Tabs({
+  activeKey,
+  onSelect,
+  children,
+  className,
+  defaultActiveKey,
+}) {
   const [active, setActive] = React.useState(activeKey ?? defaultActiveKey);
   React.useEffect(() => {
     if (activeKey != null) setActive(activeKey);
@@ -246,17 +252,18 @@ export function Tabs({ activeKey, onSelect, children, className, defaultActiveKe
 
   return (
     <div className={className}>
-      <div className="mb-4 flex gap-1 overflow-x-auto">
+      <div className="mb-4 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--border-subtle)]">
         {items.map((tab) => (
           <button
             key={tab.props.eventKey}
             type="button"
             onClick={() => select(tab.props.eventKey)}
             className={cn(
-              "-mb-px shrink-0 px-4 py-2 text-sm font-medium transition-colors",
+              "relative -mb-px shrink-0 cursor-pointer border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors",
+              "outline-none focus-visible:bg-[var(--surface-hover)]",
               active === tab.props.eventKey
-                ? "brand-tab-active"
-                : "text-[var(--foreground-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--brand-primary)]",
+                ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
+                : "border-transparent text-[var(--foreground-muted)] hover:text-[var(--foreground)]",
             )}
           >
             {tab.props.title}

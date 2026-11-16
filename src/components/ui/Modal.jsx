@@ -13,10 +13,15 @@ const ModalContext = createContext({ onHide: null });
 export function Modal({ show, onHide, children, size = "lg", className, centered, layerClassName }) {
   useEffect(() => {
     if (!show) return;
-    const prev = document.body.style.overflow;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
+    document.body.classList.add("ubintrack-modal-open");
     return () => {
-      document.body.style.overflow = prev;
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+      document.body.classList.remove("ubintrack-modal-open");
     };
   }, [show]);
 
@@ -38,7 +43,7 @@ export function Modal({ show, onHide, children, size = "lg", className, centered
         <ModalContext.Provider value={{ onHide }}>
           <div
             className={cn(
-              "fixed inset-0 z-50 flex justify-center p-4",
+              "fixed inset-0 z-50 flex justify-center overflow-hidden p-4",
               centered !== false ? "items-center" : "items-end sm:items-center",
               layerClassName,
             )}
@@ -82,7 +87,7 @@ Modal.Header = function ModalHeader({ children, closeButton = true, onHide, clas
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4",
+        "flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4",
         className,
       )}
     >
@@ -107,14 +112,23 @@ Modal.Subtitle = function ModalSubtitle({ children, className }) {
 };
 
 Modal.Body = function ModalBody({ children, className }) {
-  return <div className={cn("flex-1 overflow-y-auto px-5 py-4", className)}>{children}</div>;
+  return (
+    <div
+      className={cn(
+        "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 };
 
 Modal.Footer = function ModalFooter({ children, className }) {
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-hover)]/40 px-5 py-3 max-lg:pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
+        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-hover)]/40 px-5 py-3 max-lg:pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
         className,
       )}
     >

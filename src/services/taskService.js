@@ -48,7 +48,7 @@ export async function getTaskLogs(page = 1, filters = {}) {
   const params = new URLSearchParams();
   params.set("page", String(page));
   params.set("page_size", String(filters.pageSize || 100));
-  params.set("ordering", filters.ordering || "created_at");
+  params.set("ordering", filters.ordering || "-created_at");
   if (filters.task) params.set("task", filters.task);
   if (filters.kind) params.set("kind", filters.kind);
   const response = await httpClient.get(`/api/task-logs/?${params.toString()}`);
@@ -62,5 +62,32 @@ export async function getTaskLines(page = 1, filters = {}, pageSize = 50) {
   if (filters.task) params.set("task", filters.task);
   if (filters.line_status) params.set("line_status", filters.line_status);
   const response = await httpClient.get(`/api/task-lines/?${params.toString()}`);
+  return response.data;
+}
+
+export async function patchTaskLine(id, data) {
+  const response = await httpClient.patch(`/api/task-lines/${id}/`, data);
+  return response.data;
+}
+
+export async function verifyTaskPosition(taskId, positionCode, { lineId } = {}) {
+  const payload = { position_code: positionCode };
+  if (lineId != null) payload.line_id = lineId;
+  const response = await httpClient.post(
+    `/api/tasks/${taskId}/verify_position/`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function generateTaskLines(taskId, { force = false } = {}) {
+  const response = await httpClient.post(`/api/tasks/${taskId}/generate_lines/`, {
+    force: Boolean(force),
+  });
+  return response.data;
+}
+
+export async function regenerateTaskPdf(taskId) {
+  const response = await httpClient.post(`/api/tasks/${taskId}/regenerate_pdf/`);
   return response.data;
 }

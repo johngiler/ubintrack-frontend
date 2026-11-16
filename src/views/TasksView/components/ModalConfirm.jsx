@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Trash2, X } from "lucide-react";
 
 import { Modal, Button } from "@/components/ui/bootstrap";
+import { formatDocumentCode } from "@/lib/format";
 import { deleteTask } from "@/services/taskService";
 
 export default function ModalConfirm({ show, onHide, task, onDelete, showAlert }) {
@@ -28,7 +29,8 @@ export default function ModalConfirm({ show, onHide, task, onDelete, showAlert }
         <Modal.Title>Confirmar eliminación</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        ¿Está seguro que desea eliminar la tarea <strong>{task?.code}</strong>?
+        ¿Está seguro que desea eliminar la tarea{" "}
+        <strong>{formatDocumentCode(task?.code)}</strong>?
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={onHide} disabled={isDeleting}>

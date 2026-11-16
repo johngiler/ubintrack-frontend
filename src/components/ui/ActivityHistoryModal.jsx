@@ -20,9 +20,7 @@ export default function ActivityHistoryModal({
       </Modal.Header>
       <Modal.Body>
         {toolbar ? <div className="mb-4">{toolbar}</div> : null}
-        <div className="max-h-[min(60vh,32rem)] overflow-y-auto overscroll-contain">
-          {children}
-        </div>
+        {children}
       </Modal.Body>
       <Modal.Footer>
         <Button variant="outline" size="sm" onClick={onClose}>

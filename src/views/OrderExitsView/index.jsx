@@ -72,6 +72,7 @@ import ModalImport from "./components/ModalImport";
 import ModalReplaceBin from "./components/ModalReplaceBin";
 import ExitExpandedProducts from "./components/ExitExpandedProducts";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
+import { formatDocumentCode } from "@/lib/format";
 
 const statusVariants = {
   pendiente: "warning",
@@ -958,7 +959,7 @@ const Exits = () => {
                               ) : (
                                 <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                               )}
-                              {exit.code}
+                              {formatDocumentCode(exit.code)}
                             </button>
                           </Table.Cell>
                           <Table.Cell>

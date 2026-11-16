@@ -3,14 +3,15 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  Check,
+  ChevronDown,
+  ChevronUp,
   Eye,
+  FileText,
   Filter,
   FilterX,
   History,
   ListTodo,
   Pencil,
-  Play,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -38,18 +39,24 @@ import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import TasksViewSkeleton from "./TasksViewSkeleton";
-import { getTask, getTasks, patchTask } from "@/services/taskService";
+import {
+  generateTaskLines,
+  getTask,
+  getTasks,
+  patchTask,
+} from "@/services/taskService";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
+import { formatDocumentCode } from "@/lib/format";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
+import TaskLinesPanel from "./components/TaskLinesPanel";
+import TaskStatusMenu from "./components/TaskStatusMenu";
 import {
   EMPTY_TASK,
   TASK_PRIORITY_LABELS,
   TASK_PRIORITY_OPTIONS,
   TASK_PRIORITY_VARIANTS,
-  TASK_STATUS_LABELS,
   TASK_STATUS_OPTIONS,
-  TASK_STATUS_VARIANTS,
   TASK_TYPE_LABELS,
   TASK_TYPE_OPTIONS,
 } from "./taskLabels";
@@ -69,24 +76,19 @@ function coverageLabel(task) {
   return `${done}/${total}`;
 }
 
-function scopeSummary(task) {
-  const parts = [];
-  if (task.client?.name) parts.push(task.client.name);
-
-  const cavaNames = (task.cavas || [])
-    .map((c) => c.name || c.code)
-    .filter(Boolean);
-  if (cavaNames.length) parts.push(cavaNames.join(", "));
-
-  const halls = Array.isArray(task.halls) ? task.halls.filter(Boolean) : [];
-  if (halls.length) parts.push(halls.join(", "));
-
-  const productNames = (task.products || [])
-    .map((p) => p.name || p.client_sku)
-    .filter(Boolean);
-  if (productNames.length) parts.push(productNames.join(", "));
-
-  return parts.length ? parts.join(" · ") : "Todo el alcance";
+/** Cliente arriba; cava / pasillo / producto abajo en una línea. */
+function scopeDisplay(task) {
+  const client = task.client?.name || "";
+  const detail = [
+    ...(task.cavas || []).map((c) => c.name || c.code).filter(Boolean),
+    ...(Array.isArray(task.halls) ? task.halls : [])
+      .map((h) => String(h || "").trim())
+      .filter(Boolean),
+    ...(task.products || [])
+      .map((p) => p.name || p.client_sku)
+      .filter(Boolean),
+  ].join(" · ");
+  return { client, detail };
 }
 
 export default function TasksView() {
@@ -112,6 +114,7 @@ export default function TasksView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 400);
 
@@ -176,17 +179,43 @@ export default function TasksView() {
       if (status === "en_proceso" && !task.started_at) {
         patch.started_at = new Date().toISOString();
       }
-      if (status === "completada") {
-        patch.completed_at = new Date().toISOString();
+      if (status === "completada" || status === "verificacion") {
+        if (status === "completada") {
+          patch.completed_at = new Date().toISOString();
+        }
+        // Backend redirige a verificacion si require_approval.
       }
-      await patchTask(task.id, patch);
+      const updated = await patchTask(task.id, patch);
+      if (status === "en_proceso") {
+        const gen = await generateTaskLines(task.id);
+        if (!gen?.lines_count) {
+          showAlertMessage(
+            "warning",
+            "Tarea iniciada sin bins almacenados en el alcance.",
+          );
+          await loadTasks();
+          return;
+        }
+      }
       await loadTasks();
+      showAlertMessage(
+        "success",
+        updated?.status === "completada"
+          ? "Tarea completada"
+          : "Estado actualizado",
+      );
     } catch (err) {
       showAlertMessage(
         "danger",
         getApiErrorMessage(err, "No se pudo actualizar el estado."),
       );
     }
+  };
+
+  const canAdvanceTask = (task) => {
+    const total = Number(task.lines_count || 0);
+    const done = Number(task.lines_done || 0);
+    return total > 0 && done >= total;
   };
 
   return (
@@ -348,150 +377,207 @@ export default function TasksView() {
                   <Table.Row>
                     <Table.HeaderCell>Tarea</Table.HeaderCell>
                     <Table.HeaderCell>Tipo</Table.HeaderCell>
-                    <Table.HeaderCell>Estado</Table.HeaderCell>
                     <Table.HeaderCell>Prioridad</Table.HeaderCell>
                     <Table.HeaderCell>Alcance</Table.HeaderCell>
                     <Table.HeaderCell>Recorrido</Table.HeaderCell>
                     <Table.HeaderCell>Asignados</Table.HeaderCell>
+                    <Table.HeaderCell>Estado</Table.HeaderCell>
                     <Table.HeaderCell className="text-end">Acciones</Table.HeaderCell>
                   </Table.Row>
                 </Table.Head>
                 <Table.Body>
-                  {tasks.map((task) => (
-                    <Table.Row key={task.id}>
-                      <Table.Cell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-semibold text-slate-800">
-                            {task.code}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {task.title || "Sin título"}
-                          </span>
-                        </div>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge variant="secondary" dot={false}>
-                          {TASK_TYPE_LABELS[task.task_type] || task.task_type}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge
-                          variant={TASK_STATUS_VARIANTS[task.status] || "secondary"}
-                          dot={false}
-                        >
-                          {TASK_STATUS_LABELS[task.status] || task.status}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge
-                          variant={
-                            TASK_PRIORITY_VARIANTS[task.priority] || "secondary"
-                          }
-                          dot={false}
-                        >
-                          {TASK_PRIORITY_LABELS[task.priority] || task.priority}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <span className="text-sm text-slate-600">
-                          {scopeSummary(task)}
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <span className="text-sm tabular-nums text-slate-700">
-                          {coverageLabel(task)}
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <span className="text-sm text-slate-600">
-                          {(task.assigned_to || [])
-                            .map((u) => u.full_name || u.username)
-                            .join(", ") || "—"}
-                        </span>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <div className="flex justify-end gap-1">
-                          {perms.view ? (
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              className="text-amber-600"
-                              title="Ver historial"
+                  {tasks.map((task) => {
+                    const isExpanded = expandedTaskId === task.id;
+                    const advanceReady = canAdvanceTask(task);
+                    const alcance = scopeDisplay(task);
+                    return (
+                      <Fragment key={task.id}>
+                        <Table.Row>
+                          <Table.Cell>
+                            <button
+                              type="button"
+                              className="inline-flex cursor-pointer items-center gap-1.5 text-left"
                               onClick={() =>
-                                handleShowModal(task, "view", "history")
+                                setExpandedTaskId((prev) =>
+                                  prev === task.id ? null : task.id,
+                                )
                               }
                             >
-                              <History className="h-4 w-4" />
-                            </IconButton>
-                          ) : null}
-                          {perms.view ? (
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              title="Ver"
-                              onClick={() => handleShowModal(task, "view")}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </IconButton>
-                          ) : null}
-                          {perms.change ? (
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              title="Editar"
-                              onClick={() => handleShowModal(task, "edit")}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </IconButton>
-                          ) : null}
-                          {perms.change &&
-                          ["pendiente", "asignada"].includes(task.status) ? (
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              className="text-sky-600"
-                              title="Iniciar"
-                              onClick={() =>
-                                handleQuickStatus(task, "en_proceso")
+                              {isExpanded ? (
+                                <ChevronUp className="h-3.5 w-3.5 shrink-0 text-sky-700" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-sky-700" />
+                              )}
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold text-sky-700 hover:underline">
+                                  {formatDocumentCode(task.code)}
+                                </span>
+                                <span className="block text-xs text-slate-500">
+                                  {task.title || "Sin título"}
+                                </span>
+                              </span>
+                            </button>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Badge variant="secondary" dot={false}>
+                              {TASK_TYPE_LABELS[task.task_type] || task.task_type}
+                            </Badge>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Badge
+                              variant={
+                                TASK_PRIORITY_VARIANTS[task.priority] ||
+                                "secondary"
                               }
+                              dot={false}
                             >
-                              <Play className="h-4 w-4" />
-                            </IconButton>
-                          ) : null}
-                          {perms.change &&
-                          ["en_proceso", "verificacion"].includes(
-                            task.status,
-                          ) ? (
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              className="text-emerald-600"
-                              title="Completar"
-                              onClick={() =>
-                                handleQuickStatus(task, "completada")
+                              {TASK_PRIORITY_LABELS[task.priority] ||
+                                task.priority}
+                            </Badge>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {!alcance.client && !alcance.detail ? (
+                              <span className="text-xs text-slate-400">
+                                Todo el alcance
+                              </span>
+                            ) : (
+                              <div className="min-w-[10rem] max-w-[16rem]">
+                                {alcance.client ? (
+                                  <div
+                                    className="truncate text-sm font-medium text-slate-800"
+                                    title={alcance.client}
+                                  >
+                                    {alcance.client}
+                                  </div>
+                                ) : null}
+                                {alcance.detail ? (
+                                  <div
+                                    className="truncate text-xs text-slate-500"
+                                    title={alcance.detail}
+                                  >
+                                    {alcance.detail}
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <span className="text-sm tabular-nums text-slate-700">
+                              {coverageLabel(task)}
+                            </span>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <span className="text-sm text-slate-600">
+                              {(task.assigned_to || [])
+                                .map((u) => u.full_name || u.username)
+                                .join(", ") || "—"}
+                            </span>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <TaskStatusMenu
+                              task={task}
+                              canChange={Boolean(perms.change)}
+                              advanceReady={advanceReady}
+                              onChange={(status) =>
+                                handleQuickStatus(task, status)
                               }
+                            />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <div className="flex items-center justify-end gap-0.5">
+                              {task.status === "completada" &&
+                              task.pdf_document ? (
+                                <a
+                                  href={task.pdf_document}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Ver informe"
+                                  className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-sky-600 transition-colors hover:bg-sky-50"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                </a>
+                              ) : null}
+                              {perms.view ? (
+                                <IconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-amber-600"
+                                  title="Ver historial"
+                                  onClick={() =>
+                                    handleShowModal(task, "view", "history")
+                                  }
+                                >
+                                  <History className="h-4 w-4" />
+                                </IconButton>
+                              ) : null}
+                              {perms.view ? (
+                                <IconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  title="Ver"
+                                  onClick={() =>
+                                    handleShowModal(task, "view")
+                                  }
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </IconButton>
+                              ) : null}
+                              {perms.change ? (
+                                <IconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  title="Editar"
+                                  onClick={() =>
+                                    handleShowModal(task, "edit")
+                                  }
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </IconButton>
+                              ) : null}
+                              {perms.delete ? (
+                                <IconButton
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-rose-600"
+                                  title="Eliminar"
+                                  onClick={() => {
+                                    setSelectedTask(task);
+                                    setShowConfirmModal(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </IconButton>
+                              ) : null}
+                            </div>
+                          </Table.Cell>
+                        </Table.Row>
+                        {isExpanded ? (
+                          <Table.Row>
+                            <Table.Cell
+                              colSpan={8}
+                              className="!bg-slate-50/80 p-0"
                             >
-                              <Check className="h-4 w-4" />
-                            </IconButton>
-                          ) : null}
-                          {perms.delete ? (
-                            <IconButton
-                              variant="ghost"
-                              size="sm"
-                              className="text-rose-600"
-                              title="Eliminar"
-                              onClick={() => {
-                                setSelectedTask(task);
-                                setShowConfirmModal(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </IconButton>
-                          ) : null}
-                        </div>
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
+                              <div className="border-t border-[var(--border-subtle)] px-4 py-3">
+                                <TaskLinesPanel
+                                  taskId={task.id}
+                                  taskStatus={task.status}
+                                  canEdit={Boolean(
+                                    perms.change &&
+                                      ["en_proceso", "asignada", "verificacion"].includes(
+                                        task.status,
+                                      ),
+                                  )}
+                                  onChanged={() => {
+                                    void loadTasks();
+                                  }}
+                                />
+                              </div>
+                            </Table.Cell>
+                          </Table.Row>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
                 </Table.Body>
               </Table>
             </div>

@@ -39,7 +39,7 @@ export default function TaskLogsPanel({ taskId, logs: logsProp }) {
       getTaskLogs(1, {
         task: taskId,
         kind: kindFilter === "workflow" ? "workflow" : undefined,
-        ordering: "created_at",
+        ordering: "-created_at",
         pageSize: 100,
       }),
     { revalidateOnFocus: false },
@@ -53,7 +53,7 @@ export default function TaskLogsPanel({ taskId, logs: logsProp }) {
           ? list.filter((row) => row.kind === "workflow")
           : list;
       return filtered.sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
     }
     return data?.results || [];
@@ -68,7 +68,7 @@ export default function TaskLogsPanel({ taskId, logs: logsProp }) {
         <div>
           <h6 className="text-sm font-semibold text-slate-800">Historial</h6>
           <p className="mb-0 text-xs text-slate-500">
-            {logs.length} {logs.length === 1 ? "evento" : "eventos"} · orden de ejecución
+            {logs.length} {logs.length === 1 ? "evento" : "eventos"} · más reciente primero
           </p>
         </div>
         <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
@@ -98,7 +98,7 @@ export default function TaskLogsPanel({ taskId, logs: logsProp }) {
         <p className="py-2 text-center text-sm text-slate-500">Sin eventos registrados</p>
       ) : (
         <>
-          <div className="max-h-72 space-y-2 overflow-y-auto">
+          <div className="space-y-2">
             {visibleItems.map((log) => (
               <div
                 key={log.id}

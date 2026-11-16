@@ -186,6 +186,11 @@ body {
     color-mix(in srgb, var(--brand-primary) 12%, transparent);
 }
 
+/* Con modal abierto: el main del shell no debe mostrar scrollbar detrás. */
+body.ubintrack-modal-open main {
+  overflow: hidden !important;
+}
+
 .text-brand {
   color: var(--brand-primary);
 }
