@@ -10,7 +10,7 @@ export const TASK_TYPE_HINTS = {
   conteo_ciclico:
     "Conteo parcial asignable por producto, pasillo, cámara o cliente; con evidencia y PDF por cliente.",
   inventario_general:
-    "Barrido del alcance (incluye vacías); cobertura, diferencias, reconteo y aprobación.",
+    "Barrido del alcance; cobertura, diferencias, reconteo y aprobación.",
 };
 
 export const TASK_STATUS_LABELS = {

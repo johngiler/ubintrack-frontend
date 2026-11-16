@@ -56,6 +56,11 @@ export function getApiErrorMessage(error, fallback = "Error inesperado") {
     if (typeof data.error === "string" && data.error.trim()) return data.error.trim();
     if (typeof data.detail === "string" && data.detail.trim()) return data.detail.trim();
     if (typeof data.message === "string" && data.message.trim()) return data.message.trim();
+    const fieldMsg = Object.values(data)
+      .flatMap((value) => (Array.isArray(value) ? value : [value]))
+      .map((item) => (typeof item === "string" ? item : item?.string || ""))
+      .find((text) => text && String(text).trim());
+    if (fieldMsg) return String(fieldMsg).trim();
   }
   if (error?.message && !/^Request failed with status code \d+$/i.test(error.message)) {
     return error.message;

@@ -76,6 +76,21 @@ export default function ModalEdit({
   const isInventarioGeneral = formData.task_type === "inventario_general";
   const showProduct = formData.task_type !== "inventario_inicial";
 
+  const applyAssignees = (list) => {
+    const next = list || [];
+    setFormData((prev) => {
+      let status = prev.status;
+      if (next.length > 0 && status === "pendiente") status = "asignada";
+      if (next.length === 0 && status === "asignada") status = "pendiente";
+      return {
+        ...prev,
+        assigned_to: next,
+        assigned_to_ids: next.map((o) => o.value),
+        status,
+      };
+    });
+  };
+
   const cavaIdsKey = (formData.cava_ids || []).slice().sort().join(",");
 
   const { data: hallsData, isLoading: hallsLoading } = useSWR(
@@ -175,21 +190,27 @@ export default function ModalEdit({
     setIsSaving(true);
     setFormError(null);
     try {
+      const assignedIds = formData.assigned_to_ids || [];
       const payload = {
         title: formData.title || "",
         task_type: formData.task_type,
-        status: formData.status,
+        status:
+          assignedIds.length > 0 && formData.status === "pendiente"
+            ? "asignada"
+            : formData.status,
         priority: formData.priority,
         observations: formData.observations || "",
         halls: formData.halls || [],
-        include_empty_positions: Boolean(formData.include_empty_positions),
         require_approval: Boolean(formData.require_approval),
-        assigned_to_ids: formData.assigned_to_ids || [],
+        assigned_to_ids: assignedIds,
         client_id: formData.client_id || null,
         cava_ids: formData.cava_ids || [],
         product_ids: showProduct ? formData.product_ids || [] : [],
         is_active: formData.is_active !== false,
       };
+      if (isInventarioGeneral) {
+        payload.include_empty_positions = true;
+      }
       if (formData.id) {
         await updateTask(formData.id, payload);
       } else {
@@ -239,6 +260,23 @@ export default function ModalEdit({
                   />
                 </Form.Group>
               </Col>
+              <Col md={12}>
+                <Form.Group className="mb-0">
+                  <Form.Label className="!text-xs !font-medium !text-slate-600">
+                    Asignados
+                  </Form.Label>
+                  <AsyncSelect
+                    isMulti
+                    cacheOptions
+                    defaultOptions
+                    loadOptions={loadUsers}
+                    value={assignedValue}
+                    isDisabled={readOnly}
+                    placeholder="Seleccione usuarios"
+                    onChange={(opts) => applyAssignees(opts)}
+                  />
+                </Form.Group>
+              </Col>
               <Col md={4}>
                 <Form.Group className="mb-0">
                   <Form.Label className="!text-xs !font-medium !text-slate-600">
@@ -253,10 +291,6 @@ export default function ModalEdit({
                       setFormData((prev) => ({
                         ...prev,
                         task_type: value,
-                        include_empty_positions:
-                          value === "inventario_general"
-                            ? true
-                            : prev.include_empty_positions,
                         require_approval:
                           value === "inventario_general"
                             ? true
@@ -435,66 +469,26 @@ export default function ModalEdit({
                 </Col>
               ) : null}
               <Col md={12}>
-                <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-                  <Form.Check
-                    type="checkbox"
-                    id="include-empty"
-                    label="Incluir posiciones vacías"
-                    disabled={readOnly || isInventarioGeneral}
-                    checked={Boolean(formData.include_empty_positions)}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        include_empty_positions: e.target.checked,
-                      }))
-                    }
-                  />
-                  <Form.Check
-                    type="checkbox"
-                    id="require-approval"
-                    label="Requiere aprobación"
-                    disabled={readOnly || isInventarioGeneral}
-                    checked={Boolean(formData.require_approval)}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        require_approval: e.target.checked,
-                      }))
-                    }
-                  />
-                </div>
+                <Form.Check
+                  type="checkbox"
+                  id="require-approval"
+                  label="Requiere aprobación"
+                  disabled={readOnly || isInventarioGeneral}
+                  checked={Boolean(formData.require_approval)}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      require_approval: e.target.checked,
+                    }))
+                  }
+                />
                 {isInventarioGeneral ? (
                   <p className="mb-0 mt-1 text-xs text-slate-500">
-                    En inventario general estas opciones quedan activas.
+                    En inventario general la aprobación queda activa.
                   </p>
                 ) : null}
               </Col>
             </Row>
-          </Modal.Section>
-
-          <Modal.Section title="Asignación" className="!p-3.5">
-            <Form.Group className="mb-0">
-              <Form.Label className="!text-xs !font-medium !text-slate-600">
-                Asignados
-              </Form.Label>
-              <AsyncSelect
-                isMulti
-                cacheOptions
-                defaultOptions
-                loadOptions={loadUsers}
-                value={assignedValue}
-                isDisabled={readOnly}
-                placeholder="Seleccione usuarios"
-                onChange={(opts) => {
-                  const list = opts || [];
-                  setFormData((prev) => ({
-                    ...prev,
-                    assigned_to: list,
-                    assigned_to_ids: list.map((o) => o.value),
-                  }));
-                }}
-              />
-            </Form.Group>
           </Modal.Section>
 
           <Modal.Section title="Observaciones" className="!p-3.5">
