@@ -47,8 +47,10 @@ export async function deleteTask(id) {
 export async function getTaskLogs(page = 1, filters = {}) {
   const params = new URLSearchParams();
   params.set("page", String(page));
-  params.set("ordering", "-created_at");
+  params.set("page_size", String(filters.pageSize || 100));
+  params.set("ordering", filters.ordering || "created_at");
   if (filters.task) params.set("task", filters.task);
+  if (filters.kind) params.set("kind", filters.kind);
   const response = await httpClient.get(`/api/task-logs/?${params.toString()}`);
   return response.data;
 }

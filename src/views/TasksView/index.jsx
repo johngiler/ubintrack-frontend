@@ -4,8 +4,6 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
-  ChevronDown,
-  ChevronUp,
   Eye,
   Filter,
   FilterX,
@@ -20,7 +18,9 @@ import { useAuth } from "@/context/AuthContext";
 import { swrKeys, usePaginatedList, useDebouncedValue } from "@/lib/swr";
 import { useWmsSearchParams } from "@/hooks/useWmsRouter";
 import { useViewHistory } from "@/hooks/useViewHistory";
-import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
+import SectionHistoryModal, {
+  TASK_ACTION_OPTIONS,
+} from "@/components/activity/SectionHistoryModal";
 import ViewHistoryButton from "@/components/activity/ViewHistoryButton";
 
 import {
@@ -38,12 +38,10 @@ import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import TasksViewSkeleton from "./TasksViewSkeleton";
-import { formatDateTime } from "@/lib/format";
 import { getTask, getTasks, patchTask } from "@/services/taskService";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
-import TaskLogsPanel from "./components/TaskLogsPanel";
 import {
   EMPTY_TASK,
   TASK_PRIORITY_LABELS,
@@ -114,7 +112,6 @@ export default function TasksView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [expandedLogs, setExpandedLogs] = useState({});
 
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 400);
 
@@ -360,175 +357,141 @@ export default function TasksView() {
                   </Table.Row>
                 </Table.Head>
                 <Table.Body>
-                  {tasks.map((task) => {
-                    const isExpanded = Boolean(expandedLogs[task.id]);
-                    return (
-                      <Fragment key={task.id}>
-                        <Table.Row>
-                          <Table.Cell>
-                            <div className="flex flex-col gap-0.5">
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1 text-left text-sm font-semibold text-sky-700 hover:underline"
-                                onClick={() =>
-                                  setExpandedLogs((prev) => ({
-                                    ...prev,
-                                    [task.id]: !prev[task.id],
-                                  }))
-                                }
-                              >
-                                {isExpanded ? (
-                                  <ChevronUp className="h-3.5 w-3.5" />
-                                ) : (
-                                  <ChevronDown className="h-3.5 w-3.5" />
-                                )}
-                                {task.code}
-                              </button>
-                              <span className="text-xs text-slate-500">
-                                {task.title || "Sin título"}
-                              </span>
-                            </div>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Badge variant="secondary" dot={false}>
-                              {TASK_TYPE_LABELS[task.task_type] || task.task_type}
-                            </Badge>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Badge
-                              variant={TASK_STATUS_VARIANTS[task.status] || "secondary"}
-                              dot={false}
-                            >
-                              {TASK_STATUS_LABELS[task.status] || task.status}
-                            </Badge>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Badge
-                              variant={
-                                TASK_PRIORITY_VARIANTS[task.priority] || "secondary"
+                  {tasks.map((task) => (
+                    <Table.Row key={task.id}>
+                      <Table.Cell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-semibold text-slate-800">
+                            {task.code}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {task.title || "Sin título"}
+                          </span>
+                        </div>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Badge variant="secondary" dot={false}>
+                          {TASK_TYPE_LABELS[task.task_type] || task.task_type}
+                        </Badge>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Badge
+                          variant={TASK_STATUS_VARIANTS[task.status] || "secondary"}
+                          dot={false}
+                        >
+                          {TASK_STATUS_LABELS[task.status] || task.status}
+                        </Badge>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Badge
+                          variant={
+                            TASK_PRIORITY_VARIANTS[task.priority] || "secondary"
+                          }
+                          dot={false}
+                        >
+                          {TASK_PRIORITY_LABELS[task.priority] || task.priority}
+                        </Badge>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <span className="text-sm text-slate-600">
+                          {scopeSummary(task)}
+                        </span>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <span className="text-sm tabular-nums text-slate-700">
+                          {coverageLabel(task)}
+                        </span>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <span className="text-sm text-slate-600">
+                          {(task.assigned_to || [])
+                            .map((u) => u.full_name || u.username)
+                            .join(", ") || "—"}
+                        </span>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <div className="flex justify-end gap-1">
+                          {perms.view ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              className="text-amber-600"
+                              title="Ver historial"
+                              onClick={() =>
+                                handleShowModal(task, "view", "history")
                               }
-                              dot={false}
                             >
-                              {TASK_PRIORITY_LABELS[task.priority] || task.priority}
-                            </Badge>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <span className="text-sm text-slate-600">
-                              {scopeSummary(task)}
-                            </span>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <span className="text-sm tabular-nums text-slate-700">
-                              {coverageLabel(task)}
-                            </span>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <span className="text-sm text-slate-600">
-                              {(task.assigned_to || [])
-                                .map((u) => u.full_name || u.username)
-                                .join(", ") || "—"}
-                            </span>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <div className="flex justify-end gap-1">
-                              {perms.view ? (
-                                <IconButton
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-amber-600"
-                                  title="Ver historial"
-                                  onClick={() =>
-                                    handleShowModal(task, "view", "history")
-                                  }
-                                >
-                                  <History className="h-4 w-4" />
-                                </IconButton>
-                              ) : null}
-                              {perms.view ? (
-                                <IconButton
-                                  variant="ghost"
-                                  size="sm"
-                                  title="Ver"
-                                  onClick={() => handleShowModal(task, "view")}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </IconButton>
-                              ) : null}
-                              {perms.change ? (
-                                <IconButton
-                                  variant="ghost"
-                                  size="sm"
-                                  title="Editar"
-                                  onClick={() => handleShowModal(task, "edit")}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </IconButton>
-                              ) : null}
-                              {perms.change &&
-                              ["pendiente", "asignada"].includes(task.status) ? (
-                                <IconButton
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-sky-600"
-                                  title="Iniciar"
-                                  onClick={() =>
-                                    handleQuickStatus(task, "en_proceso")
-                                  }
-                                >
-                                  <Play className="h-4 w-4" />
-                                </IconButton>
-                              ) : null}
-                              {perms.change &&
-                              ["en_proceso", "verificacion"].includes(
-                                task.status,
-                              ) ? (
-                                <IconButton
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-emerald-600"
-                                  title="Completar"
-                                  onClick={() =>
-                                    handleQuickStatus(task, "completada")
-                                  }
-                                >
-                                  <Check className="h-4 w-4" />
-                                </IconButton>
-                              ) : null}
-                              {perms.delete ? (
-                                <IconButton
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-rose-600"
-                                  title="Eliminar"
-                                  onClick={() => {
-                                    setSelectedTask(task);
-                                    setShowConfirmModal(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </IconButton>
-                              ) : null}
-                            </div>
-                          </Table.Cell>
-                        </Table.Row>
-                        {isExpanded ? (
-                          <Table.Row>
-                            <Table.Cell colSpan={8} className="!bg-slate-50/80 p-0">
-                              <div className="border-t border-[var(--border-subtle)] px-4 py-3">
-                                <p className="mb-2 text-xs text-slate-500">
-                                  Creada {formatDateTime(task.created_at)}
-                                  {task.started_at
-                                    ? ` · Inicio ${formatDateTime(task.started_at)}`
-                                    : ""}
-                                </p>
-                                <TaskLogsPanel taskId={task.id} />
-                              </div>
-                            </Table.Cell>
-                          </Table.Row>
-                        ) : null}
-                      </Fragment>
-                    );
-                  })}
+                              <History className="h-4 w-4" />
+                            </IconButton>
+                          ) : null}
+                          {perms.view ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              title="Ver"
+                              onClick={() => handleShowModal(task, "view")}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </IconButton>
+                          ) : null}
+                          {perms.change ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              title="Editar"
+                              onClick={() => handleShowModal(task, "edit")}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </IconButton>
+                          ) : null}
+                          {perms.change &&
+                          ["pendiente", "asignada"].includes(task.status) ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              className="text-sky-600"
+                              title="Iniciar"
+                              onClick={() =>
+                                handleQuickStatus(task, "en_proceso")
+                              }
+                            >
+                              <Play className="h-4 w-4" />
+                            </IconButton>
+                          ) : null}
+                          {perms.change &&
+                          ["en_proceso", "verificacion"].includes(
+                            task.status,
+                          ) ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              className="text-emerald-600"
+                              title="Completar"
+                              onClick={() =>
+                                handleQuickStatus(task, "completada")
+                              }
+                            >
+                              <Check className="h-4 w-4" />
+                            </IconButton>
+                          ) : null}
+                          {perms.delete ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              className="text-rose-600"
+                              title="Eliminar"
+                              onClick={() => {
+                                setSelectedTask(task);
+                                setShowConfirmModal(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </IconButton>
+                          ) : null}
+                        </div>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
                 </Table.Body>
               </Table>
             </div>
@@ -577,6 +540,7 @@ export default function TasksView() {
         onClose={closeHistory}
         section="task"
         title="Historial de movimientos de tareas"
+        actionOptions={TASK_ACTION_OPTIONS}
         initialAction={historyType}
         initialActor={historyActor}
         initialBatchId={historyBatch}

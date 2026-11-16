@@ -36,6 +36,16 @@ const ACTION_OPTIONS = [
   { value: "bulk_regenerate", label: "Regeneración masiva" },
 ];
 
+/** Filtros de tipo priorizados para flujo operativo de tareas. */
+export const TASK_ACTION_OPTIONS = [
+  { value: "", label: "Todas" },
+  { value: "status", label: "Estado" },
+  { value: "create", label: "Creación" },
+  { value: "reassign", label: "Reasignación" },
+  { value: "update", label: "Actualización" },
+  { value: "delete", label: "Eliminación" },
+];
+
 /**
  * Historial macro de una sección. Lazy + SWRInfinite solo con open=true.
  */
@@ -47,8 +57,10 @@ export default function SectionHistoryModal({
   initialBatchId = null,
   initialAction = "",
   initialActor = "",
+  actionOptions = null,
   onOpenItem,
 }) {
+  const typeOptions = actionOptions || ACTION_OPTIONS;
   const [action, setAction] = useState(initialAction || "");
   const [actor, setActor] = useState(initialActor || "");
   const [dateFrom, setDateFrom] = useState("");
@@ -106,7 +118,7 @@ export default function SectionHistoryModal({
               <Form.Label className="text-xs">Tipo</Form.Label>
               <Select
                 size="sm"
-                options={ACTION_OPTIONS}
+                options={typeOptions}
                 value={action}
                 onChange={(e) => setAction(e.target.value || "")}
               />
