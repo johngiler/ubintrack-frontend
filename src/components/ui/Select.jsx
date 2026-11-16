@@ -46,10 +46,12 @@ export default function Select(props) {
     inputId,
     isClearable,
     isSearchable,
+    isMulti,
     ...rest
   } = domProps;
 
   const [SelectComponent, setSelectComponent] = useState(() => resolveSelectComponent());
+  const multi = Boolean(isMulti);
 
   useEffect(() => {
     if (!SelectComponent) {
@@ -64,10 +66,19 @@ export default function Select(props) {
     return optionsFromChildren(children);
   }, [optionsProp, children]);
 
-  const selected = useMemo(
-    () => findSelectOption(options, value),
-    [options, value],
-  );
+  const selected = useMemo(() => {
+    if (multi) {
+      const values = Array.isArray(value)
+        ? value
+        : value != null && value !== ""
+          ? [value]
+          : [];
+      return values
+        .map((item) => findSelectOption(options, item))
+        .filter(Boolean);
+    }
+    return findSelectOption(options, value);
+  }, [options, value, multi]);
 
   const { isDark } = useTheme();
 
@@ -89,11 +100,12 @@ export default function Select(props) {
         instanceId={id}
         classNamePrefix="react-select"
         options={options}
-        value={selected ?? null}
-        onChange={createSelectChangeHandler(onChange, name)}
+        value={multi ? selected : selected ?? null}
+        onChange={createSelectChangeHandler(onChange, name, multi)}
         isDisabled={Boolean(disabled ?? isDisabled)}
         placeholder={placeholder ?? "Seleccionar…"}
         isClearable={Boolean(isClearable)}
+        isMulti={multi}
         isSearchable={isSearchable ?? options.length > 8}
         styles={mergedStyles}
         components={{ ...(rest.components || {}), Input: SafeInput }}

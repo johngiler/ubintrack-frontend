@@ -1,30 +1,21 @@
 import httpClient from "./httpClient";
 
-// Tasks
 export async function getTasks(page = 1, filters = {}, searchTerm = "", pageSize = 20) {
-  let url = `/api/tasks/?page=${page}&page_size=${pageSize}`;
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
+  params.set("ordering", "-created_at");
 
-  // Agregar filtros a la URL
-  if (filters.task_type) {
-    url += `&task_type=${filters.task_type}`;
-  }
-  if (filters.status) {
-    url += `&status=${filters.status}`;
-  }
-  if (filters.priority) {
-    url += `&priority=${filters.priority}`;
-  }
-  if (filters.assigned_to) {
-    url += `&assigned_to=${filters.assigned_to}`;
-  }
-  if (searchTerm) {
-    url += `&search=${encodeURIComponent(searchTerm)}`;
-  }
+  if (filters.task_type) params.set("task_type", filters.task_type);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.priority) params.set("priority", filters.priority);
+  if (filters.assigned_to) params.set("assigned_to", filters.assigned_to);
+  if (filters.client) params.set("client", filters.client);
+  if (filters.cavas) params.set("cavas", filters.cavas);
+  if (filters.products) params.set("products", filters.products);
+  if (searchTerm) params.set("search", searchTerm);
 
-  // Ordenar por fecha de creación descendente
-  url += `&ordering=-created_at`;
-
-  const response = await httpClient.get(url);
+  const response = await httpClient.get(`/api/tasks/?${params.toString()}`);
   return response.data;
 }
 
@@ -53,83 +44,21 @@ export async function deleteTask(id) {
   return response.data;
 }
 
-// Task Logs
 export async function getTaskLogs(page = 1, filters = {}) {
-  let url = `/api/task-logs/?page=${page}`;
-
-  if (filters.task) {
-    url += `&task=${filters.task}`;
-  }
-
-  url += `&ordering=-created_at`;
-
-  const response = await httpClient.get(url);
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("ordering", "-created_at");
+  if (filters.task) params.set("task", filters.task);
+  const response = await httpClient.get(`/api/task-logs/?${params.toString()}`);
   return response.data;
 }
 
-export async function getTaskLog(id) {
-  const response = await httpClient.get(`/api/task-logs/${id}/`);
-  return response.data;
-}
-
-export async function createTaskLog(data) {
-  const response = await httpClient.post(`/api/task-logs/`, data);
-  return response.data;
-}
-
-export async function updateTaskLog(id, data) {
-  const response = await httpClient.put(`/api/task-logs/${id}/`, data);
-  return response.data;
-}
-
-export async function patchTaskLog(id, data) {
-  const response = await httpClient.patch(`/api/task-logs/${id}/`, data);
-  return response.data;
-}
-
-export async function deleteTaskLog(id) {
-  const response = await httpClient.delete(`/api/task-logs/${id}/`);
-  return response.data;
-}
-
-// Task Trackings
-export async function getTaskTrackings(page = 1, filters = {}, pageSize = 20) {
-  let url = `/api/task-trackings/?page=${page}&page_size=${pageSize}`;
-
-  if (filters.user) {
-    url += `&user=${filters.user}`;
-  }
-  if (filters.task) {
-    url += `&task=${filters.task}`;
-  }
-
-  url += `&ordering=-created_at`;
-
-  const response = await httpClient.get(url);
-  return response.data;
-}
-
-export async function getTaskTracking(id) {
-  const response = await httpClient.get(`/api/task-trackings/${id}/`);
-  return response.data;
-}
-
-export async function createTaskTracking(data) {
-  const response = await httpClient.post(`/api/task-trackings/`, data);
-  return response.data;
-}
-
-export async function updateTaskTracking(id, data) {
-  const response = await httpClient.put(`/api/task-trackings/${id}/`, data);
-  return response.data;
-}
-
-export async function patchTaskTracking(id, data) {
-  const response = await httpClient.patch(`/api/task-trackings/${id}/`, data);
-  return response.data;
-}
-
-export async function deleteTaskTracking(id) {
-  const response = await httpClient.delete(`/api/task-trackings/${id}/`);
+export async function getTaskLines(page = 1, filters = {}, pageSize = 50) {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
+  if (filters.task) params.set("task", filters.task);
+  if (filters.line_status) params.set("line_status", filters.line_status);
+  const response = await httpClient.get(`/api/task-lines/?${params.toString()}`);
   return response.data;
 }

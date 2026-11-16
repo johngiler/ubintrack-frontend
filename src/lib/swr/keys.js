@@ -48,7 +48,6 @@ export const swrKeys = {
   positions: (page, search, filters) => ["positions", page, search || "", stableFilters(filters)],
 
   tasks: (page, search, filters) => ["tasks", page, search || "", stableFilters(filters)],
-  trackings: (page, search) => ["trackings", page, search || ""],
 
   billingSummary: (start, end) => ["billing-summary", start || "", end || ""],
   billingClients: (page, start, end) => ["billing-clients", page, start || "", end || ""],

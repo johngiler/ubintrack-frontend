@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+import useSWR from "swr";
 
 import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import { useVisibleSlice } from "@/hooks/useVisibleSlice";
 import { formatDateTime } from "@/lib/format";
+import { getTaskLogs } from "@/services/taskService";
 
 function logTone(message = "") {
   const text = message.toLowerCase();
@@ -16,7 +18,15 @@ function logTone(message = "") {
   return "border-sky-500 bg-sky-50";
 }
 
-export default function TaskLogsPanel({ logs = [] }) {
+export default function TaskLogsPanel({ taskId, logs: logsProp }) {
+  const { data, isLoading } = useSWR(
+    taskId && !logsProp ? ["task-logs", taskId] : null,
+    () => getTaskLogs(1, { task: taskId }),
+    { revalidateOnFocus: false },
+  );
+
+  const logs = logsProp || data?.results || [];
+
   const sorted = useMemo(
     () =>
       [...logs].sort(
@@ -28,14 +38,24 @@ export default function TaskLogsPanel({ logs = [] }) {
   const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
     useVisibleSlice(sorted, 12, 12);
 
-  if (!logs.length) return null;
+  if (isLoading && !logs.length) {
+    return (
+      <p className="py-2 text-center text-sm text-slate-500">Cargando historial…</p>
+    );
+  }
+
+  if (!logs.length) {
+    return (
+      <p className="py-2 text-center text-sm text-slate-500">Sin eventos registrados</p>
+    );
+  }
 
   return (
-    <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-4">
+    <div>
       <div className="mb-3">
-        <h6 className="text-sm font-semibold text-slate-800">Historial de la tarea</h6>
+        <h6 className="text-sm font-semibold text-slate-800">Historial</h6>
         <p className="mb-0 text-xs text-slate-500">
-          {logs.length} {logs.length === 1 ? "evento registrado" : "eventos registrados"}
+          {logs.length} {logs.length === 1 ? "evento" : "eventos"}
         </p>
       </div>
       <div className="max-h-72 space-y-2 overflow-y-auto">

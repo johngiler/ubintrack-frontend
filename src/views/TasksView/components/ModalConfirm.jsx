@@ -15,9 +15,8 @@ export default function ModalConfirm({ show, onHide, task, onDelete, showAlert }
       await deleteTask(task.id);
       await onDelete();
       onHide();
-      showAlert("success", "Tarea eliminada correctamente");
     } catch {
-      showAlert("danger", "Error al eliminar la tarea");
+      showAlert?.("danger", "No se pudo eliminar la tarea.");
     } finally {
       setIsDeleting(false);
     }

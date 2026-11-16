@@ -105,11 +105,21 @@ export async function getCavaGeneration(id) {
 }
 
 /** Tokens de pasillo/túnel (P1, T1, …) usados en posiciones. */
-export async function getPositionHalls({ cavaId } = {}) {
+export async function getPositionHalls({ cavaId, cavaIds } = {}) {
   const params = new URLSearchParams();
-  if (cavaId) params.set("cava", String(cavaId));
+  const ids = Array.isArray(cavaIds)
+    ? cavaIds
+    : cavaId != null && cavaId !== ""
+      ? [cavaId]
+      : [];
+  ids
+    .map((id) => String(id).trim())
+    .filter(Boolean)
+    .forEach((id) => params.append("cava", id));
   const qs = params.toString();
-  const response = await httpClient.get(qs ? `/api/positions/halls/?${qs}` : "/api/positions/halls/");
+  const response = await httpClient.get(
+    qs ? `/api/positions/halls/?${qs}` : "/api/positions/halls/",
+  );
   return response.data;
 }
 

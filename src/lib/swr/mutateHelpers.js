@@ -85,7 +85,6 @@ export async function revalidateTariffs() {
 
 export async function revalidateTasks() {
   await revalidatePrefix("tasks");
-  await revalidatePrefix("trackings");
 }
 
 export async function revalidateDashboard() {

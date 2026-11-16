@@ -191,10 +191,20 @@ export function buildReactSelectStyles({
   };
 }
 
-export function createSelectChangeHandler(onChange, name) {
+export function createSelectChangeHandler(onChange, name, isMulti = false) {
   if (typeof onChange !== "function") return undefined;
 
   return (option) => {
+    if (isMulti) {
+      const list = Array.isArray(option) ? option : [];
+      onChange({
+        target: {
+          name: name ?? "",
+          value: list.map((item) => item?.value).filter((v) => v != null && v !== ""),
+        },
+      });
+      return;
+    }
     onChange({
       target: {
         name: name ?? "",

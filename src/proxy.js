@@ -18,7 +18,6 @@ const APP_ROUTES = new Set([
   "/finance/billing",
   "/finance/tariffs",
   "/tasks/tasks",
-  "/tasks/trackings",
 ]);
 
 function isAppRoute(pathname) {

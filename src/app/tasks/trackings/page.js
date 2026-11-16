@@ -1,5 +1,6 @@
-import TrackingsView from "@/views/TrackingsView";
+import { redirect } from "next/navigation";
 
-export default function TrackingsPage() {
-  return <TrackingsView />;
+/** Seguimiento (timers) eliminado: redirige al listado de tareas WMS. */
+export default function TrackingsRedirectPage() {
+  redirect("/tasks/tasks");
 }
