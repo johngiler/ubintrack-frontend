@@ -69,11 +69,14 @@ const EMPTY_FILTERS = {
   priority: "",
 };
 
-function coverageLabel(task) {
+function taskProgress(task) {
   const total = Number(task.lines_count || 0);
   const done = Number(task.lines_done || 0);
-  if (!total) return "Sin recorrido";
-  return `${done}/${total}`;
+  if (!total) {
+    return { pct: 0, done: 0, total: 0, label: "Sin líneas" };
+  }
+  const pct = Math.min(100, Math.round((done / total) * 100));
+  return { pct, done, total, label: `${pct}%` };
 }
 
 /** Cliente arriba; cava / pasillo / producto abajo en una línea. */
@@ -379,7 +382,7 @@ export default function TasksView() {
                     <Table.HeaderCell>Tipo</Table.HeaderCell>
                     <Table.HeaderCell>Prioridad</Table.HeaderCell>
                     <Table.HeaderCell>Alcance</Table.HeaderCell>
-                    <Table.HeaderCell>Recorrido</Table.HeaderCell>
+                    <Table.HeaderCell>% Progreso</Table.HeaderCell>
                     <Table.HeaderCell>Asignados</Table.HeaderCell>
                     <Table.HeaderCell>Estado</Table.HeaderCell>
                     <Table.HeaderCell className="text-end">Acciones</Table.HeaderCell>
@@ -390,6 +393,7 @@ export default function TasksView() {
                     const isExpanded = expandedTaskId === task.id;
                     const advanceReady = canAdvanceTask(task);
                     const alcance = scopeDisplay(task);
+                    const progress = taskProgress(task);
                     return (
                       <Fragment key={task.id}>
                         <Table.Row>
@@ -462,9 +466,42 @@ export default function TasksView() {
                             )}
                           </Table.Cell>
                           <Table.Cell>
-                            <span className="text-sm tabular-nums text-slate-700">
-                              {coverageLabel(task)}
-                            </span>
+                            <div
+                              className="min-w-[7.5rem] max-w-[10rem]"
+                              title={
+                                progress.total
+                                  ? `${progress.done} de ${progress.total}`
+                                  : progress.label
+                              }
+                            >
+                              <div className="mb-1 flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium tabular-nums text-slate-700">
+                                  {progress.label}
+                                </span>
+                                {progress.total ? (
+                                  <span className="text-[11px] tabular-nums text-slate-400">
+                                    {progress.done}/{progress.total}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div
+                                className="h-1.5 overflow-hidden rounded-full bg-slate-100"
+                                role="progressbar"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={progress.pct}
+                                aria-label={`Progreso ${progress.label}`}
+                              >
+                                <div
+                                  className={
+                                    progress.pct >= 100
+                                      ? "h-full rounded-full bg-emerald-500 transition-[width] duration-300"
+                                      : "h-full rounded-full bg-sky-500 transition-[width] duration-300"
+                                  }
+                                  style={{ width: `${progress.pct}%` }}
+                                />
+                              </div>
+                            </div>
                           </Table.Cell>
                           <Table.Cell>
                             <span className="text-sm text-slate-600">
