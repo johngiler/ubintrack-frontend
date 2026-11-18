@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
@@ -80,6 +87,55 @@ import ModalBulkDelete from "./components/ModalBulkDelete";
 import ExitExpandedProducts from "./components/ExitExpandedProducts";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { formatDocumentCode } from "@/lib/format";
+import {
+  emptyToNull,
+  normalizeExtraFields,
+  numOrNull,
+  valuesEqual,
+} from "@/lib/dirtyForm";
+
+function snapshotExitDetail(detail = {}, pickingPallets) {
+  const images = Array.isArray(detail.images) ? detail.images : [];
+  return {
+    id: detail.id ?? null,
+    temperature: emptyToNull(detail.temperature),
+    description: detail.description || "",
+    picking_pallets: numOrNull(pickingPallets ?? detail.picking_pallets) ?? 0,
+    include_images_in_pdf: Boolean(detail.include_images_in_pdf),
+    extra_fields: normalizeExtraFields(detail.extra_fields),
+    image_ids: images
+      .map((img) => img.id)
+      .filter((id) => id != null && id !== "legacy")
+      .map(String)
+      .sort(),
+  };
+}
+
+function snapshotExit(exit) {
+  if (!exit?.id) return null;
+  return {
+    client_id: exit.client?.id ?? null,
+    branch_id: exit.branch?.id ?? null,
+    status: exit.status ?? null,
+    out_type: emptyToNull(exit.out_type),
+    exit_date: emptyToNull(exit.exit_date),
+    detail: snapshotExitDetail(exit.exit_detail, exit.picking_pallets),
+  };
+}
+
+function isExitDetailDirty(detail, pickingPallets, baselineDetail) {
+  if (!baselineDetail) return true;
+  if (Array.isArray(detail?.new_images) && detail.new_images.length > 0) {
+    return true;
+  }
+  if (Array.isArray(detail?.delete_image_ids) && detail.delete_image_ids.length) {
+    return true;
+  }
+  return !valuesEqual(
+    snapshotExitDetail(detail, pickingPallets),
+    baselineDetail,
+  );
+}
 
 const statusVariants = {
   pendiente: "warning",
@@ -118,6 +174,7 @@ const Exits = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const exitBaselineRef = useRef(null);
   const [selectedExit, setSelectedExit] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [alert, setAlert] = useState({ show: false, variant: "", message: "" });
@@ -258,6 +315,7 @@ const Exits = () => {
 
   const handleShowModal = (exit, mode, tab = "details") => {
     if (mode === "create") {
+      exitBaselineRef.current = null;
       setSelectedExit({
         client: null,
         branch: null,
@@ -295,7 +353,7 @@ const Exits = () => {
       });
     } else {
       const detail = exit?.exit_detail || {};
-      setSelectedExit({
+      const next = {
         ...exit,
         picking_pallets:
           exit?.picking_pallets ?? detail.picking_pallets ?? null,
@@ -309,7 +367,9 @@ const Exits = () => {
           new_images: [],
           delete_image_ids: [],
         },
-      });
+      };
+      exitBaselineRef.current = snapshotExit(next);
+      setSelectedExit(next);
     }
     setModalMode(mode);
     setInitialTab(tab);
@@ -319,6 +379,7 @@ const Exits = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedExit(null);
+    exitBaselineRef.current = null;
   };
 
   // Funciones para el modal QR
@@ -717,21 +778,41 @@ const Exits = () => {
     setIsSaving(true);
     try {
       let savedExit;
+      const baseline = exitBaselineRef.current;
+      const isCreate = !exitData.id;
+      const detailDirty = isExitDetailDirty(
+        exitData.exit_detail,
+        exitData.picking_pallets,
+        baseline?.detail,
+      );
+      const outTypeDirty =
+        isCreate ||
+        !baseline ||
+        emptyToNull(exitData.out_type) !== baseline.out_type;
 
-      // Completada: tipo de salida + detalle + regenerar PDF
+      // Completada: solo tipo/detalle dirty + PDF si hubo cambios
       if (exitData.status === "completada" && exitData.id) {
-        await patchExit(exitData.id, {
-          out_type: exitData.out_type || null,
-        });
-        await saveExitDetail(
-          exitData.id,
-          exitData.exit_detail,
-          exitData.picking_pallets,
-        );
+        if (!outTypeDirty && !detailDirty) {
+          handleCloseModal();
+          showAlert("success", "Sin cambios que guardar");
+          return;
+        }
+        if (outTypeDirty) {
+          await patchExit(exitData.id, {
+            out_type: exitData.out_type || null,
+          });
+        }
+        if (detailDirty) {
+          await saveExitDetail(
+            exitData.id,
+            exitData.exit_detail,
+            exitData.picking_pallets,
+          );
+        }
         try {
           await regenerateExitPdf(exitData.id);
         } catch {
-          /* detalle ya guardado; el PDF se puede regenerar luego */
+          /* cambios ya guardados; el PDF se puede regenerar luego */
         }
         await loadExits();
         handleCloseModal();
@@ -747,38 +828,66 @@ const Exits = () => {
         exit_date: exitData.exit_date || null,
       };
 
+      const headerDirty =
+        isCreate ||
+        !baseline ||
+        !valuesEqual(
+          {
+            client_id: exitBasicData.client_id ?? null,
+            branch_id: exitBasicData.branch_id ?? null,
+            status: exitBasicData.status ?? null,
+            out_type: emptyToNull(exitBasicData.out_type),
+            exit_date: emptyToNull(exitBasicData.exit_date),
+          },
+          {
+            client_id: baseline.client_id,
+            branch_id: baseline.branch_id,
+            status: baseline.status,
+            out_type: baseline.out_type,
+            exit_date: baseline.exit_date,
+          },
+        );
+
+      const newGroups = (exitData.exit_product_groups || []).filter(
+        (group) => !group.id,
+      );
+
+      if (
+        !isCreate &&
+        !headerDirty &&
+        !detailDirty &&
+        newGroups.length === 0
+      ) {
+        handleCloseModal();
+        showAlert("success", "Sin cambios que guardar");
+        return;
+      }
+
       if (exitData.id) {
-        // Actualizar salida existente
-        savedExit = await updateExit(exitData.id, exitBasicData);
+        if (headerDirty) {
+          savedExit = await updateExit(exitData.id, exitBasicData);
+        } else {
+          savedExit = { id: exitData.id };
+        }
       } else {
-        // Crear nueva salida
         savedExit = await createExit(exitBasicData);
       }
 
-      await saveExitDetail(
-        savedExit.id,
-        exitData.exit_detail || {},
-        exitData.picking_pallets,
-      );
+      if (isCreate || detailDirty) {
+        await saveExitDetail(
+          savedExit.id,
+          exitData.exit_detail || {},
+          exitData.picking_pallets,
+        );
+      }
 
-      // Actualizado para la nueva estructura
-      if (exitData.exit_product_groups) {
-        for (const group of exitData.exit_product_groups) {
-          // Solo procesamos productos SIN ID para evitar duplicados
-          if (!group.id) {
-            // Para nuevos productos, enviamos product, quantity y bin_or_batch
-            const productData = {
-              exit: savedExit.id,
-              product: group.product,
-              quantity: group.quantity,
-              bin_or_batch: group.bin_or_batch || null,
-            };
-
-            // Crear nuevo producto de salida
-            await createExitProduct(productData);
-          }
-          // No hacemos nada con los productos que ya tienen ID (ya existen)
-        }
+      for (const group of newGroups) {
+        await createExitProduct({
+          exit: savedExit.id,
+          product: group.product,
+          quantity: group.quantity,
+          bin_or_batch: group.bin_or_batch || null,
+        });
       }
 
       await loadExits();

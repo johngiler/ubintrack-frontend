@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
@@ -72,6 +79,70 @@ import { useViewHistory } from "@/hooks/useViewHistory";
 import { useAsyncProcessTracker } from "@/hooks/useAsyncProcessTracker";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { formatDate, formatDocumentCode } from "@/lib/format";
+import {
+  emptyToNull,
+  normalizeExtraFields,
+  numOrNull,
+  valuesEqual,
+} from "@/lib/dirtyForm";
+
+function snapshotEntryProduct(product) {
+  return {
+    id: product.id,
+    product_id: product.product?.id ?? null,
+    quantity: numOrNull(product.quantity) ?? 0,
+    real_quantity: numOrNull(product.real_quantity) ?? 0,
+    batch: product.batch || "",
+    production_date: emptyToNull(product.production_date),
+    expiration_date: emptyToNull(product.expiration_date),
+  };
+}
+
+function snapshotEntryDetail(detail = {}) {
+  const images = Array.isArray(detail.images) ? detail.images : [];
+  return {
+    id: detail.id ?? null,
+    arrival_temperature: emptyToNull(detail.arrival_temperature),
+    description: detail.description || "",
+    include_images_in_pdf: Boolean(detail.include_images_in_pdf),
+    extra_fields: normalizeExtraFields(detail.extra_fields),
+    image_ids: images
+      .map((img) => img.id)
+      .filter((id) => id != null && id !== "legacy")
+      .map(String)
+      .sort(),
+  };
+}
+
+function snapshotEntry(entry) {
+  if (!entry?.id) return null;
+  return {
+    client_id: entry.client?.id ?? null,
+    storage_id: entry.storage?.id ?? null,
+    status: entry.status ?? null,
+    condition: emptyToNull(entry.condition),
+    in_type: emptyToNull(entry.in_type),
+    entry_date: emptyToNull(entry.entry_date),
+    total_restibas: numOrNull(entry.total_restibas),
+    total_wraps: numOrNull(entry.total_wraps),
+    total_added_pallets: numOrNull(entry.total_added_pallets),
+    products: (entry.entry_products || [])
+      .filter((row) => row.id)
+      .map(snapshotEntryProduct),
+    detail: snapshotEntryDetail(entry.entry_detail),
+  };
+}
+
+function isEntryDetailDirty(detail, baselineDetail) {
+  if (!baselineDetail) return true;
+  if (Array.isArray(detail?.new_images) && detail.new_images.length > 0) {
+    return true;
+  }
+  if (Array.isArray(detail?.delete_image_ids) && detail.delete_image_ids.length) {
+    return true;
+  }
+  return !valuesEqual(snapshotEntryDetail(detail), baselineDetail);
+}
 
 const statusVariants = {
   pendiente: "warning",
@@ -119,6 +190,7 @@ const Entries = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const entryBaselineRef = useRef(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [modalMode, setModalMode] = useState("view");
   const [initialTab, setInitialTab] = useState("details");
@@ -223,6 +295,7 @@ const Entries = () => {
 
   const handleShowModal = (entry, mode, tab = "details") => {
     if (mode === "create") {
+      entryBaselineRef.current = null;
       setSelectedEntry({
         status: "pendiente",
         entry_products: [
@@ -247,7 +320,7 @@ const Entries = () => {
       });
     } else {
       const detail = entry?.entry_detail || {};
-      setSelectedEntry({
+      const next = {
         ...entry,
         entry_detail: {
           ...detail,
@@ -259,7 +332,9 @@ const Entries = () => {
           new_images: [],
           delete_image_ids: [],
         },
-      });
+      };
+      entryBaselineRef.current = snapshotEntry(next);
+      setSelectedEntry(next);
     }
     setModalMode(mode);
     setInitialTab(tab);
@@ -269,6 +344,7 @@ const Entries = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedEntry(null);
+    entryBaselineRef.current = null;
   };
 
   const handleShowConfirmDelete = (entry) => {
@@ -365,41 +441,105 @@ const Entries = () => {
     setIsSaving(true);
     try {
       let savedEntry;
+      const baseline = entryBaselineRef.current;
+      const isCreate = !entryData.id;
+      const baselineProductsById = new Map(
+        (baseline?.products || []).map((row) => [row.id, row]),
+      );
 
-      // Si la entrada está completada: servicios + flags + detalle + productos
+      const buildProductPayload = (product, entryId) => ({
+        entry_id: entryId,
+        product_id: product.product?.id,
+        quantity: product.quantity,
+        real_quantity: product.real_quantity,
+        batch: product.batch,
+        production_date: product.production_date || null,
+        expiration_date: product.expiration_date,
+      });
+
+      const dirtyProducts = (entryData.entry_products || []).filter(
+        (product) => {
+          if (!product.id) return true;
+          const prev = baselineProductsById.get(product.id);
+          if (!prev) return true;
+          return !valuesEqual(snapshotEntryProduct(product), prev);
+        },
+      );
+
+      const detailDirty = isEntryDetailDirty(
+        entryData.entry_detail,
+        baseline?.detail,
+      );
+
+      // Completada: solo patch/productos/detalle dirty + PDF si hubo cambios
       if (entryData.status === "completada" && entryData.id) {
-        const serviciosData = {
-          total_restibas: entryData.total_restibas,
-          total_wraps: entryData.total_wraps,
-          total_added_pallets: entryData.total_added_pallets,
-          condition: entryData.condition,
-          in_type: entryData.in_type,
+        const serviciosData = {};
+        const nextServicios = {
+          total_restibas: numOrNull(entryData.total_restibas),
+          total_wraps: numOrNull(entryData.total_wraps),
+          total_added_pallets: numOrNull(entryData.total_added_pallets),
+          condition: emptyToNull(entryData.condition),
+          in_type: emptyToNull(entryData.in_type),
         };
-        await patchEntry(entryData.id, serviciosData);
+        if (!baseline) {
+          Object.assign(serviciosData, {
+            total_restibas: entryData.total_restibas,
+            total_wraps: entryData.total_wraps,
+            total_added_pallets: entryData.total_added_pallets,
+            condition: entryData.condition,
+            in_type: entryData.in_type,
+          });
+        } else {
+          if (nextServicios.total_restibas !== baseline.total_restibas) {
+            serviciosData.total_restibas = entryData.total_restibas;
+          }
+          if (nextServicios.total_wraps !== baseline.total_wraps) {
+            serviciosData.total_wraps = entryData.total_wraps;
+          }
+          if (
+            nextServicios.total_added_pallets !== baseline.total_added_pallets
+          ) {
+            serviciosData.total_added_pallets = entryData.total_added_pallets;
+          }
+          if (nextServicios.condition !== baseline.condition) {
+            serviciosData.condition = entryData.condition;
+          }
+          if (nextServicios.in_type !== baseline.in_type) {
+            serviciosData.in_type = entryData.in_type;
+          }
+        }
+
+        const serviciosDirty = Object.keys(serviciosData).length > 0;
+        const productsDirty = dirtyProducts.some((row) => row.id);
+        if (!serviciosDirty && !productsDirty && !detailDirty) {
+          handleCloseModal();
+          showAlert("success", "Sin cambios que guardar");
+          return;
+        }
+
+        if (serviciosDirty) {
+          await patchEntry(entryData.id, serviciosData);
+        }
 
         await Promise.all(
-          entryData.entry_products
+          dirtyProducts
             .filter((product) => product.id)
-            .map(async (product) => {
-              const productData = {
-                entry_id: entryData.id,
-                product_id: product.product?.id,
-                quantity: product.quantity,
-                real_quantity: product.real_quantity,
-                batch: product.batch,
-                production_date: product.production_date || null,
-                expiration_date: product.expiration_date,
-              };
-              await updateEntryProduct(product.id, productData);
-            })
+            .map((product) =>
+              updateEntryProduct(
+                product.id,
+                buildProductPayload(product, entryData.id),
+              ),
+            ),
         );
 
-        await saveEntryDetail(entryData.id, entryData.entry_detail);
+        if (detailDirty) {
+          await saveEntryDetail(entryData.id, entryData.entry_detail);
+        }
 
         try {
           await regenerateEntryPdf(entryData.id);
         } catch {
-          /* flags/detalle ya guardados; el PDF se puede regenerar luego */
+          /* cambios ya guardados; el PDF se puede regenerar luego */
         }
 
         await loadEntries();
@@ -420,37 +560,83 @@ const Entries = () => {
         total_added_pallets: entryData.total_added_pallets,
       };
 
+      const entryHeaderDirty =
+        isCreate ||
+        !baseline ||
+        !valuesEqual(
+          {
+            client_id: entryBasicData.client_id ?? null,
+            storage_id: entryBasicData.storage_id ?? null,
+            status: entryBasicData.status ?? null,
+            condition: emptyToNull(entryBasicData.condition),
+            in_type: emptyToNull(entryBasicData.in_type),
+            entry_date: emptyToNull(entryBasicData.entry_date),
+            total_restibas: numOrNull(entryBasicData.total_restibas),
+            total_wraps: numOrNull(entryBasicData.total_wraps),
+            total_added_pallets: numOrNull(entryBasicData.total_added_pallets),
+          },
+          {
+            client_id: baseline.client_id,
+            storage_id: baseline.storage_id,
+            status: baseline.status,
+            condition: baseline.condition,
+            in_type: baseline.in_type,
+            entry_date: baseline.entry_date,
+            total_restibas: baseline.total_restibas,
+            total_wraps: baseline.total_wraps,
+            total_added_pallets: baseline.total_added_pallets,
+          },
+        );
+
+      const deletes = productsToDelete || [];
+      const creates = (entryData.entry_products || []).filter((p) => !p.id);
+      const updates = dirtyProducts.filter((p) => p.id);
+
+      if (
+        !isCreate &&
+        !entryHeaderDirty &&
+        !detailDirty &&
+        deletes.length === 0 &&
+        creates.length === 0 &&
+        updates.length === 0
+      ) {
+        handleCloseModal();
+        showAlert("success", "Sin cambios que guardar");
+        return;
+      }
+
       if (entryData.id) {
-        savedEntry = await updateEntry(entryData.id, entryBasicData);
+        if (entryHeaderDirty) {
+          savedEntry = await updateEntry(entryData.id, entryBasicData);
+        } else {
+          savedEntry = { id: entryData.id };
+        }
       } else {
         savedEntry = await createEntry(entryBasicData);
       }
 
       await Promise.all(
-        productsToDelete.map((productId) => deleteEntryProduct(productId))
+        deletes.map((productId) => deleteEntryProduct(productId)),
       );
 
       await Promise.all(
-        entryData.entry_products.map(async (product) => {
-          const productData = {
-            entry_id: savedEntry.id,
-            product_id: product.product?.id,
-            quantity: product.quantity,
-            real_quantity: product.real_quantity,
-            batch: product.batch,
-            production_date: product.production_date || null,
-            expiration_date: product.expiration_date,
-          };
-
-          if (product.id) {
-            await updateEntryProduct(product.id, productData);
-          } else {
-            await createEntryProduct(productData);
-          }
-        })
+        creates.map((product) =>
+          createEntryProduct(buildProductPayload(product, savedEntry.id)),
+        ),
       );
 
-      await saveEntryDetail(savedEntry.id, entryData.entry_detail);
+      await Promise.all(
+        updates.map((product) =>
+          updateEntryProduct(
+            product.id,
+            buildProductPayload(product, savedEntry.id),
+          ),
+        ),
+      );
+
+      if (isCreate || detailDirty) {
+        await saveEntryDetail(savedEntry.id, entryData.entry_detail);
+      }
 
       await loadEntries();
       handleCloseModal();

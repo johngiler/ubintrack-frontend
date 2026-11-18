@@ -1156,37 +1156,21 @@ const ModalEdit = ({
                                   <Form.Label className="!text-xs !font-medium !text-slate-600">
                                     Tipo
                                   </Form.Label>
-                                  <div className="flex items-center gap-2">
-                                    <div className="min-w-0 flex-1">
-                                      <Select
-                                        size="sm"
-                                        isDisabled={isViewMode}
-                                        options={EXTRA_FIELD_TYPE_OPTIONS}
-                                        value={fieldType}
-                                        onChange={(e) =>
-                                          handleExtraFieldChange(
-                                            index,
-                                            "type",
-                                            e.target.value || "normal",
-                                          )
-                                        }
-                                      />
-                                    </div>
-                                    {!isViewMode && !isTexto ? (
-                                      <IconButton
-                                        size="sm"
-                                        className="shrink-0 text-red-600 hover:bg-red-50"
-                                        onClick={() =>
-                                          handleRemoveExtraField(index)
-                                        }
-                                        title="Quitar campo"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </IconButton>
-                                    ) : null}
-                                  </div>
+                                  <Select
+                                    size="sm"
+                                    isDisabled={isViewMode}
+                                    options={EXTRA_FIELD_TYPE_OPTIONS}
+                                    value={fieldType}
+                                    onChange={(e) =>
+                                      handleExtraFieldChange(
+                                        index,
+                                        "type",
+                                        e.target.value || "normal",
+                                      )
+                                    }
+                                  />
                                 </div>
-                                <div className={isTexto ? "" : "sm:col-span-5"}>
+                                <div className={isTexto ? "" : "sm:col-span-4"}>
                                   <Form.Label className="!text-xs !font-medium !text-slate-600">
                                     {isCheck ? "Marcado" : "Valor"}
                                   </Form.Label>
@@ -1254,6 +1238,20 @@ const ModalEdit = ({
                                     </div>
                                   ) : null}
                                 </div>
+                                {!isTexto && !isViewMode ? (
+                                  <div className="flex items-end sm:col-span-1">
+                                    <IconButton
+                                      size="sm"
+                                      className="mb-0.5 shrink-0 text-red-600 hover:bg-red-50"
+                                      onClick={() =>
+                                        handleRemoveExtraField(index)
+                                      }
+                                      title="Quitar campo"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </IconButton>
+                                  </div>
+                                ) : null}
                               </div>
                               );
                             })}
