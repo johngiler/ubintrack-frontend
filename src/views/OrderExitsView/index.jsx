@@ -281,9 +281,35 @@ const Exits = () => {
         ],
         status: "pendiente",
         exit_date: null,
+        picking_pallets: null,
+        exit_detail: {
+          temperature: "",
+          description: "",
+          picking_pallets: 0,
+          include_images_in_pdf: false,
+          extra_fields: [],
+          images: [],
+          new_images: [],
+          delete_image_ids: [],
+        },
       });
     } else {
-      setSelectedExit(exit);
+      const detail = exit?.exit_detail || {};
+      setSelectedExit({
+        ...exit,
+        picking_pallets:
+          exit?.picking_pallets ?? detail.picking_pallets ?? null,
+        exit_detail: {
+          ...detail,
+          include_images_in_pdf: Boolean(detail.include_images_in_pdf),
+          extra_fields: Array.isArray(detail.extra_fields)
+            ? detail.extra_fields
+            : [],
+          images: Array.isArray(detail.images) ? detail.images : [],
+          new_images: [],
+          delete_image_ids: [],
+        },
+      });
     }
     setModalMode(mode);
     setInitialTab(tab);
@@ -620,20 +646,92 @@ const Exits = () => {
     }
   };
 
+  const saveExitDetail = async (exitId, detail, pickingPallets) => {
+    if (!exitId || !detail) return;
+    const formData = new FormData();
+    formData.append("exit_id", exitId);
+
+    const temp = detail.temperature;
+    if (temp === "" || temp == null) {
+      formData.append("temperature", "");
+    } else {
+      formData.append("temperature", String(temp));
+    }
+    formData.append("description", detail.description || "");
+
+    const pallets =
+      pickingPallets !== undefined && pickingPallets !== null
+        ? pickingPallets
+        : detail.picking_pallets;
+    if (pallets !== undefined && pallets !== null && pallets !== "") {
+      formData.append("picking_pallets", String(pallets || 0));
+    }
+
+    formData.append(
+      "include_images_in_pdf",
+      detail.include_images_in_pdf ? "true" : "false",
+    );
+
+    const extras = (Array.isArray(detail.extra_fields) ? detail.extra_fields : [])
+      .filter((row) => String(row?.name || "").trim())
+      .map((row) => {
+        const type = row.type || "normal";
+        let value = row.value ?? "";
+        if (type === "check") {
+          value = Boolean(value);
+        } else if (type === "normal") {
+          value = String(value).slice(0, 60);
+        } else if (type === "texto") {
+          value = String(value).split("\n").slice(0, 6).join("\n");
+        }
+        return {
+          name: String(row.name).trim(),
+          type,
+          value,
+        };
+      });
+    formData.append("extra_fields", JSON.stringify(extras));
+
+    const deleteIds = Array.isArray(detail.delete_image_ids)
+      ? detail.delete_image_ids
+      : [];
+    if (deleteIds.length) {
+      formData.append("delete_image_ids", deleteIds.join(","));
+    }
+
+    const newImages = Array.isArray(detail.new_images) ? detail.new_images : [];
+    newImages.forEach((file) => {
+      if (file instanceof File) {
+        formData.append("images", file);
+      }
+    });
+
+    if (detail.id) {
+      await updateExitDetail(detail.id, formData);
+    } else {
+      await createExitDetail(formData);
+    }
+  };
+
   const handleSaveExit = async (exitData, productsToDelete = []) => {
     setIsSaving(true);
     try {
       let savedExit;
 
-      // Completada: solo tipo de salida + regenerar PDF
+      // Completada: tipo de salida + detalle + regenerar PDF
       if (exitData.status === "completada" && exitData.id) {
         await patchExit(exitData.id, {
           out_type: exitData.out_type || null,
         });
+        await saveExitDetail(
+          exitData.id,
+          exitData.exit_detail,
+          exitData.picking_pallets,
+        );
         try {
           await regenerateExitPdf(exitData.id);
         } catch {
-          /* flag ya guardado; el PDF se puede regenerar luego */
+          /* detalle ya guardado; el PDF se puede regenerar luego */
         }
         await loadExits();
         handleCloseModal();
@@ -657,24 +755,11 @@ const Exits = () => {
         savedExit = await createExit(exitBasicData);
       }
 
-      // Guardar/actualizar exit_detail (picking_pallets)
-      if (
-        exitData.picking_pallets !== undefined &&
-        exitData.picking_pallets !== null
-      ) {
-        const exitDetailData = {
-          exit_id: savedExit.id,
-          picking_pallets: exitData.picking_pallets || 0,
-        };
-
-        if (exitData.exit_detail?.id) {
-          // Actualizar exit_detail existente
-          await updateExitDetail(exitData.exit_detail.id, exitDetailData);
-        } else {
-          // Crear nuevo exit_detail
-          await createExitDetail(exitDetailData);
-        }
-      }
+      await saveExitDetail(
+        savedExit.id,
+        exitData.exit_detail || {},
+        exitData.picking_pallets,
+      );
 
       // Actualizado para la nueva estructura
       if (exitData.exit_product_groups) {

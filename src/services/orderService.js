@@ -399,13 +399,21 @@ export async function deleteExitProductBin(id) {
 }
 
 // Exit Details
-export async function createExitDetail(data) {
-  const response = await httpClient.post("/api/exit-details/", data);
+export async function createExitDetail(formData) {
+  const response = await httpClient.post("/api/exit-details/", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return response.data;
 }
 
-export async function updateExitDetail(id, data) {
-  const response = await httpClient.put(`/api/exit-details/${id}/`, data);
+export async function updateExitDetail(id, formData) {
+  const response = await httpClient.put(`/api/exit-details/${id}/`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return response.data;
 }
 
