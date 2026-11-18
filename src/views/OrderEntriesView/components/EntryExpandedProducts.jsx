@@ -168,7 +168,12 @@ function ProductCard({ ep, index, expandedProducts, setExpandedProducts, navigat
 
 const MotionTr = motion.tr;
 
-export default function EntryExpandedProducts({ entry, expandedProducts, setExpandedProducts }) {
+export default function EntryExpandedProducts({
+  entry,
+  expandedProducts,
+  setExpandedProducts,
+  showSelection = false,
+}) {
   const navigate = useWmsNavigate();
   const products = entry.entry_products || [];
   const { visibleItems, visibleCount, totalCount, hasMore, loadMore } =
@@ -184,7 +189,7 @@ export default function EntryExpandedProducts({ entry, expandedProducts, setExpa
       transition={{ duration: 0.15 }}
       className="border-0"
     >
-      <td colSpan={7} className="!border-0 !p-0">
+      <td colSpan={showSelection ? 8 : 7} className="!border-0 !p-0">
         <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
@@ -25,6 +25,7 @@ import { useWmsNavigate, useWmsSearchParams } from "@/hooks/useWmsRouter";
 import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
 import ViewHistoryButton from "@/components/activity/ViewHistoryButton";
 import { useViewHistory } from "@/hooks/useViewHistory";
+import { useAsyncProcessTracker } from "@/hooks/useAsyncProcessTracker";
 import {
   Card,
   Col,
@@ -42,10 +43,13 @@ import { IconButton } from "@/components/ui/Button";
 import {
   getExits,
   getExit,
+  getExitIds,
   createExit,
   updateExit,
+  patchExit,
   deleteExit,
   completeExit,
+  regenerateExitPdf,
   createExitProduct,
   deleteExitProduct,
   deleteExitProductBin,
@@ -59,6 +63,7 @@ import {
 } from "@/services/orderService";
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
+import AsyncProcessBanner from "@/components/wms/AsyncProcessBanner";
 import WmsListEmptyState from "@/components/wms/WmsListEmptyState";
 import ExitsViewSkeleton from "./ExitsViewSkeleton";
 import {
@@ -70,6 +75,8 @@ import ModalConfirm from "./components/ModalConfirm";
 import ModalQRValidation from "./components/ModalQRValidation";
 import ModalImport from "./components/ModalImport";
 import ModalReplaceBin from "./components/ModalReplaceBin";
+import ModalBulkRegenerate from "./components/ModalBulkRegenerate";
+import ModalBulkDelete from "./components/ModalBulkDelete";
 import ExitExpandedProducts from "./components/ExitExpandedProducts";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
 import { formatDocumentCode } from "@/lib/format";
@@ -158,6 +165,10 @@ const Exits = () => {
 
   // Estado para la pestaña inicial del modal
   const [initialTab, setInitialTab] = useState("details");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const [showBulkRegenerateModal, setShowBulkRegenerateModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   const PAGE_SIZE = 20;
 
@@ -213,18 +224,37 @@ const Exits = () => {
   });
   const isLoading = isListLoading || !ready;
 
-  useEffect(() => {
-    if (listError) {
-      console.error("Error al cargar las salidas:", listError);
-      showAlert("danger", "Error al cargar las salidas");
-    }
-  }, [listError]);
+  const showAlert = useCallback((variant, message) => {
+    setAlert({ show: true, variant, message });
+    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 4000);
+  }, []);
 
   // Revalida la lista y devuelve los resultados frescos
   const loadExits = async () => {
     const data = await mutateExits();
     return data?.results ?? [];
   };
+
+  const asyncProcess = useAsyncProcessTracker("exits", {
+    onSettled: ({ failed, message }) => {
+      showAlert(failed ? "danger" : "success", message);
+      if (!failed) {
+        setSelectedIds([]);
+        void loadExits();
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (listError) {
+      console.error("Error al cargar las salidas:", listError);
+      showAlert("danger", "Error al cargar las salidas");
+    }
+  }, [listError, showAlert]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [debouncedSearchTerm, filters.status, filters.exit_date, currentPage]);
 
   const handleShowModal = (exit, mode, tab = "details") => {
     if (mode === "create") {
@@ -595,6 +625,22 @@ const Exits = () => {
     try {
       let savedExit;
 
+      // Completada: solo tipo de salida + regenerar PDF
+      if (exitData.status === "completada" && exitData.id) {
+        await patchExit(exitData.id, {
+          out_type: exitData.out_type || null,
+        });
+        try {
+          await regenerateExitPdf(exitData.id);
+        } catch {
+          /* flag ya guardado; el PDF se puede regenerar luego */
+        }
+        await loadExits();
+        handleCloseModal();
+        showAlert("success", "Salida actualizada exitosamente");
+        return;
+      }
+
       const exitBasicData = {
         client_id: exitData.client?.id,
         branch_id: exitData.branch?.id,
@@ -661,11 +707,6 @@ const Exits = () => {
     }
   };
 
-  const showAlert = (variant, message) => {
-    setAlert({ show: true, variant, message });
-    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
-  };
-
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("es-ES", {
       day: "2-digit",
@@ -695,11 +736,78 @@ const Exits = () => {
     handleShowModal(null, "create");
   };
 
+  const visibleIds = useMemo(() => exits.map((row) => row.id), [exits]);
+  const allVisibleSelected =
+    visibleIds.length > 0 &&
+    visibleIds.every((id) => selectedIds.includes(id));
+  const selectedCount = selectedIds.length;
+  const showBulkActions = selectedCount > 0;
+  const showSelection = Boolean(perms.change || perms.delete);
+  const selectedExitsKnown = useMemo(
+    () => exits.filter((row) => selectedIds.includes(row.id)),
+    [exits, selectedIds],
+  );
+  const exitHasProcessedBins = (exit) =>
+    Boolean(
+      exit.exit_product_groups?.some((group) =>
+        group.exit_products?.some((ep) => ep.is_processed),
+      ),
+    );
+  const canBulkDeleteKnown = selectedExitsKnown.every(
+    (row) => row.status !== "completada" && !exitHasProcessedBins(row),
+  );
+  const showSelectAllFiltered =
+    allVisibleSelected &&
+    Boolean(totalItems) &&
+    totalItems > visibleIds.length &&
+    selectedCount < totalItems;
+
+  const toggleExitSelection = (exitId) => {
+    setSelectedIds((prev) =>
+      prev.includes(exitId)
+        ? prev.filter((id) => id !== exitId)
+        : [...prev, exitId],
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (!visibleIds.length) return;
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+    setSelectedIds((prev) => [...new Set([...prev, ...visibleIds])]);
+  };
+
+  const handleSelectAllFiltered = async () => {
+    setIsSelectingAll(true);
+    try {
+      const data = await getExitIds(filters, debouncedSearchTerm);
+      setSelectedIds(Array.isArray(data?.ids) ? data.ids : []);
+      if (data?.truncated) {
+        showAlert(
+          "warning",
+          data.detail || `Se seleccionaron ${data.count} de ${data.total}.`,
+        );
+      }
+    } catch (error) {
+      showAlert(
+        "danger",
+        getApiErrorMessage(error, "No se pudieron seleccionar todos"),
+      );
+    } finally {
+      setIsSelectingAll(false);
+    }
+  };
+
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({
       ...prev,
       [field]: value,
     }));
+    if (searchParams.toString()) {
+      setSearchParams({});
+    }
   };
 
   const toggleProductGroup = (groupId) => {
@@ -762,10 +870,12 @@ const Exits = () => {
     setSearchTerm("");
     setFilters({ status: "", exit_date: "" });
     setSearchParams({});
+    setSelectedIds([]);
   };
 
   return (
     <Fragment>
+      <AsyncProcessBanner jobs={asyncProcess.jobs} />
       {alert.show && (
         <Alert variant={alert.variant} className="mb-3">
           {alert.message}
@@ -907,15 +1017,70 @@ const Exits = () => {
                     </motion.div>
                   ) : null}
                 </AnimatePresence>
+              {showBulkActions ? (
+                <div className="flex w-full flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-2">
+                  <span className="text-xs text-slate-600">
+                    {selectedCount} seleccionadas
+                  </span>
+                  {perms.change ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={FileText}
+                      onClick={() => setShowBulkRegenerateModal(true)}
+                      title="Regenerar pdfs seleccionados"
+                      className="shrink-0 whitespace-nowrap"
+                      disabled={asyncProcess.hasKind("exit_regenerate_pdfs")}
+                    >
+                      Regenerar pdfs
+                    </Button>
+                  ) : null}
+                  {perms.delete ? (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon={Trash2}
+                      onClick={() => setShowBulkDeleteModal(true)}
+                      title="Eliminar salidas seleccionadas"
+                      className="shrink-0 whitespace-nowrap"
+                      disabled={asyncProcess.hasKind("exit_delete")}
+                    >
+                      Eliminar
+                    </Button>
+                  ) : null}
+                  {showSelectAllFiltered ? (
+                    <button
+                      type="button"
+                      className="cursor-pointer text-xs font-medium text-sky-700 hover:underline disabled:opacity-50"
+                      onClick={handleSelectAllFiltered}
+                      disabled={isSelectingAll}
+                    >
+                      {isSelectingAll
+                        ? "Seleccionando…"
+                        : `Seleccionar todos los filtrados (${totalItems})`}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               </div>
             </Card.Header>
             <Card.Body className="p-0">
               {isLoading ? (
-                <ExitsViewSkeleton />
+                <ExitsViewSkeleton showSelection={showSelection} />
               ) : exits.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[1040px]">
                   <Table.Head>
                       <tr>
+                      {showSelection ? (
+                        <Table.HeaderCell className="w-10 normal-case tracking-normal">
+                          <Form.Check
+                            type="checkbox"
+                            checked={allVisibleSelected}
+                            onChange={toggleSelectAllVisible}
+                            aria-label="Seleccionar todas las visibles"
+                          />
+                        </Table.HeaderCell>
+                      ) : null}
                       <Table.HeaderCell className="min-w-[140px] normal-case tracking-normal">
                           Código
                       </Table.HeaderCell>
@@ -943,6 +1108,16 @@ const Exits = () => {
                     {exits.map((exit) => (
                       <Fragment key={exit.id}>
                         <Table.Row>
+                          {showSelection ? (
+                            <Table.Cell>
+                              <Form.Check
+                                type="checkbox"
+                                checked={selectedIds.includes(exit.id)}
+                                onChange={() => toggleExitSelection(exit.id)}
+                                aria-label={`Seleccionar ${exit.code}`}
+                              />
+                            </Table.Cell>
+                          ) : null}
                           <Table.Cell className="whitespace-nowrap font-mono text-xs">
                             <button
                               type="button"
@@ -1081,7 +1256,10 @@ const Exits = () => {
                         </Table.Row>
                           {expandedGroups[exit.id] && (
                             <Table.Row className="border-0">
-                              <Table.Cell colSpan={7} className="!border-0 !p-0">
+                              <Table.Cell
+                                colSpan={showSelection ? 8 : 7}
+                                className="!border-0 !p-0"
+                              >
                                 <ExitExpandedProducts
                                   exit={exit}
                                   isAdmin={isAdmin}
@@ -1260,6 +1438,35 @@ const Exits = () => {
         onImportSuccess={() => {
           loadExits();
           setShowImportModal(false);
+        }}
+      />
+
+      <ModalBulkRegenerate
+        show={showBulkRegenerateModal}
+        onHide={() => setShowBulkRegenerateModal(false)}
+        exitIds={selectedIds}
+        showAlert={showAlert}
+        trackAsyncJob={asyncProcess}
+        onDone={async () => {
+          setSelectedIds([]);
+          await loadExits();
+        }}
+      />
+
+      <ModalBulkDelete
+        show={showBulkDeleteModal}
+        onHide={() => setShowBulkDeleteModal(false)}
+        exitIds={selectedIds}
+        canDeleteAll={
+          selectedExitsKnown.length === selectedIds.length
+            ? canBulkDeleteKnown
+            : true
+        }
+        showAlert={showAlert}
+        trackAsyncJob={asyncProcess}
+        onDone={async () => {
+          setSelectedIds([]);
+          await loadExits();
         }}
       />
 

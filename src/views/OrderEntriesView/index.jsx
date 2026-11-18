@@ -1,13 +1,12 @@
 "use client";
 
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
   ChevronDown,
   ChevronUp,
   Download,
-  ExternalLink,
   Eye,
   FileText,
   Filter,
@@ -40,6 +39,7 @@ import EntriesViewSkeleton from "./EntriesViewSkeleton";
 import {
   getEntries,
   getEntry,
+  getEntryIds,
   createEntry,
   updateEntry,
   patchEntry,
@@ -50,10 +50,13 @@ import {
   createEntryDetail,
   updateEntryDetail,
   completeEntry,
+  regenerateEntryPdf,
+  exportEntryOrdersToExcel,
 } from "@/services/orderService";
 
 import { WmsPageHeader } from "@/components/wms/WmsPageHeader";
 import WmsSearchBar from "@/components/wms/WmsSearchBar";
+import AsyncProcessBanner from "@/components/wms/AsyncProcessBanner";
 import {
   WmsExpandItemsButton,
 } from "@/components/wms/WmsExpandItemsButton";
@@ -62,10 +65,12 @@ import EntryExpandedProducts from "./components/EntryExpandedProducts";
 import ModalEdit from "./components/ModalEdit";
 import ModalConfirm from "./components/ModalConfirm";
 import ModalComplete from "./components/ModalComplete";
+import ModalBulkRegenerate from "./components/ModalBulkRegenerate";
+import ModalBulkDelete from "./components/ModalBulkDelete";
 import SectionHistoryModal from "@/components/activity/SectionHistoryModal";
 import { useViewHistory } from "@/hooks/useViewHistory";
+import { useAsyncProcessTracker } from "@/hooks/useAsyncProcessTracker";
 import { canCRUD, getApiErrorMessage } from "@/services/httpClient";
-import { exportEntryOrdersToExcel } from "@/services/orderService";
 import { formatDate, formatDocumentCode } from "@/lib/format";
 
 const statusVariants = {
@@ -131,6 +136,10 @@ const Entries = () => {
   const [ready, setReady] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [entryToComplete, setEntryToComplete] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const [showBulkRegenerateModal, setShowBulkRegenerateModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   const PAGE_SIZE = 20;
 
@@ -186,12 +195,31 @@ const Entries = () => {
   });
   const isLoading = isListLoading || !ready;
 
+  const showAlert = useCallback((variant, message) => {
+    setAlert({ show: true, variant, message });
+    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 4000);
+  }, []);
+
+  const asyncProcess = useAsyncProcessTracker("entries", {
+    onSettled: ({ failed, message }) => {
+      showAlert(failed ? "danger" : "success", message);
+      if (!failed) {
+        setSelectedIds([]);
+        void loadEntries();
+      }
+    },
+  });
+
   useEffect(() => {
     if (listError) {
       console.error("Error al cargar las entradas:", listError);
       showAlert("danger", "Error al cargar las entradas");
     }
-  }, [listError]);
+  }, [listError, showAlert]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [debouncedSearchTerm, filters.status, filters.condition, currentPage]);
 
   const handleShowModal = (entry, mode, tab = "details") => {
     if (mode === "create") {
@@ -210,11 +238,28 @@ const Entries = () => {
         entry_detail: {
           arrival_temperature: "",
           description: "",
-          image: null,
+          include_images_in_pdf: false,
+          extra_fields: [],
+          images: [],
+          new_images: [],
+          delete_image_ids: [],
         },
       });
     } else {
-      setSelectedEntry(entry);
+      const detail = entry?.entry_detail || {};
+      setSelectedEntry({
+        ...entry,
+        entry_detail: {
+          ...detail,
+          include_images_in_pdf: Boolean(detail.include_images_in_pdf),
+          extra_fields: Array.isArray(detail.extra_fields)
+            ? detail.extra_fields
+            : [],
+          images: Array.isArray(detail.images) ? detail.images : [],
+          new_images: [],
+          delete_image_ids: [],
+        },
+      });
     }
     setModalMode(mode);
     setInitialTab(tab);
@@ -258,24 +303,83 @@ const Entries = () => {
     await loadEntries();
   };
 
+  const saveEntryDetail = async (entryId, detail) => {
+    if (!entryId || !detail) return;
+    const formData = new FormData();
+    formData.append("entry_id", entryId);
+
+    const temp = detail.arrival_temperature;
+    if (temp === "" || temp == null) {
+      formData.append("arrival_temperature", "");
+    } else {
+      formData.append("arrival_temperature", String(temp));
+    }
+    formData.append("description", detail.description || "");
+    formData.append(
+      "include_images_in_pdf",
+      detail.include_images_in_pdf ? "true" : "false",
+    );
+
+    const extras = (Array.isArray(detail.extra_fields) ? detail.extra_fields : [])
+      .filter((row) => String(row?.name || "").trim())
+      .map((row) => {
+        const type = row.type || "normal";
+        let value = row.value ?? "";
+        if (type === "check") {
+          value = Boolean(value);
+        } else if (type === "normal") {
+          value = String(value).slice(0, 60);
+        } else if (type === "texto") {
+          value = String(value).split("\n").slice(0, 6).join("\n");
+        }
+        return {
+          name: String(row.name).trim(),
+          type,
+          value,
+        };
+      });
+    formData.append("extra_fields", JSON.stringify(extras));
+
+    const deleteIds = Array.isArray(detail.delete_image_ids)
+      ? detail.delete_image_ids
+      : [];
+    if (deleteIds.length) {
+      formData.append("delete_image_ids", deleteIds.join(","));
+    }
+
+    const newImages = Array.isArray(detail.new_images) ? detail.new_images : [];
+    newImages.forEach((file) => {
+      if (file instanceof File) {
+        formData.append("images", file);
+      }
+    });
+
+    if (detail.id) {
+      await updateEntryDetail(detail.id, formData);
+    } else {
+      await createEntryDetail(formData);
+    }
+  };
+
   const handleSaveEntry = async (entryData, productsToDelete = []) => {
     setIsSaving(true);
     try {
       let savedEntry;
 
-      // Si la entrada está completada, enviar servicios + actualizar productos (sin eliminar)
+      // Si la entrada está completada: servicios + flags + detalle + productos
       if (entryData.status === "completada" && entryData.id) {
         const serviciosData = {
           total_restibas: entryData.total_restibas,
           total_wraps: entryData.total_wraps,
           total_added_pallets: entryData.total_added_pallets,
+          condition: entryData.condition,
+          in_type: entryData.in_type,
         };
         await patchEntry(entryData.id, serviciosData);
 
-        // Actualizar productos existentes (no eliminar ni crear)
         await Promise.all(
           entryData.entry_products
-            .filter((product) => product.id) // Solo productos existentes
+            .filter((product) => product.id)
             .map(async (product) => {
               const productData = {
                 entry_id: entryData.id,
@@ -290,14 +394,20 @@ const Entries = () => {
             })
         );
 
-        // Recargar datos y cerrar modal
+        await saveEntryDetail(entryData.id, entryData.entry_detail);
+
+        try {
+          await regenerateEntryPdf(entryData.id);
+        } catch {
+          /* flags/detalle ya guardados; el PDF se puede regenerar luego */
+        }
+
         await loadEntries();
         handleCloseModal();
         showAlert("success", "Entrada actualizada exitosamente");
         return;
       }
 
-      // Crear o actualizar la entrada principal
       const entryBasicData = {
         client_id: entryData.client?.id,
         storage_id: entryData.storage?.id,
@@ -316,12 +426,10 @@ const Entries = () => {
         savedEntry = await createEntry(entryBasicData);
       }
 
-      // Eliminar productos marcados para eliminación
       await Promise.all(
         productsToDelete.map((productId) => deleteEntryProduct(productId))
       );
 
-      // Actualizar o crear productos
       await Promise.all(
         entryData.entry_products.map(async (product) => {
           const productData = {
@@ -342,35 +450,8 @@ const Entries = () => {
         })
       );
 
-      // Manejar los detalles de la entrada y la imagen
-      if (entryData.entry_detail) {
-        const detailFormData = new FormData();
-        detailFormData.append("entry_id", savedEntry.id);
-        detailFormData.append(
-          "arrival_temperature",
-          entryData.entry_detail.arrival_temperature || ""
-        );
-        detailFormData.append(
-          "description",
-          entryData.entry_detail.description || ""
-        );
+      await saveEntryDetail(savedEntry.id, entryData.entry_detail);
 
-        // Manejar la imagen
-        if (entryData.entry_detail.delete_image) {
-          detailFormData.append("delete_image", "true");
-          detailFormData.append("image", ""); // Enviar imagen vacía
-        } else if (entryData.entry_detail.image instanceof File) {
-          detailFormData.append("image", entryData.entry_detail.image);
-        }
-
-        if (entryData.entry_detail.id) {
-          await updateEntryDetail(entryData.entry_detail.id, detailFormData);
-        } else {
-          await createEntryDetail(detailFormData);
-        }
-      }
-
-      // Recargar datos y cerrar modal
       await loadEntries();
       handleCloseModal();
       showAlert("success", "Entrada guardada exitosamente");
@@ -382,13 +463,67 @@ const Entries = () => {
     }
   };
 
-  const showAlert = (variant, message) => {
-    setAlert({ show: true, variant, message });
-    setTimeout(() => setAlert({ show: false, variant: "", message: "" }), 3000);
-  };
-
   const handleNewEntry = () => {
     handleShowModal(null, "create");
+  };
+
+  const visibleIds = useMemo(() => entries.map((row) => row.id), [entries]);
+  const allVisibleSelected =
+    visibleIds.length > 0 &&
+    visibleIds.every((id) => selectedIds.includes(id));
+  const selectedCount = selectedIds.length;
+  const showBulkActions = selectedCount > 0;
+  const showSelection = Boolean(perms.change || perms.delete);
+  const selectedEntriesKnown = useMemo(
+    () => entries.filter((row) => selectedIds.includes(row.id)),
+    [entries, selectedIds],
+  );
+  const canBulkDeleteKnown = selectedEntriesKnown.every(
+    (row) =>
+      row.status !== "completada" && !(Number(row.bins_count) > 0),
+  );
+  const showSelectAllFiltered =
+    allVisibleSelected &&
+    Boolean(totalItems) &&
+    totalItems > visibleIds.length &&
+    selectedCount < totalItems;
+
+  const toggleEntrySelection = (entryId) => {
+    setSelectedIds((prev) =>
+      prev.includes(entryId)
+        ? prev.filter((id) => id !== entryId)
+        : [...prev, entryId],
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (!visibleIds.length) return;
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+    setSelectedIds((prev) => [...new Set([...prev, ...visibleIds])]);
+  };
+
+  const handleSelectAllFiltered = async () => {
+    setIsSelectingAll(true);
+    try {
+      const data = await getEntryIds(filters, debouncedSearchTerm);
+      setSelectedIds(Array.isArray(data?.ids) ? data.ids : []);
+      if (data?.truncated) {
+        showAlert(
+          "warning",
+          data.detail || `Se seleccionaron ${data.count} de ${data.total}.`,
+        );
+      }
+    } catch (error) {
+      showAlert(
+        "danger",
+        getApiErrorMessage(error, "No se pudieron seleccionar todos"),
+      );
+    } finally {
+      setIsSelectingAll(false);
+    }
   };
 
   const handleFilterChange = (field, value) => {
@@ -405,6 +540,7 @@ const Entries = () => {
     setSearchTerm("");
     setFilters(EMPTY_FILTERS);
     setSearchParams({});
+    setSelectedIds([]);
   };
 
   const hasFilters = Boolean(searchTerm || filters.status || filters.condition);
@@ -453,6 +589,7 @@ const Entries = () => {
 
   return (
     <Fragment>
+      <AsyncProcessBanner jobs={asyncProcess.jobs} />
       {alert.show && (
         <Alert variant={alert.variant} className="mb-3">
           {alert.message}
@@ -595,15 +732,70 @@ const Entries = () => {
                   </motion.div>
                 ) : null}
               </AnimatePresence>
+              {showBulkActions ? (
+                <div className="flex w-full flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-2">
+                  <span className="text-xs text-slate-600">
+                    {selectedCount} seleccionadas
+                  </span>
+                  {perms.change ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={FileText}
+                      onClick={() => setShowBulkRegenerateModal(true)}
+                      title="Regenerar pdfs seleccionados"
+                      className="shrink-0 whitespace-nowrap"
+                      disabled={asyncProcess.hasKind("entry_regenerate_pdfs")}
+                    >
+                      Regenerar pdfs
+                    </Button>
+                  ) : null}
+                  {perms.delete ? (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon={Trash2}
+                      onClick={() => setShowBulkDeleteModal(true)}
+                      title="Eliminar entradas seleccionadas"
+                      className="shrink-0 whitespace-nowrap"
+                      disabled={asyncProcess.hasKind("entry_delete")}
+                    >
+                      Eliminar
+                    </Button>
+                  ) : null}
+                  {showSelectAllFiltered ? (
+                    <button
+                      type="button"
+                      className="cursor-pointer text-xs font-medium text-sky-700 hover:underline disabled:opacity-50"
+                      onClick={handleSelectAllFiltered}
+                      disabled={isSelectingAll}
+                    >
+                      {isSelectingAll
+                        ? "Seleccionando…"
+                        : `Seleccionar todos los filtrados (${totalItems})`}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               </div>
             </Card.Header>
             <Card.Body className="p-0">
               {isLoading ? (
-                <EntriesViewSkeleton />
+                <EntriesViewSkeleton showSelection={showSelection} />
               ) : entries.length > 0 ? (
                 <Table hover responsive className="mb-0 min-w-[1040px]">
                   <Table.Head>
                     <tr>
+                      {showSelection ? (
+                        <Table.HeaderCell className="w-10 normal-case tracking-normal">
+                          <Form.Check
+                            type="checkbox"
+                            checked={allVisibleSelected}
+                            onChange={toggleSelectAllVisible}
+                            aria-label="Seleccionar todas las visibles"
+                          />
+                        </Table.HeaderCell>
+                      ) : null}
                       <Table.HeaderCell className="min-w-[140px] normal-case tracking-normal">
                         Código
                       </Table.HeaderCell>
@@ -631,6 +823,16 @@ const Entries = () => {
                     {entries.map((entry) => (
                       <Fragment key={entry.id}>
                         <Table.Row>
+                          {showSelection ? (
+                            <Table.Cell>
+                              <Form.Check
+                                type="checkbox"
+                                checked={selectedIds.includes(entry.id)}
+                                onChange={() => toggleEntrySelection(entry.id)}
+                                aria-label={`Seleccionar ${entry.code}`}
+                              />
+                            </Table.Cell>
+                          ) : null}
                           <Table.Cell className="whitespace-nowrap font-mono text-xs">
                             <button
                               type="button"
@@ -754,6 +956,7 @@ const Entries = () => {
                               entry={entry}
                               expandedProducts={expandedProducts}
                               setExpandedProducts={setExpandedProducts}
+                              showSelection={showSelection}
                             />
                           )}
                         </AnimatePresence>
@@ -872,6 +1075,35 @@ const Entries = () => {
         }}
         entry={entryToComplete}
         onComplete={handleEntryCompleted}
+      />
+
+      <ModalBulkRegenerate
+        show={showBulkRegenerateModal}
+        onHide={() => setShowBulkRegenerateModal(false)}
+        entryIds={selectedIds}
+        showAlert={showAlert}
+        trackAsyncJob={asyncProcess}
+        onDone={async () => {
+          setSelectedIds([]);
+          await loadEntries();
+        }}
+      />
+
+      <ModalBulkDelete
+        show={showBulkDeleteModal}
+        onHide={() => setShowBulkDeleteModal(false)}
+        entryIds={selectedIds}
+        canDeleteAll={
+          selectedEntriesKnown.length === selectedIds.length
+            ? canBulkDeleteKnown
+            : true
+        }
+        showAlert={showAlert}
+        trackAsyncJob={asyncProcess}
+        onDone={async () => {
+          setSelectedIds([]);
+          await loadEntries();
+        }}
       />
     </Fragment>
   );

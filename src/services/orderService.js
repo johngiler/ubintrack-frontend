@@ -63,6 +63,35 @@ export async function regenerateEntryPdf(id) {
   return response.data;
 }
 
+export async function getEntryIds(filters = {}, search = "") {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.condition) params.set("condition", filters.condition);
+  if (search) params.set("search", search);
+  const qs = params.toString();
+  const response = await httpClient.get(
+    qs ? `/api/entries/ids/?${qs}` : "/api/entries/ids/",
+  );
+  return response.data;
+}
+
+export async function bulkRegenerateEntryPdfs(ids) {
+  const response = await httpClient.post(
+    "/api/entries/bulk-regenerate-pdfs/",
+    { ids },
+    { timeout: 60000 },
+  );
+  return response.data;
+}
+
+export async function bulkDeleteEntries(ids) {
+  const response = await httpClient.delete("/api/entries/bulk-delete/", {
+    data: { ids },
+    timeout: 60000,
+  });
+  return response.data;
+}
+
 // Entry Products
 export async function getEntryProducts(page = 1, filters = {}, search = "") {
   let url = `/api/entry-products/?page=${page}`;
@@ -169,8 +198,47 @@ export async function updateExit(id, data) {
   return response.data;
 }
 
+export async function patchExit(id, data) {
+  const response = await httpClient.patch(`/api/exits/${id}/`, data);
+  return response.data;
+}
+
 export async function completeExit(id) {
   const response = await httpClient.post(`/api/exits/${id}/complete/`);
+  return response.data;
+}
+
+export async function regenerateExitPdf(id) {
+  const response = await httpClient.post(`/api/exits/${id}/regenerate_pdf/`);
+  return response.data;
+}
+
+export async function getExitIds(filters = {}, search = "") {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.exit_date) params.set("exit_date", filters.exit_date);
+  if (search) params.set("search", search);
+  const qs = params.toString();
+  const response = await httpClient.get(
+    qs ? `/api/exits/ids/?${qs}` : "/api/exits/ids/",
+  );
+  return response.data;
+}
+
+export async function bulkRegenerateExitPdfs(ids) {
+  const response = await httpClient.post(
+    "/api/exits/bulk-regenerate-pdfs/",
+    { ids },
+    { timeout: 60000 },
+  );
+  return response.data;
+}
+
+export async function bulkDeleteExits(ids) {
+  const response = await httpClient.delete("/api/exits/bulk-delete/", {
+    data: { ids },
+    timeout: 60000,
+  });
   return response.data;
 }
 

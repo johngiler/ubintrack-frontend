@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Minus, Plus, Save, Trash2, X } from "lucide-react";
+import { FileText, Minus, Plus, Save, Trash2, X } from "lucide-react";
 import {
   Modal,
   Button,
@@ -18,7 +18,7 @@ import { useState, useEffect } from "react";
 import { getClients, getBranches } from "@/services/coreService";
 import { useAuth } from "@/context/AuthContext";
 import { getBinProducts } from "@/services/inventoryService";
-import { updateExit } from "@/services/orderService";
+import { regenerateExitPdf, updateExit } from "@/services/orderService";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 import LoadMoreFooter from "@/components/ui/LoadMoreFooter";
 import VisibleSliceList from "@/components/ui/VisibleSliceList";
@@ -49,6 +49,9 @@ const ModalEdit = ({
 }) => {
   const isViewMode = modalMode === "view";
   const isCreateMode = modalMode === "create";
+  const isCompleted = selectedExit?.status === "completada";
+  const [isRegeneratingPdf, setIsRegeneratingPdf] = useState(false);
+  const [pdfAlert, setPdfAlert] = useState({ show: false, variant: "", message: "" });
   const user = useAuth().user;
   const isClientUser = !!user?.client && !user?.is_superuser;
   const isAdmin = user?.is_superuser || user?.is_staff;
@@ -418,6 +421,19 @@ const ModalEdit = ({
   };
 
   const handleSaveClick = async () => {
+    // Completada: solo tipo de salida
+    if (isCompleted && selectedExit?.id) {
+      setValidationErrors({
+        client: null,
+        status: null,
+        exit_date: null,
+        out_type: null,
+        products: {},
+      });
+      await handleSaveExit(selectedExit);
+      return;
+    }
+
     // Limpiar errores previos
     setValidationErrors({
       client: null,
@@ -515,12 +531,10 @@ const ModalEdit = ({
             status: "completada",
             client_id: selectedExit.client.id,
           });
-          // Si no hay error, continuar con el flujo normal
           handleSaveExit(exitDataToSave);
         } catch (error) {
           console.error("Error al cambiar estado a completada:", error);
 
-          // Capturar mensaje específico del backend para el estado
           let errorMessage = "Error al completar la orden";
 
           if (error.response?.data?.status) {
@@ -531,15 +545,13 @@ const ModalEdit = ({
             errorMessage = error.message;
           }
 
-          // Mostrar el error en el campo de estado
           setValidationErrors((prev) => ({
             ...prev,
             status: errorMessage,
           }));
-          return; // No continuar con el flujo normal si hay error
+          return;
         }
       } else {
-        // Flujo normal para otros cambios
         handleSaveExit(exitDataToSave);
       }
     }
@@ -936,7 +948,7 @@ const ModalEdit = ({
                           label: client.name,
                           ...client,
                         }))}
-                        isDisabled={!isCreateMode || isClientUser}
+                        isDisabled={!isCreateMode || isClientUser || isCompleted}
                         isLoading={isLoadingData}
                         onChange={(selected) => {
                           handleChange(
@@ -1013,7 +1025,7 @@ const ModalEdit = ({
                           label: branch.name,
                           ...branch,
                         }))}
-                        isDisabled={isViewMode || !selectedExit.client}
+                        isDisabled={isViewMode || isCompleted || !selectedExit.client}
                         isLoading={isLoadingData}
                         onChange={(selected) => {
                           handleChange(
@@ -1051,7 +1063,7 @@ const ModalEdit = ({
                       <Form.Select
                         name="status"
                         value={selectedExit.status || ""}
-                        disabled={isViewMode || isClientUser}
+                        disabled={isViewMode || isClientUser || isCompleted}
                         onChange={(e) => {
                           // Solo permitir cambiar a "pendiente" y "cancelada", otros estados son solo lectura
                           if (
@@ -1148,7 +1160,7 @@ const ModalEdit = ({
                       <Form.Select
                         name="exit_date"
                         value={selectedExit.exit_date || ""}
-                        disabled={isViewMode}
+                        disabled={isViewMode || isCompleted}
                         onChange={(e) => {
                           handleChange("exit_date", e.target.value);
                           setValidationErrors((prev) => ({
@@ -1233,7 +1245,7 @@ const ModalEdit = ({
                             selectedExit.exit_detail?.picking_pallets ??
                             0
                           }
-                          disabled={isViewMode}
+                          disabled={isViewMode || isCompleted}
                           onChange={(e) => {
                             const value = e.target.value;
                             const numValue =
@@ -2375,11 +2387,60 @@ const ModalEdit = ({
             )}
           </>
         )}
+        {pdfAlert.show && (
+          <Alert
+            variant={pdfAlert.variant}
+            className="mb-0 mt-3"
+            dismissible
+            onClose={() => setPdfAlert({ show: false, variant: "", message: "" })}
+          >
+            {pdfAlert.message}
+          </Alert>
+        )}
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" icon={X} onClick={handleCloseModal} disabled={isSaving}>
           Cerrar
         </Button>
+        {!isCreateMode && selectedExit?.id && isCompleted && (
+          <Button
+            variant="outline"
+            icon={FileText}
+            onClick={async () => {
+              try {
+                setIsRegeneratingPdf(true);
+                setPdfAlert({ show: false, variant: "", message: "" });
+                await regenerateExitPdf(selectedExit.id);
+                setPdfAlert({
+                  show: true,
+                  variant: "success",
+                  message: "PDF regenerado exitosamente",
+                });
+                setTimeout(
+                  () => setPdfAlert({ show: false, variant: "", message: "" }),
+                  3000,
+                );
+              } catch (error) {
+                console.error("Error al regenerar PDF:", error);
+                setPdfAlert({
+                  show: true,
+                  variant: "danger",
+                  message: "Error al regenerar el PDF",
+                });
+                setTimeout(
+                  () => setPdfAlert({ show: false, variant: "", message: "" }),
+                  3000,
+                );
+              } finally {
+                setIsRegeneratingPdf(false);
+              }
+            }}
+            disabled={isRegeneratingPdf}
+            loading={isRegeneratingPdf}
+          >
+            {isRegeneratingPdf ? "Generando…" : "Regenerar pdf"}
+          </Button>
+        )}
         {!isViewMode && (
           <Button
             variant="primary"
